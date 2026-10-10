@@ -136,3 +136,11 @@ v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重�
 接口已确认列表外的模型由后台拒绝；空模型保持空，不回填全局预设。成功空列表会清除旧选项；若当前型号不再开放，更新已保存用途为列表首项或空值。没有 `/models` 且无缓存的服务在精简页不能新选型号，手动调用名入口已按用户要求隐藏。旧模型 ID、厂家归属和其他配置仍保存在 storage。
 
 浏览器验证使用明确的厂家模型响应模拟（包括其他厂家/非文本、空列表、503、迟到旧请求）及本机真实 HTTP 流，公开目录真实联网；不向厂商发送合成 Key。当前证据见 [COMPACT_SETTINGS_QA.md](COMPACT_SETTINGS_QA.md)。
+
+### v4.4 模型查询失败修复
+
+`AIModelCatalog.fetchInterface(connection)` 是后台 `listModels` 和设置页通信恢复共用的账号列表查询。使用同一归一化地址和 Bearer Key，请求禁用缓存；网络或 5xx 最多重试一次，两个尝试共用 20 秒 AbortSignal。401/402/403/404/429、超时、非法 JSON/data 分别返回固定 `code` 和必要 HTTP `status`，不回显服务端正文、Key 或底层异常。
+
+`requestProviderModels` 在 `LIST_MODELS` 无回复或通道未建立/已断开时直接调用共享查询。后台明确返回的 API 错误不触发此恢复，避免把鉴权失败当作通信问题。顶部根据错误类型显示简短原因，有旧缓存时追加保留提示；控制台只记录厂家 ID、错误代码和 HTTP 状态。原有连接签名检查、独立缓存、成功静默和 Key 收起继续生效。
+
+浏览器工具另用不带凭据的实际 DeepSeek `/models` 请求检查 Edge Worker 到官方域名的连通性，预期 401。这只能证明测试 profile 当时的网络可达与鉴权入口，不能判断用户 Key 的有效性；日常 profile 的代理/网络也可能不同。列表成功、权限、生成仍使用明确模拟或本机 HTTP 样本。修复证据与未确认的用户失败原因见 [COMPACT_SETTINGS_QA.md](COMPACT_SETTINGS_QA.md)。

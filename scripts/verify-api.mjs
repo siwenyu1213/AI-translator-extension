@@ -165,8 +165,35 @@ for (const status of [401, 403, 404, 429, 500]) {
   await check(`模型查询 HTTP ${status} 正确失败`, async () => {
     await config(); responder = () => new Response('{}', { status });
     const result = await run('listModels()'); assert.equal(result.ok, false); assert.ok(result.error);
+    assert.equal(result.status,status);
+    assert.equal(result.code,({401:'key_invalid',403:'forbidden',404:'unsupported',429:'rate_limit'})[status] || 'service');
+    assert.equal(calls.length,status>=500 ? 2 : 1);
   });
 }
+await check('接口瞬时 503 自动重试一次并恢复，仍使用同一厂家地址与 Key',async()=>{
+  await config();let count=0;
+  responder=()=>++count===1 ? new Response('{}',{status:503}) : Response.json({data:[{id:'deepseek-flash'}]});
+  assert.equal((await run('listModels()')).ok,true);assert.equal(calls.length,2);
+  assert.equal(calls[0].url,calls[1].url);
+  assert.equal(calls[0].options.headers.Authorization,calls[1].options.headers.Authorization);
+  assert.equal(calls[0].options.signal,calls[1].options.signal);
+});
+await check('接口网络失败短暂重试，超时不重试，固定错误不回显凭据',async()=>{
+  await config();responder=()=>{throw new Error('connection failed secret-test-token');};
+  let result=await run('listModels()');assert.equal(result.code,'network');assert.equal(calls.length,2);
+  assert.equal(JSON.stringify(result).includes('secret-test-token'),false);
+  calls=[];responder=()=>{const error=new Error('secret-test-token');error.name='TimeoutError';throw error;};
+  result=await run('listModels()');assert.equal(result.code,'timeout');assert.equal(calls.length,1);
+  assert.equal(JSON.stringify(result).includes('secret-test-token'),false);
+});
+await check('鉴权失败不重试、不回显服务端正文；非 JSON 明确区分格式异常',async()=>{
+  await config();responder=()=>new Response('secret-test-token',{status:401});
+  let result=await run('listModels()');assert.equal(result.code,'key_invalid');assert.equal(calls.length,1);
+  assert.equal(JSON.stringify(result).includes('secret-test-token'),false);
+  responder=()=>new Response('<html>secret-test-token</html>');
+  result=await run('listModels()');assert.equal(result.code,'format');
+  assert.equal(JSON.stringify(result).includes('secret-test-token'),false);
+});
 await check('解释请求使用配置端点、完整模型 ID、最小参数并解析无空格 data 和 EOF', async () => {
   await config(); const messages = await stream(sse);
   assert.equal(calls[0].url, 'https://gateway.example/v1/chat/completions');

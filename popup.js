@@ -98,6 +98,29 @@ function showStatus(message, type = 'success') {
 }
 
 // 每个厂家独立查询；仅将响应写回请求使用的连接，不覆盖中途修改的 Key/地址。
+async function requestProviderModels(connection) {
+  let result;
+  try { result = await chrome.runtime.sendMessage({type:'LIST_MODELS',connection}); }
+  catch (err) {
+    if (!/receiving end does not exist|could not establish connection|message port closed|message channel closed/i.test(err.message)) throw err;
+  }
+  // 旧 Worker 未处理该消息或通信中断时，直接查询同一个接口；明确的接口失败不绕过。
+  if (result == null) return AIModelCatalog.fetchInterface(connection);
+  return result;
+}
+function modelFailureMessage(result, provider) {
+  const name = catalogSnapshot.providers.find(p=>p.id===provider)?.name || '模型接口';
+  const code = result?.code || ({401:'key_invalid',402:'balance',403:'forbidden',404:'unsupported',429:'rate_limit'})[result?.status];
+  const messages = {
+    key_missing:'请先填写 API Key。', key_invalid:'API Key 无效，请重新填写。',
+    balance:'账户余额不足，请检查账户。', forbidden:'API Key 无权获取模型，请检查权限。',
+    unsupported:'当前接口不支持获取模型列表。', rate_limit:'请求过于频繁，请稍后重试。',
+    timeout:'获取模型超时，请稍后重试。', network:`无法连接 ${name}，请检查网络。`,
+    format:'模型列表格式异常，请稍后重试。', address:'接口地址无效，请检查配置。',
+    service:'模型服务暂不可用，请稍后重试。'
+  };
+  return messages[code] || '无法获取模型，请重新加载扩展后重试。';
+}
 async function refreshProviderModels(provider = connectionProvider) {
   const connection = providerConnection(provider);
   if (!connection.apiKey || connection.apiKey !== savedKeys[provider]) return;
@@ -111,9 +134,13 @@ async function refreshProviderModels(provider = connectionProvider) {
   providerRequests.set(provider,request);
   request.promise = (async () => {
     try {
-      const result = await chrome.runtime.sendMessage({type:'LIST_MODELS',connection});
+      const result = await requestProviderModels(connection);
       if (!unchanged()) return;
-      if (!result?.ok) throw new Error(result?.error || '模型列表无回复');
+      if (!result?.ok) {
+        const error = new Error(modelFailureMessage(result,provider));
+        error.modelFailure = result;
+        throw error;
+      }
       const entries = AIModelCatalog.interfaceModels(result.entries || result.models.map(id => ({id})), provider);
       providerConnections[provider] = { ...connection, availableModels:entries.map(m => m.id), modelEntries:entries,
         modelsCheckedAt:new Date().toISOString() };
@@ -136,8 +163,9 @@ async function refreshProviderModels(provider = connectionProvider) {
     } catch (err) {
       if (unchanged()) {
         const cached=providerConnection(provider).modelEntries.length || providerConnection(provider).availableModels.length;
-        providerErrors.set(provider,cached ? '暂时无法获取模型，已保留已有列表。' : '暂时无法获取模型，请稍后重试。');
-        console.warn('接口模型列表更新失败：', err.message);
+        const message = err.modelFailure ? modelFailureMessage(err.modelFailure,provider) : '无法获取模型，请重新加载扩展后重试。';
+        providerErrors.set(provider,message + (cached ? ' 已保留已有列表。' : ''));
+        console.warn('接口模型列表更新失败：', {provider,code:err.modelFailure?.code || 'communication',status:err.modelFailure?.status});
       }
     } finally {
       if (providerRequests.get(provider) === request) providerRequests.delete(provider);

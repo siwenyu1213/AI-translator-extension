@@ -1227,6 +1227,44 @@
       seen.add(id); return true;
     }).map(item => ({ id: item.id, name: typeof item.name === 'string' && item.name.length <= 200 ? item.name : item.id }));
   }
+  // 后台与设置页共用账号模型查询；只返回固定错误信息，不回显服务端正文或凭据。
+  async function fetchInterface(connection) {
+    let baseUrl;
+    try { baseUrl = AIConfig.normalizeBaseUrl(connection?.apiBaseUrl); }
+    catch { return {ok:false,code:'address',error:'接口地址无效，请检查配置。'}; }
+    const apiKey = String(connection?.apiKey || '').trim();
+    if (!apiKey) return {ok:false,code:'key_missing',error:'请先填写 API Key。'};
+    const signal = AbortSignal.timeout(20000);
+    for (let attempt=0; attempt<2; attempt++) {
+      try {
+        const res = await fetch(`${baseUrl}/models`, {
+          headers:{Authorization:`Bearer ${apiKey}`}, cache:'no-store', signal
+        });
+        if (!res.ok) {
+          if (res.status>=500 && attempt===0) {
+            await new Promise(resolve=>setTimeout(resolve,300)); continue;
+          }
+          const code = ({401:'key_invalid',402:'balance',403:'forbidden',404:'unsupported',429:'rate_limit'})[res.status] || 'service';
+          return {ok:false,code,status:res.status,error:`模型接口请求失败 (${res.status})`};
+        }
+        let payload;
+        try { payload = await res.json(); }
+        catch (err) {
+          if (signal.aborted) throw err;
+          return {ok:false,code:'format',error:'模型接口未返回有效 JSON。'};
+        }
+        if (!Array.isArray(payload?.data)) return {ok:false,code:'format',error:'模型列表格式不兼容：需要 data 数组'};
+        return {ok:true,models:AIConfig.normalizeModels(payload.data.map(item=>item?.id)).sort(),
+          entries:interfaceModels(payload.data)};
+      } catch (err) {
+        if (signal.aborted || err.name==='TimeoutError' || err.name==='AbortError') {
+          return {ok:false,code:'timeout',error:'获取模型列表超时。'};
+        }
+        if (attempt===0) { await new Promise(resolve=>setTimeout(resolve,300)); continue; }
+        return {ok:false,code:'network',error:'无法连接模型接口，请检查网络。'};
+      }
+    }
+  }
   async function refresh(previous = BUILTIN) {
     let res;
     try {
@@ -1264,5 +1302,5 @@
     return { updatedAt: timestamp, source: SOURCE, providers };
   }
   globalThis.AIModelCatalog = { BUILTIN, SOURCE, COMPATIBILITY, nativeId,
-    providerFor, normalizeSnapshot, resolveId, allModels, interfaceModels, refresh };
+    providerFor, normalizeSnapshot, resolveId, allModels, interfaceModels, fetchInterface, refresh };
 })();

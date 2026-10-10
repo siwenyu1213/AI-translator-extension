@@ -14,7 +14,7 @@ const { chromium } = require(process.argv.includes('--playwright') ? arg('--play
 const evidence = resolve(root, 'artifacts/qa');
 mkdirSync(evidence, { recursive: true });
 const checks = [], requests = [], providerRequests = [], errors = [];
-let browserVersion, context, liveCatalog;
+let browserVersion, context, liveCatalog, liveDeepSeekProbe;
 const server = createServer(async (req, res) => {
   if (req.url === '/sample') {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -58,6 +58,14 @@ try {
   browserVersion = context.browser()?.version();
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', { timeout: 20000 });
   const extensionId = new URL(worker.url()).host;
+  await check('实际 Edge Worker 可访问 DeepSeek 官方模型接口：不带凭据返回 401',async()=>{
+    liveDeepSeekProbe=await worker.evaluate(async()=>{
+      const url='https://api.deepseek.com/models';
+      const response=await fetch(url,{signal:AbortSignal.timeout(20000),cache:'no-store'});
+      return {url,status:response.status,authenticated:false};
+    });
+    assert.equal(liveDeepSeekProbe.status,401);
+  });
   const popup = await context.newPage();
   await popup.setViewportSize({ width: 380, height: 1200 });
   popup.on('pageerror', err => errors.push(err.message));
@@ -222,7 +230,7 @@ try {
     await worker.evaluate(()=>{globalThis.qaProviderFail='deepseek';});
     await popup.reload();await popup.locator('#explain-manufacturer option').first().waitFor({state:'attached'});await settle();
     assert.equal(await popup.locator('#explain-model').inputValue(),'deepseek-flash');
-    assert.equal(await popup.locator('#catalog-status').innerText(),'暂时无法获取模型，已保留已有列表。');
+    assert.equal(await popup.locator('#catalog-status').innerText(),'模型服务暂不可用，请稍后重试。 已保留已有列表。');
     assert.equal(await popup.locator('#catalog-status').evaluate(el=>getComputedStyle(el).color),'rgb(185, 28, 28)');
     await popup.locator('.container').screenshot({path:resolve(evidence,'popup-interface-error.png')});
     await worker.evaluate(()=>{globalThis.qaProviderFail='';});
@@ -276,6 +284,42 @@ try {
     await popup.locator('#translate-model').selectOption('gateway/model-large');
     await popup.locator('#save-btn').click();await popup.locator('#status.success').waitFor();await settle();
   });
+  await check('厂家查询后台无回复或消息断开时，设置页按原连接经真实 HTTP 恢复（模拟通信故障）',async()=>{
+    await popup.evaluate(()=>{globalThis.qaSend=chrome.runtime.sendMessage.bind(chrome.runtime);});
+    try {
+      for(const mode of ['empty','closed']) {
+        await popup.evaluate(mode=>{
+          chrome.runtime.sendMessage=(message,...args)=>message.type==='LIST_MODELS' ?
+            (mode==='empty' ? Promise.resolve(undefined) : Promise.reject(new Error('The message port closed before a response was received.'))) : qaSend(message,...args);
+        },mode);
+        const before=requests.length;
+        await popup.evaluate(()=>refreshProviderModels('custom'));await settle();
+        assert.equal(await popup.locator('#catalog-status').isVisible(),false);
+        assert.equal(await popup.locator('#translate-model option').count(),2);
+        assert.ok(requests.slice(before).some(r=>r.path==='/custom/v1/models' && r.authenticated));
+      }
+    } finally {
+      await popup.evaluate(()=>{chrome.runtime.sendMessage=qaSend;delete globalThis.qaSend;});
+    }
+  });
+  await check('后台明确鉴权失败不直接重试绕过，错误类型精确且不显示 Key（模拟 401）',async()=>{
+    const before=requests.length;
+    await popup.evaluate(()=>{
+      globalThis.qaSend=chrome.runtime.sendMessage.bind(chrome.runtime);
+      chrome.runtime.sendMessage=(message,...args)=>message.type==='LIST_MODELS' ?
+        Promise.resolve({ok:false,code:'key_invalid',status:401,error:'synthetic-private-body'}) : qaSend(message,...args);
+    });
+    try {
+      await popup.evaluate(()=>refreshProviderModels('custom'));await settle();
+      assert.equal(requests.length,before);
+      assert.match(await popup.locator('#catalog-status').innerText(),/^API Key 无效，请重新填写。/);
+      assert.equal(await popup.locator('#catalog-status').innerText().then(t=>t.includes('synthetic-private-body')),false);
+      await popup.locator('.container').screenshot({path:resolve(evidence,'popup-model-auth-error.png')});
+    } finally {
+      await popup.evaluate(()=>{chrome.runtime.sendMessage=qaSend;delete globalThis.qaSend;});
+    }
+    await popup.evaluate(()=>refreshProviderModels('custom'));await settle();
+  });
   await check('隐藏设置保留已有启用/上下文/触发值，两个模型保存并重开仍保留',async()=>{
     const settings=await worker.evaluate(async()=>chrome.storage.local.get(['enabled','usePageContext','triggerMode']));
     assert.deepEqual(settings,{enabled:true,usePageContext:false,triggerMode:'auto'});
@@ -313,7 +357,7 @@ try {
   });
   await check('无效 Key 的接口错误可见，重填后列表恢复；无相关页面异常',async()=>{
     await saveKey('invalid-test-only');
-    assert.equal(await popup.locator('#catalog-status').innerText(),'暂时无法获取模型，请稍后重试。');
+    assert.equal(await popup.locator('#catalog-status').innerText(),'API Key 无效，请重新填写。');
     await saveKey('local-qa-only');
     assert.equal(await popup.locator('#catalog-status').isVisible(),false);
     assert.equal(await popup.locator('#explain-model option').count(),2);
@@ -330,7 +374,7 @@ try {
   await new Promise(resolve => server.close(resolve));
   const report = { date: new Date().toISOString(), node: process.version, browserVersion,
     head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
-    kind: 'Actual Edge compact popup, live public directory, localhost API and intercepted provider model/generation fixtures, synthetic credentials', liveCatalog, checks, requests, providerRequests, errors,
+    kind: 'Actual Edge compact popup, live public directory, unauthenticated live DeepSeek probe, localhost API and intercepted provider model/generation fixtures, synthetic credentials', liveCatalog, liveDeepSeekProbe, checks, requests, providerRequests, errors,
     unverified: ['真实供应商/模型、账号权限、模型质量、原生扩展工具栏和右键菜单的鼠标操作'] };
   writeFileSync(resolve(evidence, 'browser-check.json'), JSON.stringify(report, null, 2) + '\n');
 }

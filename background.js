@@ -497,23 +497,7 @@ async function parseApiError(res) {
 
 async function listModels(connection) {
   const config = connection || AIConfig.connectionFor(await getConfig());
-  let baseUrl;
-  try { baseUrl = AIConfig.normalizeBaseUrl(config.apiBaseUrl); }
-  catch (err) { return { ok: false, error: err.message }; }
-  const apiKey = String(config.apiKey || '').trim();
-  if (!apiKey) return { ok: false, error: '请先填写 API Key' };
-  try {
-    const res = await fetch(`${baseUrl}/models`, {
-      headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(20000)
-    });
-    if (!res.ok) return { ok: false, error: await parseApiError(res) };
-    const data = await res.json();
-    if (!Array.isArray(data?.data)) return { ok: false, error: '模型列表格式不兼容：需要 data 数组' };
-    const models = AIConfig.normalizeModels(data.data.map(item => item?.id)).sort();
-    return { ok: true, models, entries: AIModelCatalog.interfaceModels(data.data) };
-  } catch (err) {
-    return { ok: false, error: err.name === 'TimeoutError' ? '获取模型列表超时，请检查接口地址' : `获取模型失败：${err.message}` };
-  }
+  return AIModelCatalog.fetchInterface(config);
 }
 
 async function validateModel(inputModel, connection) {
