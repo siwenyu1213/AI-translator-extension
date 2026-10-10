@@ -8,7 +8,7 @@
 </head>
 <body>
 <div class="container">
-  <h1 class="title">AI 智能解释 &amp; 翻译 <span class="version">v4.3.0</span></h1>
+  <h1 class="title">AI 智能解释 &amp; 翻译 <span class="version">v4.4.0</span></h1>
   <p id="catalog-status" class="catalog-error" role="alert" hidden></p>
 
   <!-- ═══ 标签切换 ═══ -->
@@ -26,15 +26,6 @@
       <select id="explain-model" class="select" aria-describedby="explain-model-detail"></select>
       <p id="explain-model-detail" class="hint"></p>
 
-      <label class="label label-spaced" for="explain-custom-model">模型调用名</label>
-      <div class="custom-model-row">
-        <input type="text" id="explain-custom-model" class="input custom-model-input" placeholder="输入模型调用名，如 gpt-4.1-mini 或服务商模型 ID" autocomplete="off">
-        <button type="button" id="explain-custom-new" class="mini-btn">新增</button>
-        <button type="button" id="explain-custom-add" class="mini-btn">保存使用</button>
-        <button type="button" id="explain-custom-delete" class="mini-btn danger" disabled>删除</button>
-      </div>
-      <div id="explain-model-msg" class="model-msg" role="status"></div>
-      <p class="hint">先选厂家，再选模型，接口地址自动填写。自定义接口可手动输入地址。下方调用名可新增或修改；没有 /models 的接口可关闭保存前检测。</p>
     </div>
 
     <div class="section">
@@ -73,15 +64,6 @@
       <select id="translate-model" class="select" aria-describedby="translate-model-detail"></select>
       <p id="translate-model-detail" class="hint"></p>
 
-      <label class="label label-spaced" for="translate-custom-model">模型调用名</label>
-      <div class="custom-model-row">
-        <input type="text" id="translate-custom-model" class="input custom-model-input" placeholder="输入模型调用名，如 gpt-4.1-mini 或服务商模型 ID" autocomplete="off">
-        <button type="button" id="translate-custom-new" class="mini-btn">新增</button>
-        <button type="button" id="translate-custom-add" class="mini-btn">保存使用</button>
-        <button type="button" id="translate-custom-delete" class="mini-btn danger" disabled>删除</button>
-      </div>
-      <div id="translate-model-msg" class="model-msg" role="status"></div>
-      <p class="hint">先选厂家，再选模型，接口地址自动填写。自定义接口可手动输入地址。下方调用名可新增或修改；没有 /models 的接口可关闭保存前检测。</p>
     </div>
 
     <div class="section">
@@ -118,54 +100,31 @@
     </div>
   </div>
 
-  <!-- ═══ 通用设置 ═══ -->
-  <div class="divider">通用设置</div>
-
-  <div class="section">
-    <label class="label" for="api-base-url">API Base URL（OpenAI 兼容接口）</label>
-    <input type="url" id="api-base-url" class="input" placeholder="https://api.openai.com/v1" autocomplete="off">
-    <p id="api-address-hint" class="hint">选择厂家后自动填写；自定义接口可手动输入。</p>
+  <div class="section key-section">
+    <div id="key-editor">
+      <label class="label" for="api-key">API Key</label>
+      <input type="password" id="api-key" class="input" autocomplete="off" spellcheck="false">
+      <p class="hint">填写所选厂家的 Key，保存后自动收起。</p>
+      <div class="key-actions">
+        <button type="button" id="save-key" class="mini-btn">保存 API Key</button>
+        <button type="button" id="cancel-key" class="mini-btn" hidden>取消</button>
+      </div>
+      <p id="key-msg" class="inline-error" role="alert"></p>
+    </div>
+    <button type="button" id="rewrite-key" class="fetch-btn" hidden>重新填写 API Key</button>
   </div>
-  <div class="section">
-    <label class="label" for="api-key">API Key</label>
-    <input type="password" id="api-key" class="input" placeholder="填写此接口的 API Key" autocomplete="off">
-    <p class="hint">填写所选厂家的 Key，各厂家分别保存。解释与全文翻译可使用不同厂家。</p>
-  </div>
-  <div class="section">
-    <button type="button" id="fetch-models" class="fetch-btn">↻ 获取接口模型列表</button>
-    <div id="connection-msg" class="model-msg" role="status"></div>
-    <label class="toggle-label label-spaced">
-      <input type="checkbox" id="verify-model" checked>
-      <span class="toggle-text">保存模型前查询 /models 检测</span>
-    </label>
-    <p class="hint">此按钮获取当前接口的真实模型 ID，并按厂家归类。目录不代表当前账号权限；没有 /models 时可手动保存。</p>
-  </div>
-
-  <div class="section">
-    <label class="toggle-label">
-      <input type="checkbox" id="enabled" checked>
-      <span class="toggle-text">启用扩展</span>
-    </label>
-  </div>
-
-  <div class="section">
-    <label class="toggle-label">
-      <input type="checkbox" id="use-context" checked>
-      <span class="toggle-text">结合网页上下文</span>
-    </label>
-  </div>
-
-  <div class="section">
-    <label class="label" for="trigger-mode">触发方式</label>
-    <select id="trigger-mode" class="select">
-      <option value="auto">选中自动搜索（推荐）</option>
-      <option value="contextMenu">右键菜单搜索</option>
-    </select>
-  </div>
-
-  <div class="section">
-    <p class="download-hint">📥 下载位置：浏览器默认下载目录</p>
-  </div>
+  <button type="button" id="custom-connection-button" class="connection-link" hidden>配置自定义接口</button>
+  <dialog id="custom-connection-dialog">
+    <h2>自定义接口</h2>
+    <label class="label" for="api-base-url">接口地址</label>
+    <input type="url" id="api-base-url" class="input" placeholder="https://example.com/v1" autocomplete="off">
+    <p class="hint">填写服务商提供的兼容地址。</p>
+    <p id="custom-msg" class="inline-error" role="alert"></p>
+    <div class="key-actions">
+      <button type="button" id="custom-save" class="mini-btn">保存地址</button>
+      <button type="button" id="custom-cancel" class="mini-btn">取消</button>
+    </div>
+  </dialog>
 
   <button id="save-btn" class="save-btn">💾 保存设置</button>
   <div id="status" class="status"></div>

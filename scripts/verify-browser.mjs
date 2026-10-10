@@ -66,338 +66,260 @@ try {
     await chrome.storage.local.clear();
     await chrome.storage.local.set({ apiKey: 'legacy-test-only', qwenApiKey: 'legacy-test-only',
       explainModel: 'deepseek-flash', translateModel: 'qwen3.7-flash',
-      modelList: ['deepseek-flash', 'qwen3.7-flash', 'retained/custom'], targetLanguage: 'zh' });
+      modelList: ['deepseek-flash', 'qwen3.7-flash', 'retained/custom'], targetLanguage: 'zh', enabled:true, usePageContext:false, triggerMode:'auto' });
   });
-  await popup.goto(`chrome-extension://${extensionId}/popup.html`);
-  await popup.locator('#explain-model option').first().waitFor({ state: 'attached' });
-  const settleCatalog = () => popup.waitForFunction(() => !catalogRefreshing && document.querySelector('#explain-model option'), null, { timeout: 25000 });
-  await settleCatalog();
-  await check('实际 Edge 加载 MV3、旧配置迁移与至少 10 家厂家联动入口', async () => {
-    assert.equal(await popup.locator('#explain-manufacturer option').count(), 11);
-    assert.ok(await popup.locator('#explain-model option').count() >= 3);
-    assert.equal(await popup.locator('#api-key').inputValue(), '');
-    assert.equal(await popup.locator('#explain-model').inputValue(), 'gpt-4.1-mini');
-    assert.equal(await worker.evaluate(async () => (await chrome.storage.local.get(null)).qwenApiKey), undefined);
-    assert.match(await popup.locator('#connection-msg').innerText(), /旧供应商/);
-  });
-  await check('厂家模型不限 3 款；DeepSeek 兼容入口；调用名与通用设置仍显示', async () => {
-    const makers = await popup.locator('#explain-manufacturer option').evaluateAll(options => options.map(o => o.value).filter(v => v !== 'custom'));
-    for (const maker of makers) {
-      await popup.locator('#explain-manufacturer').selectOption(maker);
-      assert.ok(await popup.locator('#explain-model optgroup').first().locator('option').count() > 3);
-      assert.equal(await popup.locator('#api-base-url').inputValue(), await worker.evaluate(id => AIConfig.PROVIDER_ENDPOINTS[id], maker));
-      assert.equal(await popup.locator('#api-base-url').evaluate(el => el.readOnly), true);
-      assert.equal(await popup.locator('#api-key').inputValue(), '');
-    }
-    assert.equal(await popup.locator('#refresh-catalog').count(), 0);
-    assert.equal(await popup.locator('#catalog-status').isVisible(), false);
-    assert.equal(await popup.locator('#explain-custom-model').isVisible(), true);
-    assert.equal(await popup.locator('#api-base-url').isVisible(), true);
-    await popup.locator('#explain-manufacturer').selectOption('deepseek');
-    await popup.locator('#explain-model').selectOption('deepseek-v4-flash');
-    assert.match(await popup.locator('#explain-model-detail').innerText(), /退役/);
-    assert.equal(await popup.locator('#explain-model option[value="deepseek-flash"]').count(), 1);
-    assert.equal(await popup.locator('#explain-model option[value="deepseek-v4-pro"]').count(), 1);
-    await popup.locator('.container').screenshot({ path: resolve(evidence, 'popup-deepseek.png') });
-    await popup.locator('#explain-manufacturer').selectOption('openai');
-    await popup.locator('#explain-model').selectOption('gpt-4.1-mini');
-  });
-  await check('每次打开自动联网，即使缓存刚更新；成功无提示并保留模型', async () => {
-    const previous = await worker.evaluate(async () => (await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot.updatedAt);
-    await popup.reload(); await popup.locator('#explain-model option').first().waitFor({ state: 'attached' }); await settleCatalog();
-    assert.equal(await popup.locator('#catalog-status').isVisible(), false);
-    const snapshot = await worker.evaluate(async () => (await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot);
-    assert.equal(snapshot.providers.length, 10);
-    assert.ok(snapshot.providers.every(p => p.models.length > 3));
-    assert.notEqual(snapshot.updatedAt, previous);
-    liveCatalog = { source: snapshot.source, updatedAt: snapshot.updatedAt,
-      providers: snapshot.providers.map(p => ({ id: p.id, name: p.name, stale: p.stale,
-        models: p.models.map(m => ({ id: m.id, name: m.name, created: m.created })) })) };
-    assert.equal(await popup.locator('#explain-model').inputValue(), 'gpt-4.1-mini');
-  });
-  await check('旧后台未识别刷新消息时，设置页恢复刷新（模拟无回复，真实目录网络）', async () => {
-    await popup.evaluate(() => {
-      globalThis.qaSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime);
-      chrome.runtime.sendMessage = (message, ...args) => message.type === 'REFRESH_MODEL_CATALOG'
-        ? Promise.resolve(undefined) : qaSendMessage(message, ...args);
-    });
-    try {
-      await popup.evaluate(() => refreshCatalog()); await settleCatalog();
-      await popup.locator('.container').screenshot({ path: resolve(evidence, 'catalog-recovery.png') });
-      assert.equal(await popup.locator('#catalog-status').isVisible(), false);
-      assert.equal(await popup.evaluate(() => document.querySelector('#catalog-status').textContent), '');
-      assert.equal(await popup.locator('#explain-model').inputValue(), 'gpt-4.1-mini');
-    } finally {
-      await popup.evaluate(() => { chrome.runtime.sendMessage = qaSendMessage; delete globalThis.qaSendMessage; });
-    }
-  });
-  await check('后台消息通道断开时恢复；恢复网络失败可重试且保留缓存（模拟）', async () => {
-    await popup.evaluate(() => {
-      globalThis.qaSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime);
-      globalThis.qaPageFetch = globalThis.fetch;
-      chrome.runtime.sendMessage = (message, ...args) => message.type === 'REFRESH_MODEL_CATALOG'
-        ? Promise.reject(new Error('Could not establish connection. Receiving end does not exist.')) : qaSendMessage(message, ...args);
-      globalThis.fetch = () => Promise.resolve(Response.json({ data: AIModelCatalog.BUILTIN.providers.flatMap(p =>
-        p.models.map(m => ({ ...m, architecture: { input_modalities: ['text'], output_modalities: ['text'] } }))) }));
-    });
-    try {
-      await popup.evaluate(() => refreshCatalog()); await settleCatalog();
-      assert.equal(await popup.locator('#catalog-status').isVisible(), false);
-      const previous = await worker.evaluate(async () => JSON.stringify((await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot));
-      await popup.evaluate(() => { globalThis.fetch = () => Promise.resolve(new Response('{}', { status: 503 })); });
-      for (let retry = 0; retry < 2; retry++) {
-        await popup.evaluate(() => refreshCatalog()); await settleCatalog();
-        assert.equal(await popup.locator('#catalog-status').innerText(), '暂时无法获取模型，已保留已有列表。');
-        assert.equal(await popup.locator('#catalog-status').isVisible(), true);
-        assert.equal(await worker.evaluate(async () => JSON.stringify((await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot)), previous);
-        assert.equal(await popup.locator('#explain-model').inputValue(), 'gpt-4.1-mini');
+  await worker.evaluate(() => {
+    globalThis.qaNativeFetch=globalThis.fetch;
+    globalThis.qaFactoryRequests=[];
+    globalThis.qaFactoryModels={
+      openai:[{id:'gpt-4.1-mini'},{id:'gpt-4.1'},{id:'text-embedding-3-small'},{id:'gpt-image-1'}],
+      deepseek:[{id:'deepseek-flash',name:'DeepSeek V4.1 Flash',input_modalities:['text','image'],output_modalities:['text']},
+        {id:'deepseek-v4-pro',name:'DeepSeek V4 Pro'},{id:'gpt-4.1'},{id:'deepseek-embedding'}],
+      google:[{id:'gemini-3.8-flash',name:'Gemini Flash'},{id:'gemini-3.8-pro',name:'Gemini Pro'},{id:'gemini-embedding'}]
+    };
+    globalThis.fetch=(url,options={})=>{
+      if (url===AIModelCatalog.SOURCE) {
+        if(globalThis.qaCatalogFail) return Promise.resolve(new Response('{}',{status:503}));
+        return qaNativeFetch(url,options);
       }
-      await popup.locator('.container').screenshot({ path: resolve(evidence, 'catalog-recovery-error.png') });
-    } finally {
-      await popup.evaluate(() => {
-        chrome.runtime.sendMessage = qaSendMessage; globalThis.fetch = qaPageFetch;
-        delete globalThis.qaSendMessage; delete globalThis.qaPageFetch;
-      });
-    }
+      if (url.startsWith('http://127.0.0.1:')) return qaNativeFetch(url,options);
+      const provider=Object.entries(AIConfig.PROVIDER_ENDPOINTS).find(([,base])=>url.startsWith(base+'/'))?.[0];
+      if(!provider) throw new Error('Unexpected QA URL');
+      const authenticated=options.headers.Authorization==='Bearer qa-'+provider || options.headers.Authorization==='Bearer qa-'+provider+'-new';
+      qaFactoryRequests.push({url,provider,method:options.method||'GET',authenticated,
+        model:options.body ? JSON.parse(options.body).model : undefined});
+      if(!authenticated) return Promise.resolve(new Response('{}',{status:401}));
+      if(url.endsWith('/models')) {
+        if(globalThis.qaProviderFail===provider) return Promise.resolve(new Response('{}',{status:503}));
+        const data=structuredClone(qaFactoryModels[provider]||[]);
+        if(provider==='deepseek' && globalThis.qaDelayDeepSeek) return new Promise(resolve=> {
+          globalThis.qaReleaseModels=()=>resolve(Response.json({data}));
+        });
+        return Promise.resolve(Response.json({data}));
+      }
+      return Promise.resolve(new Response('data: {"choices":[{"delta":{"content":"浏览器内模拟厂家流式输出，验证独立路由与 Key。"}}]}\n\ndata: [DONE]\n',
+        {headers:{'Content-Type':'text/event-stream'}}));
+    };
   });
-  await check('目录刷新失败时保留缓存和当前选择（浏览器内模拟 503）', async () => {
-    const original = await worker.evaluate(async () => JSON.stringify((await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot));
-    await worker.evaluate(() => {
-      globalThis.qaOriginalFetch = globalThis.fetch;
-      globalThis.fetch = (url, ...args) => url === AIModelCatalog.SOURCE
-        ? Promise.resolve(new Response('{}', { status: 503 })) : qaOriginalFetch(url, ...args);
+  await popup.goto('chrome-extension://'+extensionId+'/popup.html');
+  await popup.locator('#explain-manufacturer option').first().waitFor({state:'attached'});
+  const settle=()=>popup.waitForFunction(()=>!catalogRefreshing && providerRequests.size===0,null,{timeout:25000});
+  const saveKey=async key=>{
+    if(await popup.locator('#rewrite-key').isVisible()) await popup.locator('#rewrite-key').click();
+    await popup.locator('#api-key').fill(key);
+    await popup.locator('#save-key').click();
+    await popup.locator('#rewrite-key').waitFor({state:'visible'});
+    await settle();
+  };
+  const stream=data=>popup.evaluate(data=>new Promise((resolve,reject)=>{
+    const port=chrome.runtime.connect({name:'stream-compact-qa'}),messages=[];
+    const timer=setTimeout(()=>{port.disconnect();reject(new Error('stream timeout'));},10000);
+    port.onMessage.addListener(message=>{
+      messages.push(message);
+      if(message.type==='done'||message.type==='error'){clearTimeout(timer);port.disconnect();resolve(messages);}
     });
-    try {
-      await popup.reload(); await popup.locator('#explain-model option').first().waitFor({ state: 'attached' }); await settleCatalog();
-      assert.equal(await popup.locator('#catalog-status').innerText(), '暂时无法获取模型，已保留已有列表。');
-      assert.equal(await popup.locator('#catalog-status').evaluate(el => getComputedStyle(el).color), 'rgb(185, 28, 28)');
-      assert.equal(await popup.locator('#explain-model').inputValue(), 'gpt-4.1-mini');
-      assert.equal(await worker.evaluate(async () => JSON.stringify((await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot)), original);
-    } finally { await worker.evaluate(() => { globalThis.fetch = qaOriginalFetch; delete globalThis.qaOriginalFetch; }); }
-    await popup.reload(); await popup.locator('#explain-model option').first().waitFor({ state: 'attached' }); await settleCatalog();
-    assert.equal(await popup.locator('#catalog-status').isVisible(), false);
-    await popup.locator('.container').screenshot({ path: resolve(evidence, 'popup-auto-success.png') });
+    port.postMessage(data);
+  }),data);
+  await settle();
+  await check('实际 Edge 初次加载：10 家入口、调用名/通用设置/地址隐藏、首次 Key 输入可见',async()=>{
+    assert.equal(await popup.locator('#explain-manufacturer option').count(),11);
+    assert.equal(await popup.locator('#explain-custom-model').count(),0);
+    assert.equal(await popup.locator('#enabled').count(),0);
+    assert.equal(await popup.locator('#api-base-url').isVisible(),false);
+    assert.equal(await popup.locator('#api-key').isVisible(),true);
+    assert.equal(await popup.locator('#explain-model').isDisabled(),true);
+    assert.equal(await worker.evaluate(async()=>(await chrome.storage.local.get(null)).qwenApiKey),undefined);
+    assert.equal(await popup.locator('#refresh-catalog').count(),0);
+    await popup.locator('.container').screenshot({path:resolve(evidence,'popup-key-first.png')});
   });
-  await check('刷新保留中途选择和输入；移除下架目录项；部分失败仅显示红字（模拟）', async () => {
-    const removed = await worker.evaluate(async () => {
-      const snapshot = (await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot;
-      const model = snapshot.providers[0].models.find(m => AIModelCatalog.nativeId(m) !== 'gpt-4.1-mini');
-      const data = snapshot.providers.filter(p => p.id !== 'google').flatMap(p => p.models.filter(m => m.id !== model.id)
-        .map(m => ({ ...m, architecture: { input_modalities: ['text'], output_modalities: ['text'] } })));
-      globalThis.qaOriginalFetch = globalThis.fetch;
-      globalThis.fetch = (url, ...args) => url === AIModelCatalog.SOURCE
-        ? new Promise(resolve => { globalThis.qaReleaseCatalogFetch = () => resolve(Response.json({ data })); }) : qaOriginalFetch(url, ...args);
-      return AIModelCatalog.nativeId(model);
-    });
-    let pending;
-    try {
-      pending = popup.evaluate(() => refreshCatalog());
-      await popup.waitForFunction(() => catalogRefreshing);
-      assert.equal(await popup.locator('#catalog-status').isVisible(), false);
-      await popup.locator('#explain-manufacturer').selectOption('deepseek');
-      await popup.locator('#explain-model').selectOption('deepseek-flash');
-      await popup.locator('#explain-custom-model').fill('draft-model-not-yet-saved');
-      await worker.evaluate(async () => {
-        for (let retry = 0; retry < 200 && !globalThis.qaReleaseCatalogFetch; retry++) await new Promise(resolve => setTimeout(resolve, 10));
-        qaReleaseCatalogFetch();
-      });
-      await pending; await settleCatalog();
-      assert.equal(await popup.locator('#explain-manufacturer').inputValue(), 'deepseek');
-      assert.equal(await popup.locator('#explain-model').inputValue(), 'deepseek-flash');
-      assert.equal(await popup.locator('#explain-custom-model').inputValue(), 'draft-model-not-yet-saved');
-      assert.equal(await popup.locator('#catalog-status').innerText(), '部分厂家的模型暂未更新，已保留已有列表。');
-      assert.equal(await worker.evaluate(async id => (await chrome.storage.local.get('modelList')).modelList.includes(id), removed), false);
-    } finally {
-      await worker.evaluate(() => {
-        globalThis.qaReleaseCatalogFetch?.(); globalThis.fetch = qaOriginalFetch;
-        delete globalThis.qaOriginalFetch; delete globalThis.qaReleaseCatalogFetch;
-      });
-      if (pending) await pending;
+  await check('每次打开真实公开目录刷新，成功静默；无 Key 不展示未经接口确认的型号',async()=>{
+    const before=await worker.evaluate(async()=>(await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot.updatedAt);
+    await popup.reload();await popup.locator('#explain-manufacturer option').first().waitFor({state:'attached'});await settle();
+    const snapshot=await worker.evaluate(async()=>(await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot);
+    assert.notEqual(snapshot.updatedAt,before);
+    assert.equal(snapshot.providers.length,10);
+    assert.equal(await popup.locator('#catalog-status').isVisible(),false);
+    assert.equal(await popup.locator('#explain-model option').count(),1);
+    const makers=await popup.locator('#explain-manufacturer option').evaluateAll(items=>items.map(o=>o.value).filter(id=>id!=='custom'));
+    for(const maker of makers){
+      await popup.locator('#explain-manufacturer').selectOption(maker);
+      assert.equal(await popup.locator('#explain-model').isDisabled(),true);
+      assert.equal(await popup.locator('#api-key').inputValue(),'');
+      assert.equal(await popup.locator('#api-base-url').isVisible(),false);
     }
-    await popup.reload(); await popup.locator('#explain-model option').first().waitFor({ state: 'attached' }); await settleCatalog();
+    liveCatalog={source:snapshot.source,updatedAt:snapshot.updatedAt,providers:snapshot.providers.map(p=>({id:p.id,count:p.models.length}))};
   });
-  await check('当前输入连接经实际 runtime 消息获取模型并持久保存', async () => {
-    await popup.locator('#explain-manufacturer').selectOption('custom');
-    assert.equal(await popup.locator('#api-base-url').evaluate(el => el.readOnly), false);
-    await popup.locator('#api-base-url').fill(`${base}/custom/v1/chat/completions/`);
-    await popup.locator('#api-key').fill('local-qa-only');
-    await popup.locator('#fetch-models').click();
-    await popup.locator('#connection-msg.success').waitFor();
-    assert.ok(await popup.locator('#explain-model option').count() >= 3);
-    const saved = await worker.evaluate(async () => chrome.storage.local.get(['apiBaseUrl', 'apiKey']));
-    assert.equal(saved.apiBaseUrl, `${base}/custom/v1`); assert.equal(saved.apiKey, 'local-qa-only');
-  });
-  await check('异步查询期间切换厂家不覆盖新厂家连接或 Key（模拟延迟）', async () => {
-    await popup.evaluate(() => {
-      globalThis.qaSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime);
-      chrome.runtime.sendMessage = (message, ...args) => message.type === 'LIST_MODELS'
-        ? new Promise(resolve => { globalThis.qaReleaseModelList = () => resolve({ok:true,models:['race-only-model']}); })
-        : qaSendMessage(message, ...args);
-    });
-    try {
-      await popup.locator('#fetch-models').click();
-      await popup.waitForFunction(() => Boolean(globalThis.qaReleaseModelList));
-      await popup.locator('#explain-manufacturer').selectOption('deepseek');
-      await popup.evaluate(() => qaReleaseModelList());
-      await popup.locator('#connection-msg.error').waitFor();
-      assert.match(await popup.locator('#connection-msg').innerText(), /连接已切换/);
-      assert.equal(await popup.locator('#api-key').inputValue(), '');
-      assert.equal(await popup.locator('#api-base-url').inputValue(), 'https://api.deepseek.com');
-      assert.equal(await popup.locator('#explain-model option[value="race-only-model"]').count(), 0);
-    } finally {
-      await popup.evaluate(() => { chrome.runtime.sendMessage = qaSendMessage; delete globalThis.qaSendMessage; delete globalThis.qaReleaseModelList; });
-    }
-  });
-  await check('不同厂家分别保存到解释/翻译，重开保留厂家、模型、连接和 Key', async () => {
+  await check('保存 DeepSeek Key 后自动收起；仅当前接口两款文本模型，无历史/其他厂家/嵌入项',async()=>{
     await popup.locator('#explain-manufacturer').selectOption('deepseek');
-    await popup.locator('#explain-model').selectOption('deepseek-flash');
-    await popup.locator('#api-key').fill('local-ds-only');
+    await saveKey('qa-deepseek');
+    assert.equal(await popup.locator('#api-key').isVisible(),false);
+    assert.equal(await popup.locator('#rewrite-key').isVisible(),true);
+    assert.deepEqual(await popup.locator('#explain-model option').evaluateAll(items=>items.map(o=>o.value)),['deepseek-flash','deepseek-v4-pro']);
+    assert.equal(await popup.locator('#explain-model option[value="deepseek-v4-flash"]').count(),0);
+    assert.equal(await popup.locator('#explain-model option[value="gpt-4.1"]').count(),0);
+    await popup.locator('.container').screenshot({path:resolve(evidence,'popup-compact-saved.png')});
+  });
+  await check('重新填写入口、空值提示和取消恢复；旧 Key 保留且不在界面显示',async()=>{
+    await popup.locator('#rewrite-key').click();
+    assert.equal(await popup.locator('#api-key').inputValue(),'');
+    await popup.locator('#save-key').click();
+    assert.equal(await popup.locator('#key-msg').innerText(),'请输入 API Key。');
+    await popup.locator('#cancel-key').click();
+    await popup.locator('#rewrite-key').waitFor({state:'visible'});
+    assert.equal(await worker.evaluate(async()=>(await chrome.storage.local.get('providerConnections')).providerConnections.deepseek.apiKey==='qa-deepseek'),true);
+    await popup.locator('.container').screenshot({path:resolve(evidence,'popup-key-rewrite.png')});
+  });
+  await check('翻译使用 Gemini 独立 Key 和接口模型；保存、重开 Key 仍隐藏且自动查询两厂家',async()=>{
     await popup.locator('[data-tab="translate"]').click();
     await popup.locator('#translate-manufacturer').selectOption('google');
-    await popup.locator('#translate-model').selectOption('gemini-3.8-flash');
-    assert.equal(await popup.locator('#api-key').inputValue(), '');
-    assert.equal(await popup.locator('#api-base-url').inputValue(), 'https://generativelanguage.googleapis.com/v1beta/openai');
-    await popup.locator('#api-key').fill('local-google-only');
-    await popup.locator('#save-btn').click(); await popup.locator('#status.success').waitFor();
-    await popup.reload(); await popup.locator('#explain-manufacturer option').first().waitFor({ state: 'attached' });
-    assert.equal(await popup.locator('#explain-manufacturer').inputValue(), 'deepseek');
-    assert.equal(await popup.locator('#explain-model').inputValue(), 'deepseek-flash');
-    assert.equal(await popup.locator('#translate-manufacturer').inputValue(), 'google');
-    assert.equal(await popup.locator('#translate-model').inputValue(), 'gemini-3.8-flash');
-    assert.equal(await popup.locator('#api-key').inputValue(), 'local-ds-only');
-    assert.equal(await popup.locator('#api-base-url').inputValue(), 'https://api.deepseek.com');
-    await popup.locator('[data-tab="translate"]').click();
-    assert.equal(await popup.locator('#api-key').inputValue(), 'local-google-only');
-    await popup.locator('[data-tab="explain"]').click();
-    const saved = await worker.evaluate(async () => (await chrome.storage.local.get('providerConnections')).providerConnections);
-    assert.equal(saved.deepseek.apiKey, 'local-ds-only'); assert.equal(saved.google.apiKey, 'local-google-only');
-    assert.equal(saved.custom.apiKey, 'local-qa-only');
-    await popup.locator('.container').screenshot({ path: resolve(evidence, 'popup-provider-autofill.png') });
+    await saveKey('qa-google');
+    assert.deepEqual(await popup.locator('#translate-model option').evaluateAll(items=>items.map(o=>o.value)),['gemini-3.8-flash','gemini-3.8-pro']);
+    await popup.locator('#translate-model').selectOption('gemini-3.8-pro');
+    await popup.locator('#save-btn').click();await popup.locator('#status.success').waitFor();await settle();
+    const before=await worker.evaluate(()=>qaFactoryRequests.filter(r=>r.method==='GET').length);
+    await popup.reload();await popup.locator('#explain-manufacturer option').first().waitFor({state:'attached'});await settle();
+    assert.equal(await popup.locator('#explain-manufacturer').inputValue(),'deepseek');
+    assert.equal(await popup.locator('#translate-manufacturer').inputValue(),'google');
+    assert.equal(await popup.locator('#translate-model').inputValue(),'gemini-3.8-pro');
+    assert.equal(await popup.locator('#api-key').isVisible(),false);
+    assert.ok(await worker.evaluate(()=>qaFactoryRequests.filter(r=>r.method==='GET').length)>before);
   });
-  await check('实际 Edge 端口按解释/翻译厂家发送独立连接，缺 Key 拦截（网络模拟）', async () => {
-    await settleCatalog();
-    await worker.evaluate(() => {
-      globalThis.qaOriginalFetch = globalThis.fetch;
-      globalThis.qaProviderRequests = [];
-      globalThis.fetch = (url, options) => {
-        if (url === AIModelCatalog.SOURCE) return qaOriginalFetch(url, options);
-        const expectedKey = url.startsWith(AIConfig.PROVIDER_ENDPOINTS.deepseek) ? 'local-ds-only' : 'local-google-only';
-        qaProviderRequests.push({ url, authenticated: options.headers.Authorization === `Bearer ${expectedKey}`, model: JSON.parse(options.body).model });
-        return Promise.resolve(new Response('data: {"choices":[{"delta":{"content":"浏览器内模拟流式输出，验证两厂家的连接和路由。"}}]}\n\ndata: [DONE]\n', {headers:{'Content-Type':'text/event-stream'}}));
-      };
+  await check('实际运行时端口分别使用厂家地址/Key/模型，B 与全文使用翻译连接（网络模拟）',async()=>{
+    for(const data of [
+      {type:'STREAM_REQUEST',mode:'C',text:'中文解释验证'},
+      {type:'STREAM_REQUEST',mode:'B',text:'translation route'},
+      {type:'STREAM_BATCH',text:'full page route',batchId:'compact-qa'}
+    ]) assert.equal((await stream(data)).at(-1).type,'done');
+    const calls=await worker.evaluate(()=>qaFactoryRequests.filter(r=>r.method==='POST'));
+    assert.deepEqual(calls.map(r=>[r.provider,r.authenticated,r.model]),[
+      ['deepseek',true,'deepseek-flash'],['google',true,'gemini-3.8-pro'],['google',true,'gemini-3.8-pro']
+    ]);
+  });
+  await check('新 Key 的列表先返回，旧查询晚返回不会覆盖新连接与模型（模拟延迟）',async()=>{
+    await worker.evaluate(()=>{globalThis.qaDelayDeepSeek=true;});
+    const pending=popup.evaluate(()=>refreshProviderModels('deepseek'));
+    pending.catch(()=>{});
+    await worker.evaluate(async()=>{
+      for(let retry=0;retry<200&&!globalThis.qaReleaseModels;retry++) await new Promise(resolve=>setTimeout(resolve,10));
+      if(!globalThis.qaReleaseModels) throw new Error('delayed request not started');
     });
-    const request = data => popup.evaluate(data => new Promise((resolve, reject) => {
-      const port = chrome.runtime.connect({name:'stream-provider-qa'}), messages = [];
-      const timer = setTimeout(() => {port.disconnect();reject(new Error('流式消息超时'));}, 10000);
-      port.onMessage.addListener(msg => {
-        messages.push(msg);
-        if (msg.type === 'done' || msg.type === 'error') {clearTimeout(timer);port.disconnect();resolve(messages);}
-      });
-      port.postMessage(data);
-    }), data);
-    try {
-      for (const data of [
-        {type:'STREAM_REQUEST',mode:'C',text:'浏览器验证解释'},
-        {type:'STREAM_REQUEST',mode:'B',text:'browser translation'},
-        {type:'STREAM_BATCH',promptType:'translate',text:'browser full page',batchId:'qa-provider'}
-      ]) assert.equal((await request(data)).at(-1).type, 'done');
-      providerRequests.push(...await worker.evaluate(() => qaProviderRequests));
-      assert.deepEqual(providerRequests.map(r => [r.url,r.authenticated,r.model]), [
-        ['https://api.deepseek.com/chat/completions',true,'deepseek-flash'],
-        ['https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',true,'gemini-3.8-flash'],
-        ['https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',true,'gemini-3.8-flash']
-      ]);
-      await worker.evaluate(async () => chrome.storage.local.set({explainManufacturer:'xai'}));
-      assert.equal((await request({type:'STREAM_REQUEST',mode:'C',text:'缺 Key'}))[0].type, 'error');
-      assert.equal(await worker.evaluate(() => qaProviderRequests.length), 3);
-      await worker.evaluate(async () => chrome.storage.local.set({explainManufacturer:'deepseek'}));
-    } finally {await worker.evaluate(() => {globalThis.fetch=qaOriginalFetch;delete globalThis.qaOriginalFetch;delete globalThis.qaProviderRequests;});}
+    await worker.evaluate(()=>{
+      globalThis.qaDelayDeepSeek=false;
+      qaFactoryModels.deepseek=[{id:'deepseek-flash',name:'当前账号 Flash'}];
+    });
+    await popup.locator('#rewrite-key').click();
+    await popup.locator('#api-key').fill('qa-deepseek-new');
+    await popup.locator('#save-key').click();
+    await popup.locator('#explain-model option').filter({hasText:'当前账号 Flash'}).waitFor({state:'attached'});
+    await worker.evaluate(()=>qaReleaseModels());await pending;await settle();
+    assert.equal(await popup.locator('#explain-model option').count(),1);
+    assert.equal(await worker.evaluate(async()=>{
+      const c=(await chrome.storage.local.get('providerConnections')).providerConnections;
+      return c.deepseek.apiKey==='qa-deepseek-new' && c.deepseek.availableModels.length===1 && c.google.apiKey==='qa-google';
+    }),true);
   });
-  await check('无效模型拒绝保存；新增/修改/删除模型同步到两标签', async () => {
-    await popup.locator('[data-tab="translate"]').click();
-    await popup.locator('#translate-manufacturer').selectOption('custom');
-    await popup.locator('[data-tab="explain"]').click();
+  await check('厂家列表失败保留当前缓存，顶部红字；重新打开成功后静默恢复（模拟 503）',async()=>{
+    await worker.evaluate(()=>{globalThis.qaProviderFail='deepseek';});
+    await popup.reload();await popup.locator('#explain-manufacturer option').first().waitFor({state:'attached'});await settle();
+    assert.equal(await popup.locator('#explain-model').inputValue(),'deepseek-flash');
+    assert.equal(await popup.locator('#catalog-status').innerText(),'暂时无法获取模型，已保留已有列表。');
+    assert.equal(await popup.locator('#catalog-status').evaluate(el=>getComputedStyle(el).color),'rgb(185, 28, 28)');
+    await popup.locator('.container').screenshot({path:resolve(evidence,'popup-interface-error.png')});
+    await worker.evaluate(()=>{globalThis.qaProviderFail='';});
+    await popup.reload();await popup.locator('#explain-manufacturer option').first().waitFor({state:'attached'});await settle();
+    assert.equal(await popup.locator('#catalog-status').isVisible(),false);
+  });
+  await check('公开目录失败和后台无回复恢复均保留接口模型列表（模拟故障，恢复真实网络）',async()=>{
+    await worker.evaluate(()=>{globalThis.qaCatalogFail=true;});
+    await popup.evaluate(()=>refreshCatalog());await settle();
+    assert.equal(await popup.locator('#catalog-status').innerText(),'暂时无法获取模型，已保留已有列表。');
+    assert.equal(await popup.locator('#explain-model').inputValue(),'deepseek-flash');
+    await worker.evaluate(()=>{globalThis.qaCatalogFail=false;});
+    await popup.evaluate(()=>{
+      globalThis.qaSend=chrome.runtime.sendMessage.bind(chrome.runtime);
+      chrome.runtime.sendMessage=(message,...args)=>message.type==='REFRESH_MODEL_CATALOG'?Promise.resolve(undefined):qaSend(message,...args);
+    });
+    try {await popup.evaluate(()=>refreshCatalog());await settle();assert.equal(await popup.locator('#catalog-status').isVisible(),false);}
+    finally{await popup.evaluate(()=>{chrome.runtime.sendMessage=qaSend;delete globalThis.qaSend;});}
+  });
+  await check('当前接口开放列表变为空时清除旧型号，后台不回填预设或发送生成请求',async()=>{
+    await worker.evaluate(()=>{globalThis.qaFactoryModels.deepseek=[];});
+    await popup.evaluate(()=>refreshProviderModels('deepseek'));await settle();
+    assert.equal(await popup.locator('#explain-model').isDisabled(),true);
+    assert.equal(await popup.locator('#explain-model').inputValue(),'');
+    const before=await worker.evaluate(()=>qaFactoryRequests.filter(r=>r.method==='POST').length);
+    assert.equal((await stream({type:'STREAM_REQUEST',mode:'C',text:'无可用模型'}))[0].type,'error');
+    assert.equal(await worker.evaluate(()=>qaFactoryRequests.filter(r=>r.method==='POST').length),before);
+    await worker.evaluate(()=>{qaFactoryModels.deepseek=[{id:'deepseek-flash',name:'DeepSeek V4.1 Flash'}];});
+    await popup.evaluate(()=>refreshProviderModels('deepseek'));await settle();
+    assert.equal(await popup.locator('#explain-model').inputValue(),'deepseek-flash');
+  });
+  await check('自定义地址仅在独立弹窗中出现；错误地址提示，正确地址归一化并保存',async()=>{
     await popup.locator('#explain-manufacturer').selectOption('custom');
-    assert.equal(await popup.locator('#api-key').inputValue(), 'local-qa-only');
-    await popup.locator('#explain-custom-new').click();
-    await popup.locator('#explain-custom-model').fill('missing-model');
-    await popup.locator('#explain-custom-add').click();
-    await popup.locator('#explain-model-msg.error').waitFor();
-    assert.equal(await popup.locator('#explain-model option[value="missing-model"]').count(), 0);
-    await popup.locator('#explain-custom-model').fill('mock-chat');
-    await popup.locator('#explain-custom-add').click();
-    await popup.locator('#explain-model-msg.success').waitFor();
-    await popup.locator('#explain-custom-delete').click();
-    await popup.locator('#translate-model option[value="mock-chat"]').waitFor({ state: 'detached' });
-    await popup.locator('#explain-custom-new').click();
-    await popup.locator('#verify-model').uncheck();
-    await popup.locator('#explain-custom-model').fill('local/manual-model');
-    await popup.locator('#explain-custom-add').click();
-    await popup.locator('#explain-model-msg.success').waitFor();
-    assert.equal(await popup.locator('#explain-model').inputValue(), 'local/manual-model');
-    await popup.locator('#explain-custom-model').fill('local/renamed-model');
-    await popup.locator('#explain-custom-add').click();
-    await popup.locator('[data-tab="translate"]').click();
-    await popup.locator('#translate-manufacturer').selectOption('custom');
-    await popup.locator('#translate-model option[value="local/renamed-model"]').waitFor({ state: 'attached' });
-    await popup.locator('[data-tab="explain"]').click();
-    assert.equal(await popup.locator('#explain-model option[value="local/manual-model"]').count(), 0);
+    assert.equal(await popup.locator('#api-base-url').isVisible(),false);
+    await popup.locator('#custom-connection-button').click();
+    await popup.locator('#api-base-url').fill('not-url');await popup.locator('#custom-save').click();
+    assert.match(await popup.locator('#custom-msg').innerText(),/有效/);
+    await popup.locator('#api-base-url').fill(base+'/custom/v1/chat/completions/');
+    await popup.locator('#custom-save').click();
+    await popup.locator('#custom-connection-dialog').waitFor({state:'hidden'});
+    assert.equal(await worker.evaluate(async()=>(await chrome.storage.local.get('providerConnections')).providerConnections.custom.apiBaseUrl),base+'/custom/v1');
   });
-  await check('解释/翻译独立保存、重新打开后仍保留；新端点不使用旧配置', async () => {
-    await popup.locator('#explain-model').selectOption('local/renamed-model');
-    await popup.locator('[data-tab="translate"]').click();
-    await popup.locator('#translate-manufacturer').selectOption('custom');
+  await check('自定义 Key 保存后经实际 runtime/HTTP 查询，仅列此接口型号，不混入官方厂家缓存',async()=>{
+    await saveKey('local-qa-only');
+    assert.deepEqual(await popup.locator('#explain-model option').evaluateAll(items=>items.map(o=>o.value)),['mock-chat','gateway/model-large']);
+    assert.equal(await popup.locator('#explain-model option[value="deepseek-flash"]').count(),0);
+    assert.ok(requests.some(r=>r.path==='/custom/v1/models'&&r.authenticated));
+    await popup.locator('#explain-model').selectOption('mock-chat');
+    await popup.locator('[data-tab="translate"]').click();await popup.locator('#translate-manufacturer').selectOption('custom');await settle();
+    assert.equal(await popup.locator('#api-key').isVisible(),false);
     await popup.locator('#translate-model').selectOption('gateway/model-large');
-    await popup.locator('#api-base-url').fill(`${base}/other/v1`);
-    await popup.locator('#save-btn').click();
-    await popup.locator('#status.success').waitFor();
-    await popup.reload();
-    await popup.locator('#explain-model option').first().waitFor({ state: 'attached' });
-    assert.equal(await popup.locator('#explain-model').inputValue(), 'local/renamed-model');
-    assert.equal(await popup.locator('#translate-model').inputValue(), 'gateway/model-large');
-    assert.equal(await popup.locator('#api-base-url').inputValue(), `${base}/other/v1`);
-    await popup.evaluate(() => window.scrollTo(0, 0));
-    await popup.screenshot({ path: resolve(evidence, 'popup-explain.png'), fullPage: true });
-    await popup.locator('[data-tab="translate"]').click();
-    await popup.evaluate(() => window.scrollTo(0, 0));
-    await popup.screenshot({ path: resolve(evidence, 'popup-translate.png'), fullPage: true });
+    await popup.locator('#save-btn').click();await popup.locator('#status.success').waitFor();await settle();
   });
-  const page = await context.newPage();
-  page.on('pageerror', err => errors.push(err.message));
-  await page.goto(`${base}/sample`);
-  const tabId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url).id, `${base}/sample`);
-  await check('实际内容脚本划词 → Worker → HTTP SSE → 卡片完整文本和模型 ID', async () => {
-    await page.evaluate(() => {
-      const p = document.querySelector('#word'), range = document.createRange(); range.selectNodeContents(p);
-      const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
-      p.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+  await check('隐藏设置保留已有启用/上下文/触发值，两个模型保存并重开仍保留',async()=>{
+    const settings=await worker.evaluate(async()=>chrome.storage.local.get(['enabled','usePageContext','triggerMode']));
+    assert.deepEqual(settings,{enabled:true,usePageContext:false,triggerMode:'auto'});
+    await popup.reload();await popup.locator('#explain-manufacturer option').first().waitFor({state:'attached'});await settle();
+    assert.equal(await popup.locator('#explain-model').inputValue(),'mock-chat');
+    assert.equal(await popup.locator('#translate-model').inputValue(),'gateway/model-large');
+    assert.equal(await popup.locator('#api-key').isVisible(),false);
+  });
+  const page=await context.newPage();page.on('pageerror',err=>errors.push(err.message));await page.goto(base+'/sample');
+  const tabId=await worker.evaluate(async url=>(await chrome.tabs.query({})).find(tab=>tab.url===url).id,base+'/sample');
+  await check('实际划词 → Worker → 本机 HTTP SSE → 结果卡片完整输出',async()=>{
+    await page.evaluate(()=>{
+      const p=document.querySelector('#word'),range=document.createRange();range.selectNodeContents(p);
+      const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
+      p.dispatchEvent(new MouseEvent('mouseup',{bubbles:true,button:0}));
     });
-    await page.locator('.ds-body').filter({ hasText: '流式翻译结果。' }).waitFor();
-    await page.locator('.ds-model-tag').filter({ hasText: 'local/renamed-model' }).waitFor();
-    assert.ok(requests.some(req => req.path === '/other/v1/chat/completions' && req.model === 'local/renamed-model' && req.authenticated));
-    await page.screenshot({ path: resolve(evidence, 'selection-stream.png') });
+    await page.locator('.ds-body').filter({hasText:'流式翻译结果。'}).waitFor();
+    assert.ok(requests.some(r=>r.path==='/custom/v1/chat/completions'&&r.model==='mock-chat'&&r.authenticated));
+    await page.screenshot({path:resolve(evidence,'selection-stream.png')});
     await page.keyboard.press('Escape');
-    await page.locator('#deepseek-explain-tooltip.ds-visible').waitFor({ state: 'detached' });
   });
-  await check('实际按需注入全文脚本，独立翻译模型与原文恢复', async () => {
-    await worker.evaluate(async id => chrome.tabs.sendMessage(id, { type: 'TRIGGER_FULLPAGE_TRANSLATE' }), tabId);
-    await page.locator('#paragraph').filter({ hasText: '流式翻译结果。' }).waitFor();
-    assert.ok(requests.some(req => req.model === 'gateway/model-large' && req.path === '/other/v1/chat/completions'));
-    await page.screenshot({ path: resolve(evidence, 'fullpage-stream.png') });
+  await check('实际 B 分类使用翻译模型，经本机 HTTP SSE 完成',async()=>{
+    assert.equal((await stream({type:'STREAM_REQUEST',mode:'B',text:'Long English translation request for QA'})).at(-1).type,'done');
+    assert.ok(requests.some(r=>r.model==='gateway/model-large'&&r.authenticated));
+  });
+  await check('实际按需注入全文脚本，翻译与原文切换/取消恢复',async()=>{
+    await worker.evaluate(async id=>chrome.tabs.sendMessage(id,{type:'TRIGGER_FULLPAGE_TRANSLATE'}),tabId);
+    await page.locator('#paragraph').filter({hasText:'流式翻译结果。'}).waitFor();
     await page.locator('#ds-tb-show-original').click();
-    await page.locator('#paragraph').filter({ hasText: 'This is a longer English paragraph' }).waitFor();
+    await page.locator('#paragraph').filter({hasText:'This is a longer English paragraph'}).waitFor();
     await page.locator('#ds-tb-show-original').click();
-    await page.locator('#paragraph').filter({ hasText: '流式翻译结果。' }).waitFor();
+    await page.locator('#paragraph').filter({hasText:'流式翻译结果。'}).waitFor();
     await page.locator('#ds-tb-cancel').click();
-    await page.locator('#paragraph').filter({ hasText: 'This is a longer English paragraph' }).waitFor();
+    await page.locator('#paragraph').filter({hasText:'This is a longer English paragraph'}).waitFor();
   });
-  await check('错误凭据提示且获取失败不覆盖已存连接；无相关页面异常', async () => {
-    await popup.locator('#api-key').fill('invalid-test-only');
-    await popup.locator('#fetch-models').click();
-    await popup.locator('#connection-msg.error').waitFor();
-    assert.match(await popup.locator('#connection-msg').innerText(), /API Key 无效/);
-    assert.equal(await worker.evaluate(async () => (await chrome.storage.local.get('apiKey')).apiKey), 'local-qa-only');
-    assert.deepEqual(errors, []);
+  await check('无效 Key 的接口错误可见，重填后列表恢复；无相关页面异常',async()=>{
+    await saveKey('invalid-test-only');
+    assert.equal(await popup.locator('#catalog-status').innerText(),'暂时无法获取模型，请稍后重试。');
+    await saveKey('local-qa-only');
+    assert.equal(await popup.locator('#catalog-status').isVisible(),false);
+    assert.equal(await popup.locator('#explain-model option').count(),2);
+    assert.deepEqual(errors,[]);
+    providerRequests.push(...await worker.evaluate(()=>qaFactoryRequests));
+    await popup.locator('.container').screenshot({path:resolve(evidence,'popup-compact-final.png')});
   });
 } catch (err) {
   console.error(err.message);
@@ -408,7 +330,7 @@ try {
   await new Promise(resolve => server.close(resolve));
   const report = { date: new Date().toISOString(), node: process.version, browserVersion,
     head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
-    kind: 'Actual Edge extension, live public model directory, localhost and Worker-intercepted mock inference API, synthetic credentials', liveCatalog, checks, requests, providerRequests, errors,
+    kind: 'Actual Edge compact popup, live public directory, localhost API and intercepted provider model/generation fixtures, synthetic credentials', liveCatalog, checks, requests, providerRequests, errors,
     unverified: ['真实供应商/模型、账号权限、模型质量、原生扩展工具栏和右键菜单的鼠标操作'] };
   writeFileSync(resolve(evidence, 'browser-check.json'), JSON.stringify(report, null, 2) + '\n');
 }

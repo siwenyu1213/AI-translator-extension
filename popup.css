@@ -1,6 +1,7 @@
 /* ========== AI 智能解释 & 翻译 — Popup 样式 ========== */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 
 body {
   width: 380px;
@@ -117,6 +118,17 @@ body {
 .input::placeholder {
   color: #cbd5e1;
 }
+
+.key-section { padding-top: 12px; border-top: 1px solid #e2e8f0; margin-top: 16px; }
+.key-actions { display: flex; gap: 8px; margin-top: 10px; }
+.key-actions .mini-btn { min-height: 36px; padding: 6px 12px; }
+.inline-error { color: #b91c1c; font-size: 12px; margin-top: 6px; }
+.inline-error:empty { display: none; }
+.connection-link { border: 0; background: transparent; color: #2563eb; cursor: pointer; padding: 8px 0; font: inherit; }
+.select:disabled { color: #64748b; background: #f8fafc; }
+dialog { width: 332px; margin: auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; color: #1e293b; }
+dialog::backdrop { background: rgba(15, 23, 42, .25); }
+dialog h2 { font-size: 15px; margin-bottom: 16px; }
 
 /* ── 开关 ── */
 .toggle-label {

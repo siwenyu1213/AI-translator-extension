@@ -51,6 +51,23 @@ async function stream(data, request = {}) {
 }
 const content = '这是流式文本，长度足以验证完整结果与缓存。';
 const sse = `data:${JSON.stringify({ choices: [{ delta: { content } }] })}\r\n\r\ndata: [DONE]`;
+await check('接口模型按厂家与文本能力过滤，排除其他厂家/嵌入/图像/过期且保留新型号', () => {
+  context.modelFixture = [
+    {id:'deepseek-flash',name:'DeepSeek Flash',input_modalities:['text','image'],output_modalities:['text']},
+    {id:'deepseek-flash'},{id:'deepseek-new-model'}, {id:'gpt-4.1'},
+    {id:'deepseek-embedding'}, {id:'deepseek-image',output_modalities:['image']},
+    {id:'deepseek-mixed',output_modalities:['text','image']},
+    {id:'deepseek-expired',expiration_date:'2020-01-01'},null
+  ];
+  assert.deepEqual(Array.from(run("AIModelCatalog.interfaceModels(modelFixture,'deepseek')"),m=>m.id),['deepseek-flash','deepseek-new-model']);
+  assert.equal(run("AIModelCatalog.interfaceModels([{id:'models/gemini-flash'}],'google')[0].id"),'models/gemini-flash');
+  assert.equal(run("AIModelCatalog.interfaceModels([{id:'ft:gpt-4.1:org:custom'}],'openai').length"),1);
+});
+await check('厂家接口缓存保留名称与查询时间，不把其他厂家的 ID 带入显示列表', () => {
+  const profile = run("AIConfig.normalizeConnections({deepseek:{apiKey:'test-only',availableModels:['deepseek-flash','gpt-4.1'],modelEntries:[{id:'deepseek-flash',name:'Flash name'},{id:'gpt-4.1'}],modelsCheckedAt:'2026-10-10T00:00:00Z'}}).deepseek");
+  assert.equal(profile.modelEntries.length,1);assert.equal(profile.modelEntries[0].name,'Flash name');
+  assert.equal(profile.modelsCheckedAt,'2026-10-10T00:00:00Z');
+});
 await check('10 家内置目录不限定 3 款、DeepSeek 历史兼容项及原生/网关 ID', () => {
   assert.equal(run('AIModelCatalog.BUILTIN.providers.length'), 10);
   assert.equal(run('AIModelCatalog.BUILTIN.providers.every(p => p.models.length > 3)'), true);
@@ -135,14 +152,14 @@ await check('发现模型用当前草稿端点和 Bearer，去重且保留网关
   assert.equal(calls[0].url, 'https://draft.example/api/v1/models');
   assert.equal(calls[0].options.headers.Authorization, 'Bearer draft-only');
 });
-await check('模型查询拒绝列表外模型、无 Key、无效 data 和空模型列表', async () => {
+await check('模型查询拒绝列表外模型、无 Key 和无效 data；有效空列表成功返回', async () => {
   await config(); responder = () => Response.json({ data: [{ id: 'valid' }] });
   assert.equal((await run("validateModel('missing')")).ok, false);
   assert.equal((await run("validateModel('valid')")).ok, true);
   assert.equal((await run("listModels({apiBaseUrl:'https://example.org/v1',apiKey:''})")).ok, false);
-  for (const data of [{ models: [] }, { data: [] }]) {
-    responder = () => Response.json(data); assert.equal((await run('listModels()')).ok, false);
-  }
+  responder = () => Response.json({models:[]});assert.equal((await run('listModels()')).ok,false);
+  responder = () => Response.json({data:[]});
+  const empty=await run('listModels()');assert.equal(empty.ok,true);assert.equal(empty.models.length,0);
 });
 for (const status of [401, 403, 404, 429, 500]) {
   await check(`模型查询 HTTP ${status} 正确失败`, async () => {
@@ -206,6 +223,14 @@ await check('切换到未配置厂家阻止请求；另一厂家 Key 不外发�
   const messages = await stream(sse);
   assert.equal(calls.length, 0); assert.equal(messages[0].type, 'error');
   assert.match(messages[0].error, /所选厂家/);
+});
+await check('空模型保持空，不回填其他厂家预设；接口列表外模型阻止发请求', async () => {
+  await config();
+  await chrome.storage.local.set({explainModel:''});
+  await run('AIConfig.load()');assert.equal(storage.explainModel,'');
+  await chrome.storage.local.set({explainManufacturer:'deepseek',explainModel:'deepseek-old',modelList:['deepseek-old'],
+    providerConnections:{deepseek:{apiKey:'test-only',availableModels:['deepseek-flash'],modelsCheckedAt:'2026-10-10T00:00:00Z'}}});
+  const messages=await stream(sse);assert.equal(calls.length,0);assert.match(messages[0].error,/当前厂家/);
 });
 for (const [name, data] of [
   ['流内错误', 'data: {"error":{"message":"quota unavailable"}}\n'],

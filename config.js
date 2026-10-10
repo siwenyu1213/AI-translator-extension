@@ -65,7 +65,7 @@
     config.catalogSnapshot = AIModelCatalog.normalizeSnapshot(config.catalogSnapshot);
     for (const key of ['explainModel', 'translateModel']) {
       config[key] = normalizeModel(config[key]);
-      if (!config.modelList.includes(config[key])) config[key] = config.modelList[0] || '';
+      if (!config.modelList.includes(config[key])) config[key] = raw.providerConfigVersion === 1 ? '' : (config.modelList[0] || '');
       const manufacturerKey = key.replace('Model', 'Manufacturer');
       if (!validProvider(config[manufacturerKey])) config[manufacturerKey] = AIModelCatalog.providerFor(config[key], config.modelManufacturers);
     }
@@ -98,7 +98,9 @@
       if (!entry || typeof entry !== 'object') continue;
       connections[id] = { apiBaseUrl: PROVIDER_ENDPOINTS[id] || String(entry.apiBaseUrl || DEFAULT_BASE_URL),
         apiKey: typeof entry.apiKey === 'string' ? entry.apiKey.trim() : '',
-        availableModels: normalizeModels(entry.availableModels) };
+        availableModels: normalizeModels(entry.availableModels),
+        modelEntries: AIModelCatalog.interfaceModels(entry.modelEntries || normalizeModels(entry.availableModels).map(model => ({id:model})), id),
+        modelsCheckedAt: typeof entry.modelsCheckedAt === 'string' ? entry.modelsCheckedAt : '' };
     }
     return connections;
   }
@@ -109,7 +111,7 @@
     if (!validProvider(provider)) throw new Error('请先选择接口厂家并保存设置');
     const entry = config.providerConnections?.[provider] || {};
     return { apiBaseUrl: PROVIDER_ENDPOINTS[provider] || entry.apiBaseUrl || DEFAULT_BASE_URL,
-      apiKey: entry.apiKey || '', availableModels: normalizeModels(entry.availableModels) };
+      apiKey: entry.apiKey || '', availableModels: normalizeModels(entry.availableModels), modelsCheckedAt: entry.modelsCheckedAt || '' };
   }
 
   async function load() {

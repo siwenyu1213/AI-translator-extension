@@ -210,6 +210,11 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
     port.disconnect();
     return;
   }
+  if ((connection.modelsCheckedAt || connection.availableModels.length) && !connection.availableModels.includes(model)) {
+    port.postMessage({type:'error',error:'请重新选择当前厂家的可用模型',batchId});
+    port.disconnect();
+    return;
+  }
 
   // 缓存检查（键包含思考开关，避免开关切换后命中旧缓存）
   const cacheKey = JSON.stringify([cacheRevision, baseUrl, model, systemPrompt, prompt,
@@ -505,8 +510,7 @@ async function listModels(connection) {
     const data = await res.json();
     if (!Array.isArray(data?.data)) return { ok: false, error: '模型列表格式不兼容：需要 data 数组' };
     const models = AIConfig.normalizeModels(data.data.map(item => item?.id)).sort();
-    if (!models.length) return { ok: false, error: '接口返回了空模型列表' };
-    return { ok: true, models };
+    return { ok: true, models, entries: AIModelCatalog.interfaceModels(data.data) };
   } catch (err) {
     return { ok: false, error: err.name === 'TimeoutError' ? '获取模型列表超时，请检查接口地址' : `获取模型失败：${err.message}` };
   }

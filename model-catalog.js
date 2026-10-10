@@ -1211,6 +1211,22 @@
   function allModels(snapshot = BUILTIN) {
     return [...snapshot.providers.flatMap(p => p.models.map(m => ({ ...m, provider: p.id }))), ...COMPATIBILITY];
   }
+  function interfaceModels(items, provider = 'custom') {
+    const seen = new Set();
+    return (Array.isArray(items) ? items : []).filter(item => {
+      const id = item?.id;
+      if (typeof id !== 'string' || !id.trim() || id.length > 200 || /\s/.test(id) || seen.has(id)) return false;
+      const input = item.input_modalities || item.architecture?.input_modalities;
+      const output = item.output_modalities || item.architecture?.output_modalities;
+      if ((Array.isArray(input) && !input.includes('text')) ||
+          (Array.isArray(output) && (output.length !== 1 || output[0] !== 'text'))) return false;
+      if (item.expiration_date && Date.parse(item.expiration_date) <= Date.now()) return false;
+      if (/(?:embed|rerank|whisper|tts|dall-e|image|moderation|sora|realtime|transcri|audio)/i.test(id)) return false;
+      const family = id.replace(/^ft:/, '').replace(/^models\//, '');
+      if (provider !== 'custom' && providerFor(family) !== provider) return false;
+      seen.add(id); return true;
+    }).map(item => ({ id: item.id, name: typeof item.name === 'string' && item.name.length <= 200 ? item.name : item.id }));
+  }
   async function refresh(previous = BUILTIN) {
     let res;
     try {
@@ -1248,5 +1264,5 @@
     return { updatedAt: timestamp, source: SOURCE, providers };
   }
   globalThis.AIModelCatalog = { BUILTIN, SOURCE, COMPATIBILITY, nativeId,
-    providerFor, normalizeSnapshot, resolveId, allModels, refresh };
+    providerFor, normalizeSnapshot, resolveId, allModels, interfaceModels, refresh };
 })();

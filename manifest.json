@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AI 智能解释 & 翻译",
-  "version": "4.3.0",
-  "description": "划词智能解释与全文流式翻译。支持 10 家厂家地址自动填写、各厂家独立 API Key、自定义 OpenAI 兼容接口、自动更新目录和自定义模型。",
+  "version": "4.4.0",
+  "description": "划词智能解释与全文流式翻译。支持 10 家厂家地址自动匹配、独立 API Key、接口开放模型自动更新及自定义兼容接口，Key 保存后收起。",
   "permissions": ["storage", "downloads", "contextMenus", "scripting"],
   "host_permissions": ["<all_urls>"],
   "background": {
