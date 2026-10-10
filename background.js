@@ -5,6 +5,7 @@ const CACHE = new Map();
 const CACHE_MAX = 100;
 let cacheRevision = 0;
 
+importScripts('model-catalog.js');
 importScripts('config.js');
 
 // ═══════════════════════════════════════════
@@ -50,6 +51,12 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 // ═══════════════════════════════════════════
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'REFRESH_MODEL_CATALOG') {
+    refreshModelCatalog()
+      .then(snapshot => sendResponse({ ok: true, snapshot }))
+      .catch(err => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
   if (message.type === 'DOWNLOAD') {
     handleDownload(message.text, message.explanation);
     return false;
@@ -73,6 +80,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // 异步响应
   }
 });
+
+let catalogRefresh = null;
+function refreshModelCatalog() {
+  if (!catalogRefresh) catalogRefresh = (async () => {
+    const stored = await chrome.storage.local.get('catalogSnapshot');
+    // 公开目录不带用户 Key、地址或任何网页数据。
+    const snapshot = await AIModelCatalog.refresh(stored.catalogSnapshot);
+    await chrome.storage.local.set({ catalogSnapshot: snapshot });
+    return snapshot;
+  })().finally(() => { catalogRefresh = null; });
+  return catalogRefresh;
+}
 
 // ═══════════════════════════════════════════
 // 全文翻译脚本注入

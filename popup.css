@@ -297,3 +297,6 @@ body {
 }
 .fetch-btn:disabled { opacity: .5; cursor: wait; }
 .hint { line-height: 1.5; color: #64748b; }
+
+.catalog-bar { margin: 12px 0; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
+.catalog-bar .hint { margin-top: 6px; }

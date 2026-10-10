@@ -86,7 +86,7 @@ git commit -m "docs: describe extension development workflow"
 
 ## 通用接口实现与回归工具
 
-`config.js` 是后台与设置页共享配置入口：后台通过 `importScripts` 加载，设置页在 `popup.js` 前加载。它负责默认值、模型列表、Base URL 归一化以及 v3→v4 的一次性迁移。更新时同步 `manifest.json` 与 `popup.html` 的版本显示。
+`config.js` 是后台与设置页共享配置入口：后台通过 `importScripts` 加载，设置页在 `popup.js` 前加载；两端先加载 `model-catalog.js`。它负责默认值、模型列表、Base URL 归一化以及 v3→v4 的一次性迁移。更新时同步 `manifest.json` 与 `popup.html` 的版本显示。
 
 无需任何第三方依赖的后台模拟回归：
 
@@ -103,6 +103,14 @@ node scripts/verify-browser.mjs --playwright '<已安装的 playwright 包目录
 # 自定义 Edge 可再加 --edge '<msedge.exe 绝对路径>'
 ```
 
-使用独立 `.local/browser-profile/api-qa/`，启动 headless Edge，加载本仓库实际扩展。脚本只写入合成测试 Key，启动本机模拟 HTTP API，检查设置持久化、消息、SSE、划词与全文恢复，并保存 `artifacts/qa/browser-check.json` 和截图。它会重置这个专用 QA profile 中的扩展设置，不读取用户日常浏览器配置。
+每轮在 `.local/browser-profile/api-qa/run-<时间戳>/` 创建新的独立 profile，避免旧 Worker 脚本缓存，并启动 headless Edge 加载本仓库实际扩展。脚本只写入合成测试 Key，刷新真实公开模型目录，启动本机模拟 HTTP API，检查设置持久化、消息、SSE、划词与全文恢复，并保存 `artifacts/qa/browser-check.json` 和截图。它会重置这个专用 QA profile 中的扩展设置，不读取用户日常浏览器配置。
 
 实际设置页在扩展页面中直接打开，划词通过页面 mouseup 路径触发，全文翻译通过真实后台 tabs 消息启动。原生工具栏弹出层及右键菜单鼠标操作仍需人工检查；真实供应商仍需使用其有效凭据检查成功、失败与模型能力。
+
+## 厂家目录维护
+
+`model-catalog.js` 内置从公开 `/api/v1/models` 取得的 10 家×3 款文本目录及获取时间，供两端共用。动态刷新返回纯数据，使用白名单厂家与字段、长度/时间/模态检查；不加载远程 JavaScript，也不发送用户 API Key、Base URL、浏览器 storage 或网页数据。刷新去重并按目录上架时间取 3 款，失败保留原快照；部分厂家不足 3 款时保留该厂家缓存并标注。
+
+后台 `REFRESH_MODEL_CATALOG` 消息协调并发刷新并保存 `catalogSnapshot`。设置页在打开后缓存超过 15 分钟时检查，也提供手动实时刷新。两个厂家选择器只筛模型，仍走通用 Base URL/Key。当前接口返回的模型精确 ID 优先；公开目录无法证明某个网关或账号权限。
+
+v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重复清 Key。`modelManufacturers` 记录自定义型号归属，`hiddenCatalogModels` 记录删除/修改的目录项，`availableModels` 记录当前接口返回的 ID；连接变更使当前接口列表失效。最近三款的来源与厂家官方发布日期的区别见 [MANUFACTURER_MODELS_QA.md](MANUFACTURER_MODELS_QA.md)。

@@ -8,7 +8,14 @@
 </head>
 <body>
 <div class="container">
-  <h1 class="title">AI 智能解释 &amp; 翻译 <span class="version">v4.0.0</span></h1>
+  <h1 class="title">AI 智能解释 &amp; 翻译 <span class="version">v4.1.0</span></h1>
+
+  <div class="catalog-bar">
+    <button type="button" id="refresh-catalog" class="fetch-btn">↻ 实时更新厂家模型</button>
+    <p id="catalog-status" class="hint" role="status" aria-live="polite"></p>
+    <p class="hint">每家列出公开目录最近上架的 3 款文本模型，另保留兼容型号和自定义模型。打开设置时，若上次检查已超过 15 分钟则自动更新。</p>
+    <a class="link" href="https://openrouter.ai/models" target="_blank" rel="noopener noreferrer">公开目录来源：OpenRouter</a>
+  </div>
 
   <!-- ═══ 标签切换 ═══ -->
   <div class="tab-bar">
@@ -19,8 +26,11 @@
   <!-- ═══ 解释标签设置 ═══ -->
   <div class="tab-panel active" id="panel-explain">
     <div class="section">
-      <label class="label" for="explain-model">模型列表</label>
-      <select id="explain-model" class="select"></select>
+      <label class="label" for="explain-manufacturer">模型厂家</label>
+      <select id="explain-manufacturer" class="select" aria-controls="explain-model"></select>
+      <label class="label label-spaced" for="explain-model">该厂家模型</label>
+      <select id="explain-model" class="select" aria-describedby="explain-model-detail"></select>
+      <p id="explain-model-detail" class="hint"></p>
 
       <label class="label label-spaced" for="explain-custom-model">模型调用名</label>
       <div class="custom-model-row">
@@ -30,7 +40,7 @@
         <button type="button" id="explain-custom-delete" class="mini-btn danger" disabled>删除</button>
       </div>
       <div id="explain-model-msg" class="model-msg" role="status"></div>
-      <p class="hint">选择列表模型会同步到输入框；修改后点“保存使用”即更新当前模型。点“新增”可输入新调用名添加到列表。模型统一使用下方的接口地址和 API Key。可在线获取更多模型；接口不提供模型列表时，可关闭保存前检测后手动添加。</p>
+      <p class="hint">先选厂家，再选模型。下方显示实际调用名，可新增或修改。所有厂家共用你配置的兼容接口；没有 /models 的接口可关闭保存前检测。</p>
     </div>
 
     <div class="section">
@@ -63,8 +73,11 @@
   <!-- ═══ 翻译标签设置 ═══ -->
   <div class="tab-panel" id="panel-translate">
     <div class="section">
-      <label class="label" for="translate-model">模型列表</label>
-      <select id="translate-model" class="select"></select>
+      <label class="label" for="translate-manufacturer">模型厂家</label>
+      <select id="translate-manufacturer" class="select" aria-controls="translate-model"></select>
+      <label class="label label-spaced" for="translate-model">该厂家模型</label>
+      <select id="translate-model" class="select" aria-describedby="translate-model-detail"></select>
+      <p id="translate-model-detail" class="hint"></p>
 
       <label class="label label-spaced" for="translate-custom-model">模型调用名</label>
       <div class="custom-model-row">
@@ -74,7 +87,7 @@
         <button type="button" id="translate-custom-delete" class="mini-btn danger" disabled>删除</button>
       </div>
       <div id="translate-model-msg" class="model-msg" role="status"></div>
-      <p class="hint">选择列表模型会同步到输入框；修改后点“保存使用”即更新当前模型。点“新增”可输入新调用名添加到列表。模型统一使用下方的接口地址和 API Key。可在线获取更多模型；接口不提供模型列表时，可关闭保存前检测后手动添加。</p>
+      <p class="hint">先选厂家，再选模型。下方显示实际调用名，可新增或修改。所有厂家共用你配置的兼容接口；没有 /models 的接口可关闭保存前检测。</p>
     </div>
 
     <div class="section">
@@ -131,7 +144,7 @@
       <input type="checkbox" id="verify-model" checked>
       <span class="toggle-text">保存模型前查询 /models 检测</span>
     </label>
-    <p class="hint">预设仅供选用，以接口权限为准。没有 /models 的接口可关闭检测，手动保存任意调用名。</p>
+    <p class="hint">此按钮获取当前接口的真实模型 ID，并按厂家归类。目录不代表当前账号权限；没有 /models 时可手动保存。</p>
   </div>
 
   <div class="section">
@@ -164,6 +177,7 @@
   <div id="status" class="status"></div>
 </div>
 
+<script src="model-catalog.js"></script>
 <script src="config.js"></script>
 <script src="popup.js"></script>
 </body>

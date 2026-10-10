@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AI 智能解释 & 翻译",
-  "version": "4.0.0",
-  "description": "划词智能解释与全文流式翻译。支持自定义 OpenAI 兼容接口、统一 API Key、在线获取模型列表和任意模型调用名。",
+  "version": "4.1.0",
+  "description": "划词智能解释与全文流式翻译。支持自定义 OpenAI 兼容接口、统一 API Key、10 家厂家联动模型选择、在线更新目录和自定义模型。",
   "permissions": ["storage", "downloads", "contextMenus", "scripting"],
   "host_permissions": ["<all_urls>"],
   "background": {

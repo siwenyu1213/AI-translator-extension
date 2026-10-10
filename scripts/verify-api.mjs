@@ -47,11 +47,53 @@ async function stream(data, request = {}) {
 }
 const content = '这是流式文本，长度足以验证完整结果与缓存。';
 const sse = `data:${JSON.stringify({ choices: [{ delta: { content } }] })}\r\n\r\ndata: [DONE]`;
+await check('10 家内置目录各有 3 款、DeepSeek 历史兼容项及原生/网关 ID', () => {
+  assert.equal(run('AIModelCatalog.BUILTIN.providers.length'), 10);
+  assert.equal(run('AIModelCatalog.BUILTIN.providers.every(p => p.models.length === 3)'), true);
+  assert.equal(run("AIModelCatalog.resolveId({id:'deepseek/deepseek-v4.1-flash'}, 'https://api.deepseek.com')"), 'deepseek-flash');
+  assert.equal(run("AIModelCatalog.resolveId({id:'deepseek/deepseek-v4.1-flash'}, 'https://openrouter.ai/api/v1')"), 'deepseek/deepseek-v4.1-flash');
+  assert.equal(run("AIModelCatalog.resolveId({id:'deepseek/deepseek-v4.1-flash'}, 'https://gateway.example/v1', ['deepseek/deepseek-v4.1-flash'])"), 'deepseek/deepseek-v4.1-flash');
+  assert.equal(run("AIModelCatalog.COMPATIBILITY.some(m => m.nativeId === 'deepseek-v4-flash' && m.note.includes('退役'))"), true);
+});
+await check('公开目录刷新按时间排序，排除非文本/批量/过期/重复，缺厂家保留缓存', async () => {
+  await config();
+  const model = (id, created, extras = {}) => ({ id, name: id, created,
+    architecture: { input_modalities: ['text'], output_modalities: ['text'] }, ...extras });
+  responder = () => Response.json({ data: [
+    model('openai/gpt-new-c', 100), model('openai/gpt-new-a', 300), model('openai/gpt-new-b', 200),
+    model('openai/gpt-new-a', 300), model('openai/gpt-new-a:batch', 400),
+    model('openai/image-new', 500, { architecture: { input_modalities: ['text'], output_modalities: ['text', 'image'] } }),
+    model('openai/expired', 600, { expiration_date: '2020-01-01' })
+  ] });
+  const snapshot = await run('refreshModelCatalog()');
+  assert.deepEqual(Array.from(snapshot.providers[0].models, m => m.id), ['openai/gpt-new-a', 'openai/gpt-new-b', 'openai/gpt-new-c']);
+  assert.equal(snapshot.providers[1].stale, true);
+  assert.equal(calls[0].url, 'https://openrouter.ai/api/v1/models');
+  assert.equal(calls[0].options.headers, undefined);
+  assert.equal(snapshot.providers.length, 10); assert.equal(storage.apiKey, 'test-only-key');
+});
+await check('目录失败不覆盖存储，损坏缓存回退且厂家归类不改变接口', async () => {
+  await config(); responder = () => new Response('{}', { status: 503 });
+  const previous = JSON.stringify(storage.catalogSnapshot);
+  await assert.rejects(() => run('refreshModelCatalog()'));
+  assert.equal(JSON.stringify(storage.catalogSnapshot), previous);
+  assert.equal(run("AIModelCatalog.normalizeSnapshot({source:AIModelCatalog.SOURCE,updatedAt:new Date().toISOString(),providers:{}}).providers.length"), 10);
+  for (const [id, maker] of [['gateway/DeepSeek-V4-Pro','deepseek'], ['anthropic/claude-sonnet-5.5','anthropic'], ['Qwen/foo','qwen'], ['local/model','custom']]) {
+    context.modelId = id; assert.equal(run('AIModelCatalog.providerFor(modelId)'), maker);
+  }
+});
+await check('v4→厂家目录升级保留已保存的 Key/连接/选定模型且仅追加一次', () => {
+  const once = run("AIConfig.migrate({apiConfigVersion:1,apiBaseUrl:'https://saved.example/v1',apiKey:'saved-test',modelList:['local/model'],explainModel:'local/model',translateModel:'local/model'})");
+  context.once = once;
+  const twice = run('AIConfig.migrate(once)');
+  assert.equal(once.apiKey, 'saved-test'); assert.equal(twice.explainModel, 'local/model');
+  assert.equal(once.modelList.length, twice.modelList.length); assert.equal(twice.apiBaseUrl, 'https://saved.example/v1');
+});
 await check('旧配置移除专用模型与 Key，保留语言/触发方式及自定义模型', () => {
   const result = run("AIConfig.migrate({apiKey:'old-secret',qwenApiKey:'old-secret-2',modelList:['qwen3.7-flash','deepseek-flash','vendor/custom'],explainModel:'deepseek-flash',targetLanguage:'ja',triggerMode:'contextMenu'})");
   assert.equal(result.apiKey, ''); assert.equal(result.qwenApiKey, undefined);
   assert.equal(result.explainModel, 'gpt-4.1-mini'); assert.equal(result.targetLanguage, 'ja');
-  assert.ok(result.modelList.includes('vendor/custom')); assert.equal(result.modelList.length, 11);
+  assert.ok(result.modelList.includes('vendor/custom')); assert.ok(result.modelList.length >= 31);
 });
 await check('完整端点、尾斜杠、子路径归一化；拒绝非法协议与 URL 内凭据', () => {
   assert.equal(run("AIConfig.normalizeBaseUrl('https://example.org/custom/v1/chat/completions/')"), 'https://example.org/custom/v1');
@@ -60,7 +102,7 @@ await check('完整端点、尾斜杠、子路径归一化；拒绝非法协议�
   }
 });
 await check('新版配置再次加载不改自定义模型或连接；删除全部模型保持空列表', () => {
-  const result = run("AIConfig.migrate({apiConfigVersion:1,apiBaseUrl:'http://localhost:1234/v1',apiKey:'local-key',modelList:[],explainModel:'',translateModel:''})");
+  const result = run("AIConfig.migrate({apiConfigVersion:1,modelCatalogVersion:1,apiBaseUrl:'http://localhost:1234/v1',apiKey:'local-key',modelList:[],explainModel:'',translateModel:''})");
   assert.equal(result.apiKey, 'local-key'); assert.equal(result.modelList.length, 0);
   assert.equal(result.explainModel, '');
 });

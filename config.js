@@ -45,9 +45,19 @@
     config.apiBaseUrl ||= DEFAULT_BASE_URL;
     config.apiKey ||= '';
     config.modelList = normalizeModels(config.modelList);
+    // 只升级厂家目录，不改 v4 已保存的接口、Key 或当前模型。
+    if (config.modelCatalogVersion !== 1) {
+      const presets = AIModelCatalog.allModels().map(AIModelCatalog.nativeId);
+      config.modelList = normalizeModels([...config.modelList, ...presets]);
+      config.modelCatalogVersion = 1;
+    }
+    config.modelManufacturers ||= {};
+    config.availableModels = normalizeModels(config.availableModels);
+    config.catalogSnapshot = AIModelCatalog.normalizeSnapshot(config.catalogSnapshot);
     for (const key of ['explainModel', 'translateModel']) {
       config[key] = normalizeModel(config[key]);
       if (!config.modelList.includes(config[key])) config[key] = config.modelList[0] || '';
+      config[key.replace('Model', 'Manufacturer')] = AIModelCatalog.providerFor(config[key], config.modelManufacturers);
     }
     for (const key of ['explainReasoningEffort', 'translateReasoningEffort']) {
       if (!['low', 'medium', 'high'].includes(config[key])) config[key] = 'high';
