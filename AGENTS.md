@@ -5,6 +5,8 @@
 - 本文件适用于整个仓库。开始任务先读 README.md、docs/DEVELOPMENT.md，以及未来新增的子目录规则。
 - 这是原生 JavaScript / HTML / CSS 的 Manifest V3 扩展；根目录源码可直接在 Edge 中加载。当前没有 npm 依赖或构建步骤，不为例行任务引入框架或包管理环境。
 - background.js 管理服务工作线程、API 代理和下载；content.js 管理划词浮层；content-fullpage.js 按需注入执行全文翻译；popup.* 管理设置；manifest.json 声明扩展入口。
+- 如果根目录存在本地 Description.md，开始任务时一并读取。新增、删除、重命名项目文件，或改变职责、入口、调用关系、配置与验证方式时，在同一任务中同步更新对应说明和维护记录；从远程更新代码后也要复核。
+- Description.md 是用户的本地文件说明，使用本仓库 .git/info/exclude 中的 /Description.md 规则排除；不得暂存、强制添加、提交或上传该文件。规则仅对存在此本地文件的工作目录适用。
 
 ## 保护已有成果
 
