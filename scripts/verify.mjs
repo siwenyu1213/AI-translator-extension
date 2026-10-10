@@ -83,6 +83,10 @@ check('Background literal injection resources', () => {
     paths.forEach(resource);
   }
 });
+check('Background imported shared scripts', () => {
+  const source = readFileSync(resolve(root, 'background.js'), 'utf8');
+  for (const match of source.matchAll(/\bimportScripts\(\s*['"]([^'"]+)['"]\s*\)/g)) resource(match[1]);
+});
 
 const report = {
   startedAt, finishedAt: new Date().toISOString(), root, node: process.version, head, workingTree,

@@ -1,4 +1,4 @@
-/* ========== DeepSeek 智能解释 & 翻译 — Popup 样式 ========== */
+/* ========== AI 智能解释 & 翻译 — Popup 样式 ========== */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -290,3 +290,10 @@ body {
   background: #eff6ff;
   border-color: #bfdbfe;
 }
+
+.fetch-btn {
+  width: 100%; padding: 8px; border: 1px solid #bfdbfe; border-radius: 6px;
+  background: #eff6ff; color: #1d4ed8; font: inherit; cursor: pointer;
+}
+.fetch-btn:disabled { opacity: .5; cursor: wait; }
+.hint { line-height: 1.5; color: #64748b; }

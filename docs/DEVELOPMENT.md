@@ -22,13 +22,13 @@ git diff --check
 
 检查脚本使用 Node.js 内置模块，无需 npm install，不联网，不调用供应商 API，不启动浏览器。退出码 0 表示脚本所列检查通过，非 0 表示失败。JSON 报告包含时间、工具版本、运行时检查对应的 HEAD、未提交文件状态及逐项结果。报告的 HEAD 是检查开始时的版本；若检查的是未提交修改，须结合 workingTree 记录判断范围。
 
-检查覆盖：仓库源码中的 .js/.mjs 文件语法、Manifest V3 基本入口、manifest 声明的资源、popup.html 中的本地 JS/CSS 引用、background.js 中 files 字面量引用、设置页版本与 manifest 版本一致性。不完整校验 Manifest schema、HTML/CSS 渲染、chrome.* API、真实流式交互或供应商模型可用性。
+检查覆盖：仓库源码中的 .js/.mjs 文件语法、Manifest V3 基本入口、manifest 声明的资源、popup.html 中的本地 JS/CSS 引用、background.js 中 files 字面量引用与 importScripts 本地共享脚本、设置页版本与 manifest 版本一致性。不完整校验 Manifest schema、HTML/CSS 渲染、chrome.* API、真实流式交互或供应商模型可用性。
 
 ## 加载与更新扩展
 
 1. 打开 Edge 的 edge://extensions，开启开发人员模式。
 2. 点击“加载解压缩的扩展”，选择项目根目录。
-3. 打开扩展设置页，输入对应供应商的 API Key，配置模型和触发方式并保存。
+3. 打开扩展设置页，填写 OpenAI 兼容 API Base URL 和该接口的 API Key，配置模型和触发方式并保存。
 4. 修改源码或 git pull 后，在扩展管理页点击该扩展的重新加载按钮，并刷新已打开的测试网页，使旧内容脚本更新。
 5. 检查扩展管理页的错误信息，必要时打开服务工作线程的开发者工具。
 
@@ -46,9 +46,9 @@ git diff --check
 | 流式请求 | 文本逐步显示、完成状态正确；测试相关断网、无效 Key、取消或重载情况，记录实际错误处理 |
 | 全文翻译 | 右键空白处启动、滚动新内容、原文/译文切换、取消恢复；检查链接/图片及页面布局 |
 | 复制与下载 | 剪贴板内容、TXT 文件内容与浏览器实际下载位置 |
-| 供应商 | 改动涉及的 DeepSeek / 千问真实模型请求；成功和失败场景分别记录 |
+| 兼容接口 | 当前 Base URL + Bearer Key 的模型发现、真实模型、流式与失败路径；查询列表不等于生成已通过 |
 
-可使用 .local/materials/ 下的样本，经本地 HTTP 服务访问；若需临时服务，从样本目录运行 python -m http.server 8765 --bind 127.0.0.1，并在验收后停止。本任务没有创建网页样本或启动服务。
+可使用 .local/materials/ 下的样本，经本地 HTTP 服务访问；若需临时服务，从样本目录运行 python -m http.server 8765 --bind 127.0.0.1，并在验收后停止。浏览器自动化脚本会在 127.0.0.1 的随机端口启动临时样本和模拟 API，并在结束时停止。
 
 ## 证据与交付
 
@@ -83,3 +83,26 @@ git commit -m "docs: describe extension development workflow"
 ```
 
 上述文件列表仅为示例，实际提交须包含本任务的完整且准确范围。需要上传时按用户授权执行 git push；出现 PR 时先审核/验收、在 GitHub 合并，再在干净的本地 main 上执行 git pull --ff-only origin main。若本地 main 有自己的未推送提交，先比较两边历史再决定整合方式。
+
+## 通用接口实现与回归工具
+
+`config.js` 是后台与设置页共享配置入口：后台通过 `importScripts` 加载，设置页在 `popup.js` 前加载。它负责默认值、模型列表、Base URL 归一化以及 v3→v4 的一次性迁移。更新时同步 `manifest.json` 与 `popup.html` 的版本显示。
+
+无需任何第三方依赖的后台模拟回归：
+
+```powershell
+node scripts/verify-api.mjs
+```
+
+该脚本在 Node VM 中执行实际 `config.js` / `background.js`，模拟 chrome.storage 与网络响应。结果为 `artifacts/qa/api-simulation.json`，不代表浏览器或真实 API 已验收。
+
+如果本机已经有 Playwright，可运行可选的实际 Edge 验收（不执行 npm install，不改变扩展运行依赖）：
+
+```powershell
+node scripts/verify-browser.mjs --playwright '<已安装的 playwright 包目录>'
+# 自定义 Edge 可再加 --edge '<msedge.exe 绝对路径>'
+```
+
+使用独立 `.local/browser-profile/api-qa/`，启动 headless Edge，加载本仓库实际扩展。脚本只写入合成测试 Key，启动本机模拟 HTTP API，检查设置持久化、消息、SSE、划词与全文恢复，并保存 `artifacts/qa/browser-check.json` 和截图。它会重置这个专用 QA profile 中的扩展设置，不读取用户日常浏览器配置。
+
+实际设置页在扩展页面中直接打开，划词通过页面 mouseup 路径触发，全文翻译通过真实后台 tabs 消息启动。原生工具栏弹出层及右键菜单鼠标操作仍需人工检查；真实供应商仍需使用其有效凭据检查成功、失败与模型能力。

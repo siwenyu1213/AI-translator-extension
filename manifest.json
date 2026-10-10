@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "DeepSeek 智能解释 & 翻译",
-  "version": "3.5.0",
-  "description": "选中文本智能解释/翻译，全文覆盖翻译。模型列表支持 deepseek-flash、自定义模型调用名，可在线检测、修改、删除，全部流式输出。",
+  "name": "AI 智能解释 & 翻译",
+  "version": "4.0.0",
+  "description": "划词智能解释与全文流式翻译。支持自定义 OpenAI 兼容接口、统一 API Key、在线获取模型列表和任意模型调用名。",
   "permissions": ["storage", "downloads", "contextMenus", "scripting"],
   "host_permissions": ["<all_urls>"],
   "background": {
@@ -16,7 +16,7 @@
     }
   ],
   "action": {
-    "default_title": "DeepSeek 智能解释 & 翻译",
+    "default_title": "AI 智能解释 & 翻译",
     "default_popup": "popup.html"
   }
 }

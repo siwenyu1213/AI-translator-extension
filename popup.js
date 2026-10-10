@@ -1,19 +1,6 @@
-// ========== DeepSeek 智能解释 & 翻译 — Popup ==========
+// ========== AI 智能解释 & 翻译 — Popup ==========
 // 双标签布局：解释 / 翻译各自独立模型配置 + 通用设置
-// 模型列表：所有模型（含预设）均可修改、保存、删除；保存前调用 API 校验可用性
-
-// ── 模型常量与旧名称兼容 ──
-const DEFAULT_MODEL = 'deepseek-flash';
-const DEFAULT_MODEL_LIST = ['deepseek-flash', 'deepseek-v4-pro', 'qwen3.7-flash'];
-const LEGACY_MODEL_ALIASES = {
-  'deepseek-v4-flash': 'deepseek-flash',
-  'deepseek-v4-flash-vision-exp': 'deepseek-flash'
-};
-const MODEL_DISPLAY_NAMES = {
-  'deepseek-flash': 'DeepSeek-V4.1-Flash',
-  'deepseek-v4-pro': 'DeepSeek-V4-Pro',
-  'qwen3.7-flash': 'Qwen3.7-Flash'
-};
+// 模型列表：预设和自定义均可修改、保存、删除；可选查询接口模型列表。
 
 // ── DOM 引用 ──
 // 标签
@@ -46,7 +33,10 @@ const $targetLanguage = document.getElementById('target-language');
 
 // 通用
 const $apiKey = document.getElementById('api-key');
-const $qwenApiKey = document.getElementById('qwen-api-key');
+const $apiBaseUrl = document.getElementById('api-base-url');
+const $fetchModels = document.getElementById('fetch-models');
+const $verifyModel = document.getElementById('verify-model');
+const $connectionMsg = document.getElementById('connection-msg');
 const $enabled = document.getElementById('enabled');
 const $useContext = document.getElementById('use-context');
 const $triggerMode = document.getElementById('trigger-mode');
@@ -87,7 +77,7 @@ const tabs = [
 
 function normalizeModelName(model) {
   const name = String(model || '').trim();
-  return LEGACY_MODEL_ALIASES[name] || name;
+  return name;
 }
 
 function normalizeModelList(list) {
@@ -100,10 +90,7 @@ function normalizeModelList(list) {
   return out;
 }
 
-function modelDisplayName(model) {
-  const name = MODEL_DISPLAY_NAMES[model];
-  return name ? `${name}（${model}）` : model;
-}
+function modelDisplayName(model) { return model; }
 
 function clearModelMessage($msg) {
   clearTimeout($msg._hideTimer);
@@ -124,12 +111,6 @@ function showModelMessage($msg, text, type = 'error', autoHide = 5000) {
 }
 
 function syncThinkingForTab(tab) {
-  const isQwen = (tab.select.value || '').startsWith('qwen');
-  if (isQwen) {
-    tab.thinking.checked = false;
-    tab.effortSection.style.display = 'none';
-    return;
-  }
   tab.effortSection.style.display = tab.thinking.checked ? '' : 'none';
 }
 
@@ -235,11 +216,15 @@ async function saveCurrentModel(tab) {
   // 按用户要求：保存前先调用后台 API 测试模型是否存在/可调用
   tab.addBtn.disabled = true;
   tab.newBtn.disabled = true;
-  showModelMessage(tab.msg, '正在检测模型可用性…', 'info', 0);
+  showModelMessage(tab.msg, '正在保存模型…', 'info', 0);
 
   let result;
   try {
-    result = await chrome.runtime.sendMessage({ type: 'VALIDATE_MODEL', model: requested });
+    const connection = getConnection();
+    result = $verifyModel.checked
+      ? await chrome.runtime.sendMessage({ type: 'VALIDATE_MODEL', model: requested, connection })
+      : { ok: true, model: { id: requested } };
+    if (result?.ok) await saveConnection(connection);
   } catch (err) {
     result = { ok: false, error: err.message || '模型检测失败' };
   } finally {
@@ -262,7 +247,7 @@ async function saveCurrentModel(tab) {
       renderAllModelOptions();
       setTabSelection(tab, targetId);
       await chrome.storage.local.set({ modelList: modelList.slice(), [tab.key]: targetId });
-      showModelMessage(tab.msg, `✅ 模型可用，已选择：${targetId}`, 'success', 3000);
+      showModelMessage(tab.msg, `✅ 已选择：${targetId}`, 'success', 3000);
       return;
     }
     showModelMessage(tab.msg, `模型列表中已存在：${targetId}，请直接从列表选择`, 'error', 8000);
@@ -298,7 +283,7 @@ async function saveCurrentModel(tab) {
   await chrome.storage.local.set(updates);
 
   const action = currentInList ? '修改' : '新增';
-  showModelMessage(tab.msg, `✅ 模型可用，已保存${action}：${targetId}`, 'success', 3000);
+  showModelMessage(tab.msg, `✅ 已保存${action}：${targetId}`, 'success', 3000);
 }
 
 async function deleteCurrentModel(tab) {
@@ -351,106 +336,12 @@ tabs.forEach(tab => {
 // ═══════════════════════════════════════════
 
 (async () => {
-  const defaults = {
-    apiKey: '',
-    qwenApiKey: '',
-    // 解释
-    explainModel: DEFAULT_MODEL,
-    explainThinkingEnabled: false,
-    explainReasoningEffort: 'high',
-    language: 'auto',
-    // 翻译
-    translateModel: DEFAULT_MODEL,
-    translateThinkingEnabled: false,
-    translateReasoningEffort: 'high',
-    targetLanguage: 'zh',
-    // 通用
-    enabled: true,
-    usePageContext: true,
-    triggerMode: 'auto',
-    // null 表示没有保存过模型列表，需要按默认预设迁移
-    modelList: null
-  };
-
-  let config = await chrome.storage.local.get(defaults);
-  let migrated = false;
-
-  // ── 旧版配置迁移 ──
-  if (config.model !== undefined) {
-    config.explainModel = config.model;
-    config.translateModel = config.model;
-    delete config.model;
-    migrated = true;
-  }
-  if (config.thinkingEnabled !== undefined) {
-    config.explainThinkingEnabled = config.thinkingEnabled;
-    config.translateThinkingEnabled = config.thinkingEnabled;
-    delete config.thinkingEnabled;
-    migrated = true;
-  }
-  if (config.reasoningEffort !== undefined) {
-    config.explainReasoningEffort = config.reasoningEffort;
-    config.translateReasoningEffort = config.reasoningEffort;
-    delete config.reasoningEffort;
-    migrated = true;
-  }
-
-  // 旧模型名兼容：deepseek-v4-flash → deepseek-flash
-  const originalExplain = config.explainModel;
-  const originalTranslate = config.translateModel;
-  config.explainModel = normalizeModelName(config.explainModel) || DEFAULT_MODEL;
-  config.translateModel = normalizeModelName(config.translateModel) || DEFAULT_MODEL;
-  if (config.explainModel !== originalExplain || config.translateModel !== originalTranslate) {
-    migrated = true;
-  }
-
-  // 模型列表：优先使用新版 modelList；否则由内置预设 + 旧 customModels 迁移而来
-  const storedModelList = Array.isArray(config.modelList) ? config.modelList : null;
-  const normalizedStoredModelList = storedModelList ? normalizeModelList(storedModelList) : null;
-
-  if (storedModelList) {
-    modelList = normalizedStoredModelList;
-  } else {
-    modelList = normalizeModelList([
-      ...DEFAULT_MODEL_LIST,
-      ...(Array.isArray(config.customModels) ? config.customModels : [])
-    ]);
-    // 旧配置中正在使用的自定义模型也必须出现在列表里
-    [config.explainModel, config.translateModel].forEach(model => {
-      if (model && !modelList.includes(model)) modelList.push(model);
-    });
-  }
-
-  if (!storedModelList || JSON.stringify(normalizedStoredModelList) !== JSON.stringify(storedModelList)) {
-    migrated = true;
-  }
-
-  // 当前选中模型如果不在列表中，则回退到列表第一个；列表为空时为空
-  const pickSelectedModel = preferred => {
-    const model = normalizeModelName(preferred);
-    if (model && modelList.includes(model)) return model;
-    return modelList[0] || '';
-  };
-  const pickedExplain = pickSelectedModel(config.explainModel);
-  const pickedTranslate = pickSelectedModel(config.translateModel);
-  if (pickedExplain !== config.explainModel || pickedTranslate !== config.translateModel) {
-    config.explainModel = pickedExplain;
-    config.translateModel = pickedTranslate;
-    migrated = true;
-  }
-
-  if (migrated) {
-    await chrome.storage.local.set({
-      ...config,
-      explainModel: config.explainModel,
-      translateModel: config.translateModel,
-      modelList: modelList.slice()
-    });
-  }
-  // 清理旧版 customModels 键
-  if (config.customModels !== undefined) {
-    await chrome.storage.local.remove('customModels');
-  }
+  const config = await AIConfig.load();
+  modelList = config.modelList.slice();
+  $apiBaseUrl.value = config.apiBaseUrl;
+  $verifyModel.checked = config.verifyModel !== false;
+  if (config.requiresApiSetup) showModelMessage($connectionMsg,
+    '已升级为通用接口。旧供应商 Key 和预设已移除，请填写新的接口地址和 API Key。', 'info', 0);
 
   // ── 填充 UI ──
   $explainThinking.checked = config.explainThinkingEnabled === true;
@@ -466,11 +357,11 @@ tabs.forEach(tab => {
   setTabSelection(tabs[1], config.translateModel);
 
   $apiKey.value = config.apiKey || '';
-  $qwenApiKey.value = config.qwenApiKey || '';
+
   $enabled.checked = config.enabled !== false;
   $useContext.checked = config.usePageContext !== false;
   $triggerMode.value = config.triggerMode || 'auto';
-})();
+})().catch(err => showStatus('读取设置失败：' + err.message, 'error'));
 
 // ═══════════════════════════════════════════
 // 保存配置
@@ -478,11 +369,15 @@ tabs.forEach(tab => {
 
 $saveBtn.addEventListener('click', async () => {
   const apiKey = $apiKey.value.trim();
-  const qwenApiKey = $qwenApiKey.value.trim();
+  let connection;
+  try { connection = getConnection(); }
+  catch (err) { showStatus(err.message, 'error'); return; }
 
   const config = {
     apiKey: apiKey,
-    qwenApiKey: qwenApiKey,
+    ...connection,
+    verifyModel: $verifyModel.checked,
+    requiresApiSetup: false,
     // 解释标签
     explainModel: normalizeModelName($explainModel.value) || '',
     explainThinkingEnabled: $explainThinking.checked,
@@ -503,7 +398,7 @@ $saveBtn.addEventListener('click', async () => {
 
   try {
     await chrome.storage.local.set(config);
-    if (!apiKey && !qwenApiKey) {
+    if (!apiKey) {
       showStatus('⚠️ 已保存，但未设置任何 API Key，扩展将无法使用', 'error');
     } else {
       showStatus('✅ 设置已保存！现在去任意页面试试吧', 'success');
@@ -539,3 +434,30 @@ function showStatus(msg, type) {
     $status.className = 'status';
   }, 3000);
 }
+
+// 获取列表和保存模型均使用当前输入的连接，不需要先点总保存。
+function getConnection() {
+  return { apiBaseUrl: AIConfig.normalizeBaseUrl($apiBaseUrl.value), apiKey: $apiKey.value.trim() };
+}
+async function saveConnection(connection) {
+  await chrome.storage.local.set({ ...connection, verifyModel: $verifyModel.checked, requiresApiSetup: false });
+  $apiBaseUrl.value = connection.apiBaseUrl;
+}
+$fetchModels.addEventListener('click', async () => {
+  $fetchModels.disabled = true;
+  showModelMessage($connectionMsg, '正在获取接口模型列表…', 'info', 0);
+  try {
+    const connection = getConnection();
+    const result = await chrome.runtime.sendMessage({ type: 'LIST_MODELS', connection });
+    if (!result?.ok) throw new Error(result?.error || '获取模型失败');
+    modelList = normalizeModelList([...modelList, ...result.models]);
+    const selected = tabs.map(tab => tab.select.value || result.models[0]);
+    renderAllModelOptions();
+    tabs.forEach((tab, index) => setTabSelection(tab, selected[index]));
+    await chrome.storage.local.set({ ...connection, modelList: modelList.slice(),
+      explainModel: tabs[0].select.value, translateModel: tabs[1].select.value,
+      verifyModel: $verifyModel.checked, requiresApiSetup: false });
+    showModelMessage($connectionMsg, `✅ 获取 ${result.models.length} 个模型并合并到列表。请选择支持文本对话的模型，列表存在不代表生成已验证。`, 'success', 0);
+  } catch (err) { showModelMessage($connectionMsg, err.message, 'error', 0); }
+  finally { $fetchModels.disabled = false; }
+});

@@ -1,14 +1,15 @@
-# DeepSeek 智能解释 & 翻译 - Edge 浏览器扩展
+# AI 智能解释 & 翻译 - Edge 浏览器扩展
 
-> 选中网页上的任意文本，DeepSeek 立刻在鼠标旁弹出智能解释或翻译卡片。右键空白处一键全文翻译。
+> 选中网页上的任意文本，AI 立刻在鼠标旁弹出智能解释或翻译卡片。右键空白处一键全文翻译。
 
 这是一款轻量级 Edge 浏览器扩展。无需跳转页面、无需复制粘贴——在浏览网页时选中文字，AI 自动判断你需要解释还是翻译，即时给出分点结果。支持全文覆盖翻译（如 Edge 自带翻译）、流式打字机输出、双标签独立模型配置。
 
 ## 前置条件
 
 - Edge 浏览器（Chrome 亦可）
-- DeepSeek API Key（[点击获取](https://platform.deepseek.com/api_keys)）
-- 千问 API Key（可选，[点击获取](https://platform.qianwenai.com/home/api-keys)）—— 如需使用 Qwen3.7-Flash 模型
+- 一个支持 **OpenAI Chat Completions** 的接口地址（Base URL）及该接口的 API Key
+- 默认地址是 `https://api.openai.com/v1`，也可填写第三方兼容服务、聚合网关或本机兼容服务地址
+- 鉴权方式为 `Authorization: Bearer <API Key>`；这里的“兼容 OpenAI”指协议兼容，每家服务仍需使用自己的 Key
 
 ## 功能
 
@@ -29,10 +30,12 @@
 - **网页上下文**：自动提取选中文本所在段落的上下文，让结果更准确（可选开关）
 - **流式输出**：所有解释/翻译结果逐 token 打字机式呈现，即时反馈
 - **一键复制 / 下载**：将内容写入剪贴板或保存为 TXT 文件
-- **多模型**：支持 DeepSeek-V4.1-Flash（调用名 `deepseek-flash`）、DeepSeek-V4-Pro（调用名 `deepseek-v4-pro`）、千问 Qwen3.7-Flash（暂不推荐使用千问模型）
-- **模型列表**：解释/全文翻译各自从“模型列表”选择模型，选中后调用名会同步到“模型调用名”输入框；预设的 `deepseek-flash`、`deepseek-v4-pro` 也可修改、删除，方便后续模型更新时自助替换
-- **保存前检测**：点“保存使用”会调用官方 `/models` 接口检测模型调用名是否可用；不可用时显示淡红色提示且不写入列表。列表中的模型均支持修改、保存、删除
-- **深度思考**：可选开启思考模式，支持高/最高两档思考强度（DeepSeek Flash / V4-Pro 均支持）
+- **通用接口**：自定义 Base URL + 单一 API Key，解释/全文翻译各自选模型，共用接口连接，不再按模型名前缀路由
+- **10 个模型预设**：`gpt-4.1-mini`（默认）、`gpt-4.1`、`gpt-4.1-nano`、`gpt-4o`、`gpt-4o-mini`、`gpt-5`、`gpt-5-mini`、`gpt-5-nano`、`o3`、`o4-mini`。预设是可编辑的调用名，是否有权限使用以接口实际响应为准
+- **在线获取更多模型**：点击“获取接口模型列表”，向当前输入的地址请求 `/models`，去重后合并到两个标签共用的列表；网关的带路径模型 ID 会原样保留。列表可能包括嵌入/图像等模型，应选择支持文本 Chat Completions 的模型
+- **手动模型管理**：列表和调用名输入框同步，所有模型都可新增、修改、删除；两个标签可以选择不同模型
+- **可选保存前检测**：默认查询 `/models`；无效调用名或 Key 会提示并阻止保存。若接口没有 `/models`，取消“保存模型前查询 /models 检测”即可手动保存。查询成功只表示模型 ID 在列表内，不等于完成真实生成
+- **可选思考参数**：开启后发送标准 `reasoning_effort`（低/中/高），只适用于支持此参数的接口及模型。关闭时省略参数、使用模型自身默认行为，全文翻译建议关闭
 
 ### 全文翻译（右键空白处）
 
@@ -45,9 +48,7 @@
 
 ### 双标签独立配置
 
-设置面板分为「📖 解释」和「🌐 全文翻译」两个标签，**各自拥有独立的模型选择**（可在 DeepSeek 和千问之间切换）、深度思考开关和思考强度。
-
-比如：解释用 DeepSeek V4-Pro（深度推理），全文翻译用千问 Qwen3.7-Flash（高性价比）。跨供应商混搭，互不干扰。
+设置面板分为「📖 解释」和「🌐 全文翻译」两个标签，各自拥有模型选择、思考开关和强度。比如解释选择 `gpt-4.1`，全文翻译选择 `gpt-4.1-mini`，都使用同一个兼容接口及 Key。
 
 ## 安装
 
@@ -60,20 +61,24 @@ git clone https://github.com/siwenyu666-beep/AI-translator-extension.git
 1. 打开 Edge，地址栏输入 `edge://extensions`（或在扩展图标中点击"管理扩展"）
 2. 开启左侧「开发人员模式」
 3. 点击「加载解压缩的扩展」，选择克隆后的文件夹
-4. 点击工具栏扩展图标，在「解释」或「全文翻译」标签中选择模型，填入对应的 API Key：
-   - 默认推荐 DeepSeek `deepseek-flash`（即 DeepSeek-V4.1-Flash）
-   - 在「模型调用名」输入后点「保存使用」，会先检测模型可用性；通过后当前标签立即使用，并保存到两个标签共享的模型列表
-   - 从「模型列表」选择模型时，输入框会同步显示调用名；修改输入框后点「保存使用」即更新该模型，点「删除」可删除任意列表模型（包括预设模型）
-   - DeepSeek 模型 → 需填入 DeepSeek API Key（[获取地址](https://platform.deepseek.com/api_keys)）
-   - 千问模型 → 需填入千问 API Key（[获取地址](https://platform.qianwenai.com/home/api-keys)）
-5. 去任意网页选中文字右键，或右键空白处，即可使用
+4. 点击工具栏扩展图标，填写“API Base URL”和“API Key”：
+   - OpenAI 官方地址为 `https://api.openai.com/v1`；第三方服务使用其提供的地址和 Key，保留 `/v1` 或其他兼容路径
+   - 也可粘贴完整 `/chat/completions` 地址，保存时自动归一化；不要在地址内嵌入 Key、账号或查询参数
+   - 点“获取接口模型列表”获取账号的模型 ID；这个按钮和“保存使用”直接使用当前输入的连接，通过后立即保存连接，无需先点总保存
+   - 在两个标签分别选择模型，点“保存设置”。修改调用名用“保存使用”；增加新调用名先点“新增”
+   - 如果接口不支持查询 `/models`，取消保存前检测，手动输入模型调用名
+5. 去普通网页选中文字右键，或右键空白处，即可使用
+
+升级旧版本后请在 `edge://extensions` 点重新加载，并刷新已打开网页。v4.0.0 移除千问、DeepSeek 专用设置和预设；首次升级会清空旧供应商 Key，回退到通用默认模型，保留语言、触发方式和其他自定义模型。请重新填写新接口的 Key，旧 Key 不会自动发送给新地址。
+
+支持范围为 HTTP/HTTPS、Bearer Key 鉴权、`POST <Base URL>/chat/completions`，并返回 OpenAI 格式 SSE（`choices[0].delta.content`）。只提供 Responses API、原生其他协议或需要特殊鉴权的服务不在当前支持范围内。并非一个 OpenAI 官方 Key 可用于所有服务。
 
 ## 使用技巧
 
 - **右键菜单永远只需点一下**：选中文本 →「📖 智能解释」（自动分类，不用纠结选什么）；空白处 →「🌐 全文翻译」。没有多余的菜单项
 - 在设置面板中切换「触发方式」：「选中自动搜索」更快捷，「右键菜单搜索」避免误触发
 - 将 Edge 默认下载目录设为你的笔记文件夹，下载的解释文件会自动归档
-- 开启「深度思考模式」（V4-Pro 效果最佳，DeepSeek Flash 亦支持）
+- 仅在接口和模型支持 `reasoning_effort` 时开启「深度思考模式」；遇到参数错误可关闭后重试
 - 关闭「结合网页上下文」可减少 token 消耗
 - 按【Esc】可以快速关闭弹窗
 
@@ -82,7 +87,7 @@ git clone https://github.com/siwenyu666-beep/AI-translator-extension.git
 - Manifest V3
 - Service Worker（流式 API 代理 + SSE 解析）
 - Content Script（划词检测 + 四分类自动分发 + 流式渲染 + 全文 DOM 覆盖翻译）
-- DeepSeek Chat Completions API / 千问 DashScope OpenAI 兼容 API（stream: true）
+- OpenAI 兼容 Chat Completions API（Bearer 鉴权，stream: true）
 
 ## 许可证
 
@@ -99,3 +104,5 @@ node scripts/verify.mjs --report artifacts/qa/static-check.json
 ```
 
 静态检查通过仅说明 JavaScript 语法及已检查的本地资源引用通过；浏览器功能和真实 API 请求需按开发说明另行验收。
+
+本次通用接口变更、执行证据和未验证项见 [docs/OPENAI_COMPATIBLE_QA.md](docs/OPENAI_COMPATIBLE_QA.md)。接口实现参考 [OpenAI Chat Completions 文档](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) 和 [模型列表文档](https://developers.openai.com/api/reference/resources/models/methods/list)。

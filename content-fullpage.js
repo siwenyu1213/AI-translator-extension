@@ -1,4 +1,4 @@
-// ========== DeepSeek 全文翻译 — Content Script ==========
+// ========== AI 全文翻译 — Content Script ==========
 // 由 background.js 通过 chrome.scripting.executeScript 按需注入
 // 职责：DOM 文本扫描 → 段落级流式翻译 → 覆盖原文 → 视口感知 → 还原
 

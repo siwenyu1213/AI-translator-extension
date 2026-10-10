@@ -1,15 +1,11 @@
-// ========== DeepSeek 智能解释 & 翻译 — Service Worker ==========
+// ========== AI 智能解释 & 翻译 — Service Worker ==========
 // 职责：配置管理、流式 API 代理、动态右键菜单、缓存、下载
 
 const CACHE = new Map();
 const CACHE_MAX = 100;
+let cacheRevision = 0;
 
-// 官方已将 deepseek-v4-flash 迁移为 deepseek-flash（DeepSeek-V4.1-Flash）。
-// 旧的调用名仍被官方接受，但对应模型已退役；这里统一归一化，避免旧配置继续发旧模型名。
-const LEGACY_MODEL_ALIASES = {
-  'deepseek-v4-flash': 'deepseek-flash',
-  'deepseek-v4-flash-vision-exp': 'deepseek-flash'
-};
+importScripts('config.js');
 
 // ═══════════════════════════════════════════
 // 右键菜单：安装/更新时创建（精简为两项）
@@ -63,9 +59,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     injectFullPageTranslator(sender);
     return false;
   }
-  // 模型可用性检测：调用各供应商的 /models 接口，避免无效模型被保存到列表
+  if (message.type === 'LIST_MODELS') {
+    listModels(message.connection)
+      .then(sendResponse)
+      .catch(err => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+  // 查询模型列表不代表已经完成一次生成请求。
   if (message.type === 'VALIDATE_MODEL') {
-    validateModel(message.model)
+    validateModel(message.model, message.connection)
       .then(result => sendResponse(result))
       .catch(err => sendResponse({ ok: false, error: err.message || '模型检测失败' }));
     return true; // 异步响应
@@ -86,7 +88,7 @@ async function injectFullPageTranslator(sender) {
       files: ['content-fullpage.js']
     });
   } catch (err) {
-    console.error('[DeepSeek] 全文翻译注入失败:', err);
+    console.error('[AI] 全文翻译注入失败:', err);
   }
 }
 
@@ -124,7 +126,7 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
     port.disconnect();
     return;
   }
-  if (!config.apiKey && !config.qwenApiKey) {
+  if (!config.apiKey) {
     port.postMessage({ type: 'error', error: '请先设置 API Key', batchId });
     port.disconnect();
     return;
@@ -136,11 +138,11 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
   if (mode) {
     if (mode === 'B') {
       // 纯翻译 → 使用翻译标签的模型
-      model = config.translateModel || 'deepseek-flash';
+      model = config.translateModel;
       thinkingEnabled = config.translateThinkingEnabled || false;
       reasoningEffort = config.translateReasoningEffort || 'high';
     } else {
-      model = config.explainModel || 'deepseek-flash';
+      model = config.explainModel;
       thinkingEnabled = config.explainThinkingEnabled || false;
       reasoningEffort = config.explainReasoningEffort || 'high';
     }
@@ -157,37 +159,37 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
     }
   } else if (promptType === 'explain') {
     // 兼容旧路径
-    model = config.explainModel || 'deepseek-flash';
+    model = config.explainModel;
     thinkingEnabled = config.explainThinkingEnabled || false;
     reasoningEffort = config.explainReasoningEffort || 'high';
     systemPrompt = '你是一个知识渊博、擅于解释的助手。给出简洁清晰的解释，不要重复开场白，直接解释。';
     prompt = buildExplainPrompt(text, config.language, context);
   } else {
     // translate (fullpage / pdf)
-    model = config.translateModel || 'deepseek-flash';
+    model = config.translateModel;
     thinkingEnabled = config.translateThinkingEnabled || false;
     reasoningEffort = config.translateReasoningEffort || 'high';
     systemPrompt = '你是一个专业的翻译引擎。只输出译文，不要任何解释、说明。';
     prompt = buildTranslatePrompt(text, config.targetLanguage || 'zh', context);
   }
 
-  // ── 供应商判断 & Key 验证 ──
-  const provider = getProvider(model);
-  const apiKey = provider === 'qwen' ? config.qwenApiKey : config.apiKey;
-  if (!apiKey) {
-    const name = provider === 'qwen' ? '千问' : 'DeepSeek';
-    port.postMessage({ type: 'error', error: `请先设置${name} API Key`, batchId });
+  if (!model) {
+    port.postMessage({ type: 'error', error: '请先选择模型并保存设置', batchId });
     port.disconnect();
     return;
   }
+  let baseUrl;
+  try { baseUrl = AIConfig.normalizeBaseUrl(config.apiBaseUrl); }
+  catch (err) {
+    port.postMessage({ type: 'error', error: err.message, batchId });
+    port.disconnect();
+    return;
+  }
+  const apiKey = config.apiKey;
 
   // 缓存检查（键包含思考开关，避免开关切换后命中旧缓存）
-  const modeKey = mode || promptType;
-  const langKey = (mode && (mode === 'A' || mode === 'B')) ? (config.targetLanguage || 'zh') : config.language;
-  const ctxFingerprint = context ? hashString(context.title + (context.before || '') + (context.after || '')) : 'noctx';
-  const thinkingFlag = thinkingEnabled ? 't1' : 't0';
-  const effortFlag = thinkingEnabled ? (reasoningEffort || 'default') : 'n';
-  const cacheKey = `${modeKey}:${model}:${langKey}:${thinkingFlag}:${effortFlag}:${ctxFingerprint}:${text}`;
+  const cacheKey = JSON.stringify([cacheRevision, baseUrl, model, systemPrompt, prompt,
+    thinkingEnabled, reasoningEffort]);
   if (CACHE.has(cacheKey)) {
     // 模拟流式：分 chunk 发送缓存结果
     const cached = CACHE.get(cacheKey);
@@ -202,44 +204,33 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
         return;
       }
     }
-    port.postMessage({ type: 'done', model: model.replace('deepseek-', ''), batchId });
+    port.postMessage({ type: 'done', model: model, batchId });
     port.disconnect();
     return;
   }
 
   const controller = new AbortController();
   port.onDisconnect.addListener(() => controller.abort());
+  let timedOut = false;
+  let timeout;
+  const resetTimeout = () => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 60000);
+  };
+  resetTimeout();
 
   try {
-    let maxTokens = getMaxTokens(mode, promptType);
-    if (thinkingEnabled && provider === 'deepseek') {
-      maxTokens *= 3; // 思考模式的推理 token 计入输出上限，需放大防止回答被截断
-    }
     const body = {
-      model: model,
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt }
       ],
-      temperature: (mode === 'B' || promptType === 'translate') ? 0.1 : 0.3,
-      max_tokens: maxTokens,
       stream: true
     };
-
-    if (provider === 'deepseek') {
-      // DeepSeek V4/V4.1 思考模式默认开启，必须显式控制开关，否则 UI 开关形同虚设
-      body.thinking = { type: thinkingEnabled ? 'enabled' : 'disabled' };
-      if (thinkingEnabled) {
-        body.reasoning_effort = reasoningEffort;
-        // 思考模式下 temperature 是无效参数（官方文档），省略
-        delete body.temperature;
-      }
-    }
-
-    // 根据供应商选择端点
-    const endpoint = provider === 'qwen'
-      ? 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
-      : 'https://api.deepseek.com/chat/completions';
+    // 默认使用最小公共参数，避免不同模型对 temperature / token 上限的差异。
+    if (thinkingEnabled) body.reasoning_effort = reasoningEffort;
+    const endpoint = `${baseUrl}/chat/completions`;
 
     const res = await fetch(endpoint, {
       method: 'POST',
@@ -257,76 +248,57 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
       return;
     }
 
-    // SSE 流式解析
+    if (!res.body) throw new Error('接口没有返回响应流');
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
-    let buffer = '';
-    let fullText = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') {
-          // 缓存完整结果
-          if (fullText.length > 10) {
-            CACHE.set(cacheKey, fullText);
-            if (CACHE.size > CACHE_MAX) {
-              const first = CACHE.keys().next().value;
-              CACHE.delete(first);
-            }
-          }
-          port.postMessage({ type: 'done', model: model.replace('deepseek-', ''), batchId });
-          return;
-        }
-        try {
-          const parsed = JSON.parse(data);
-          const token = parsed?.choices?.[0]?.delta?.content;
-          if (token) {
-            fullText += token;
-            port.postMessage({ type: 'token', token, batchId });
-          }
-        } catch { /* skip malformed */ }
+    let buffer = '', fullText = '', finished = false, sawFinish = false;
+    function consume(line) {
+      if (!line.startsWith('data:')) return;
+      const data = line.slice(5).trim();
+      if (!data) return;
+      if (data === '[DONE]') { finished = true; return; }
+      let parsed;
+      try { parsed = JSON.parse(data); }
+      catch { throw new Error('接口返回了无效的流式 JSON'); }
+      if (parsed.error) throw new Error(parsed.error.message || '接口流式响应报错');
+      const choice = parsed?.choices?.[0];
+      const token = choice?.delta?.content;
+      if (typeof token === 'string' && token) {
+        fullText += token;
+        port.postMessage({ type: 'token', token, batchId });
       }
+      if (choice?.finish_reason === 'length') throw new Error('模型输出达到长度上限，请缩短待翻译文本');
+      if (choice?.finish_reason === 'content_filter') throw new Error('接口过滤了模型输出');
+      if (choice?.finish_reason) sawFinish = true;
     }
-
-    // 流结束但没收到 [DONE]：flush 解码器残余字节
-    buffer += decoder.decode();
-    for (const line of buffer.split('\n')) {
-      if (!line.startsWith('data: ')) continue;
-      const data = line.slice(6).trim();
-      if (data === '[DONE]') break;
-      try {
-        const parsed = JSON.parse(data);
-        const token = parsed?.choices?.[0]?.delta?.content;
-        if (token) {
-          fullText += token;
-          port.postMessage({ type: 'token', token, batchId });
-        }
-      } catch { /* skip malformed */ }
-    }
-
-    // 缓存完整结果
+    try {
+      while (!finished) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        resetTimeout();
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) { consume(line); if (finished) break; }
+      }
+      if (!finished) {
+        buffer += decoder.decode();
+        for (const line of buffer.split('\n')) { consume(line); if (finished) break; }
+      }
+    } finally { await reader.cancel().catch(() => {}); }
+    if (!fullText) throw new Error('模型没有返回文本，请确认该模型支持流式 Chat Completions');
+    if (!finished && !sawFinish) throw new Error('响应流意外中断，请重试');
     if (fullText.length > 10) {
       CACHE.set(cacheKey, fullText);
-      if (CACHE.size > CACHE_MAX) {
-        const first = CACHE.keys().next().value;
-        CACHE.delete(first);
-      }
+      if (CACHE.size > CACHE_MAX) CACHE.delete(CACHE.keys().next().value);
     }
-    port.postMessage({ type: 'done', model: model.replace('deepseek-', ''), batchId });
+    port.postMessage({ type: 'done', model, batchId });
   } catch (err) {
-    if (err.name !== 'AbortError') {
-      port.postMessage({ type: 'error', error: err.message, batchId });
+    if (timedOut || err.name !== 'AbortError') {
+      port.postMessage({ type: 'error', error: timedOut ? '接口响应超时，请检查网络或接口地址' : err.message, batchId });
     }
   } finally {
+    clearTimeout(timeout);
     port.disconnect();
   }
 }
@@ -457,88 +429,18 @@ ${text}
 - 不要使用 Markdown 格式`;
 }
 
-// 🆕 按模式返回 max_tokens
-function getMaxTokens(mode, promptType) {
-  if (mode === 'A') return 800;   // 翻译+解释
-  if (mode === 'B') return 2048;  // 纯翻译
-  if (mode === 'C') return 400;   // 拓展解释
-  if (mode === 'D') return 600;   // 语境解读
-  return promptType === 'translate' ? 2048 : 400;
-}
-
 // ═══════════════════════════════════════════
 // 配置读取
 // ═══════════════════════════════════════════
 
 // 会话级配置缓存：避免全文翻译高并发时每个请求都读 storage
 let configCache = null;
-
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local') configCache = null;
+  if (area === 'local') { configCache = null; cacheRevision++; CACHE.clear(); }
 });
-
 async function getConfig() {
-  if (configCache) return configCache;
-
-  const defaults = {
-    apiKey: '',
-    qwenApiKey: '',
-    // 解释标签
-    explainModel: 'deepseek-flash',
-    explainThinkingEnabled: false,
-    explainReasoningEffort: 'high',
-    language: 'auto',
-    // 翻译标签
-    translateModel: 'deepseek-flash',
-    translateThinkingEnabled: false,
-    translateReasoningEffort: 'high',
-    targetLanguage: 'zh',
-    // 通用
-    enabled: true,
-    usePageContext: true,
-    triggerMode: 'auto'
-  };
-
-  let stored = await chrome.storage.local.get(defaults);
-
-  // ── 旧版迁移 ──
-  let migrated = false;
-  if (stored.model !== undefined) {
-    stored.explainModel = stored.model;
-    stored.translateModel = stored.model;
-    delete stored.model;
-    migrated = true;
-  }
-  if (stored.thinkingEnabled !== undefined) {
-    stored.explainThinkingEnabled = stored.thinkingEnabled;
-    stored.translateThinkingEnabled = stored.thinkingEnabled;
-    delete stored.thinkingEnabled;
-    migrated = true;
-  }
-  if (stored.reasoningEffort !== undefined) {
-    stored.explainReasoningEffort = stored.reasoningEffort;
-    stored.translateReasoningEffort = stored.reasoningEffort;
-    delete stored.reasoningEffort;
-    migrated = true;
-  }
-  // 归一化旧模型调用名（deepseek-v4-flash -> deepseek-flash）
-  ['explainModel', 'translateModel'].forEach(key => {
-    if (!stored[key]) return;
-    const normalized = normalizeModelName(stored[key]);
-    if (normalized !== stored[key]) {
-      stored[key] = normalized;
-      migrated = true;
-    }
-  });
-
-  if (migrated) {
-    await chrome.storage.local.set(stored);
-    // 删除旧版遗留键，避免每次缓存失效都重跑迁移
-    await chrome.storage.local.remove(['model', 'thinkingEnabled', 'reasoningEffort']);
-  }
-
-  configCache = stored;
-  return stored;
+  if (!configCache) configCache = await AIConfig.load();
+  return configCache;
 }
 
 // ═══════════════════════════════════════════
@@ -552,7 +454,8 @@ async function parseApiError(res) {
     if (res.status === 402) return '账户余额不足，请充值';
     if (res.status === 403) return 'API Key 无权访问，请检查';
     if (res.status === 429) return '请求过于频繁，请稍后再试';
-    if (res.status === 400) return '请求参数有误，请重试';
+    if (res.status === 400) return '请求参数或模型不受支持，请检查模型名；若开启思考，请尝试关闭';
+    if (res.status === 404) return '接口路径或模型不存在，请检查 Base URL 和模型名';
     return `API 错误 (${res.status}): ${body.slice(0, 100)}`;
   } catch {
     return `API 错误 (${res.status})`;
@@ -563,72 +466,40 @@ async function parseApiError(res) {
 // 模型可用性检测
 // ═══════════════════════════════════════════
 
-async function validateModel(inputModel) {
-  const model = normalizeModelName(inputModel);
-  if (!model) {
-    return { ok: false, error: '模型调用名不能为空' };
-  }
-
-  const config = await getConfig();
-  const provider = getProvider(model);
-  const apiKey = provider === 'qwen' ? config.qwenApiKey : config.apiKey;
-  if (!apiKey) {
-    const providerName = provider === 'qwen' ? '千问' : 'DeepSeek';
-    return { ok: false, error: `请先设置${providerName} API Key` };
-  }
-
-  const endpoint = provider === 'qwen'
-    ? 'https://dashscope.aliyuncs.com/compatible-mode/v1/models'
-    : 'https://api.deepseek.com/models';
-
+async function listModels(connection) {
+  const config = connection || await getConfig();
+  let baseUrl;
+  try { baseUrl = AIConfig.normalizeBaseUrl(config.apiBaseUrl); }
+  catch (err) { return { ok: false, error: err.message }; }
+  const apiKey = String(config.apiKey || '').trim();
+  if (!apiKey) return { ok: false, error: '请先填写 API Key' };
   try {
-    const res = await fetch(endpoint, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      }
+    const res = await fetch(`${baseUrl}/models`, {
+      headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(20000)
     });
-
-    if (!res.ok) {
-      return { ok: false, error: await parseApiError(res) };
-    }
-
+    if (!res.ok) return { ok: false, error: await parseApiError(res) };
     const data = await res.json();
-    const models = Array.isArray(data?.data) ? data.data : [];
-    const found = models.find(item => {
-      const id = item?.id || item?.model;
-      return id && String(id) === model;
-    });
-
-    if (!found) {
-      return { ok: false, error: `未找到可调用的模型：${model}` };
-    }
-
-    return {
-      ok: true,
-      provider: provider,
-      model: {
-        id: found.id || model,
-        name: found.name || found.id || model
-      }
-    };
+    if (!Array.isArray(data?.data)) return { ok: false, error: '模型列表格式不兼容：需要 data 数组' };
+    const models = AIConfig.normalizeModels(data.data.map(item => item?.id)).sort();
+    if (!models.length) return { ok: false, error: '接口返回了空模型列表' };
+    return { ok: true, models };
   } catch (err) {
-    return { ok: false, error: `模型检测失败：${err.message}` };
+    return { ok: false, error: err.name === 'TimeoutError' ? '获取模型列表超时，请检查接口地址' : `获取模型失败：${err.message}` };
   }
+}
+
+async function validateModel(inputModel, connection) {
+  const model = AIConfig.normalizeModel(inputModel);
+  if (!model || /\s/.test(model)) return { ok: false, error: '请输入不含空格的模型调用名' };
+  const result = await listModels(connection);
+  if (!result.ok) return result;
+  if (!result.models.includes(model)) return { ok: false, error: `接口模型列表中未找到：${model}` };
+  return { ok: true, model: { id: model } };
 }
 
 // ═══════════════════════════════════════════
 // 工具函数
 // ═══════════════════════════════════════════
-
-function normalizeModelName(model) {
-  const name = String(model || '').trim();
-  return LEGACY_MODEL_ALIASES[name] || name;
-}
-
-function getProvider(model) {
-  return model && model.startsWith('qwen') ? 'qwen' : 'deepseek';
-}
 
 function splitIntoChunks(text, count) {
   if (!text || count <= 1) return [text || ''];
@@ -663,10 +534,10 @@ function handleDownload(selectedText, explanation) {
   const now = new Date();
   const pad = n => String(n).padStart(2, '0');
   const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  const filename = `笔记/DeepSeek解释_${timestamp}.txt`;
+  const filename = `笔记/AI解释_${timestamp}.txt`;
 
   const content = [
-    `DeepSeek 智能解释`,
+    `AI 智能解释`,
     `生成时间: ${now.toLocaleString('zh-CN')}`,
     ``,
     `── 选中原文 ──`,
