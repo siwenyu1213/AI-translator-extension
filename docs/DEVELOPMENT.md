@@ -109,10 +109,10 @@ node scripts/verify-browser.mjs --playwright '<已安装的 playwright 包目录
 
 ## 厂家目录维护
 
-`model-catalog.js` 内置从公开 `/api/v1/models` 取得的 10 家×3 款文本目录及获取时间，供两端共用。动态刷新返回纯数据，使用白名单厂家与字段、长度/时间/模态检查；不加载远程 JavaScript，也不发送用户 API Key、Base URL、浏览器 storage 或网页数据。刷新去重并按目录上架时间取 3 款，失败保留原快照；部分厂家不足 3 款时保留该厂家缓存并标注。
+`model-catalog.js` 内置从公开 `/api/v1/models` 取得的 10 家文本目录及获取时间，供两端共用；v4.2 首次快照有 210 款，数量随来源变化。动态刷新返回纯数据，使用白名单厂家与字段、长度/时间/模态检查；不加载远程 JavaScript，也不发送用户 API Key、Base URL、浏览器 storage 或网页数据。去重并按目录上架时间排序，不截断为 3 款；一家有 1 款也可正常更新，完全缺失则保留该厂家缓存。规范化缓存同样不截断。
 
-后台 `REFRESH_MODEL_CATALOG` 消息协调并发刷新并保存 `catalogSnapshot`。设置页在打开后缓存超过 15 分钟时检查，也提供手动实时刷新。两个厂家选择器只筛模型，仍走通用 Base URL/Key。当前接口返回的模型精确 ID 优先；公开目录无法证明某个网关或账号权限。
+后台 `REFRESH_MODEL_CATALOG` 消息协调并发刷新并保存 `catalogSnapshot`。设置页每次初始化都自动请求，即使上次刚更新也不跳过；没有手动刷新按钮、15 分钟节流、来源卡片或成功提示。先显示缓存，成功后静默更新；失败显示顶部红字，部分厂家未更新显示简短部分失败提示。选择和输入草稿在请求完成时保留；目录中下架的非选定、非手动、非接口模型从自动列表移除。两个厂家选择器只筛模型，仍走通用 Base URL/Key。当前接口返回的模型精确 ID 优先；公开目录无法证明某个网关或账号权限。
 
-如果后台刷新消息无回复，或消息通道未建立/已断开，设置页调用同一份目录刷新逻辑并保存成功快照；后台明确返回的 HTTP/格式等失败不会被当成通信故障重试。恢复仍只访问公开目录，不读取或发送 Key。设置页提示恢复成功并建议重新加载扩展；网络连接、20 秒超时、HTTP 状态、非 JSON 和后台无效回复分别显示具体原因。浏览器脚本通过模拟无回复与通道断开验证这些路径，其中无回复恢复使用真实目录网络；恢复失败重复点击验证缓存/选择不被覆盖。详见 [CATALOG_REFRESH_FIX.md](CATALOG_REFRESH_FIX.md)。
+如果后台刷新消息无回复，或消息通道未建立/已断开，设置页调用同一份目录刷新逻辑并保存成功快照；后台明确返回的 HTTP/格式等失败不会被当成通信故障重试。恢复仍只访问公开目录，不读取或发送 Key，成功不显示反馈。底层仍区分连接、20 秒超时、HTTP 状态、非 JSON 和后台无效回复，技术原因记录为设置页控制台 warning，用户只看到简短红字。浏览器脚本通过模拟无回复与通道断开验证恢复，真实网络验证每次打开自动刷新；新增草稿保留、目录下架清理、部分失败提示、错误颜色以及重开后恢复静默等检查。历史原因见 [CATALOG_REFRESH_FIX.md](CATALOG_REFRESH_FIX.md)，当前验收见 [AUTO_MODEL_CATALOG_QA.md](AUTO_MODEL_CATALOG_QA.md)。
 
-v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重复清 Key。`modelManufacturers` 记录自定义型号归属，`hiddenCatalogModels` 记录删除/修改的目录项，`availableModels` 记录当前接口返回的 ID；连接变更使当前接口列表失效。最近三款的来源与厂家官方发布日期的区别见 [MANUFACTURER_MODELS_QA.md](MANUFACTURER_MODELS_QA.md)。
+v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重复清 Key。`modelManufacturers` 记录自定义型号归属，`hiddenCatalogModels` 记录删除/修改的目录项，`availableModels` 记录当前接口返回的 ID；连接变更使当前接口列表失效。历史 v4.1 的最近三款记录见 [MANUFACTURER_MODELS_QA.md](MANUFACTURER_MODELS_QA.md)；v4.2 已取消这个数量限制。

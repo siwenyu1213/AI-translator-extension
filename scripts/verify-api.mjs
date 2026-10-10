@@ -47,9 +47,9 @@ async function stream(data, request = {}) {
 }
 const content = '这是流式文本，长度足以验证完整结果与缓存。';
 const sse = `data:${JSON.stringify({ choices: [{ delta: { content } }] })}\r\n\r\ndata: [DONE]`;
-await check('10 家内置目录各有 3 款、DeepSeek 历史兼容项及原生/网关 ID', () => {
+await check('10 家内置目录不限定 3 款、DeepSeek 历史兼容项及原生/网关 ID', () => {
   assert.equal(run('AIModelCatalog.BUILTIN.providers.length'), 10);
-  assert.equal(run('AIModelCatalog.BUILTIN.providers.every(p => p.models.length === 3)'), true);
+  assert.equal(run('AIModelCatalog.BUILTIN.providers.every(p => p.models.length > 3)'), true);
   assert.equal(run("AIModelCatalog.resolveId({id:'deepseek/deepseek-v4.1-flash'}, 'https://api.deepseek.com')"), 'deepseek-flash');
   assert.equal(run("AIModelCatalog.resolveId({id:'deepseek/deepseek-v4.1-flash'}, 'https://openrouter.ai/api/v1')"), 'deepseek/deepseek-v4.1-flash');
   assert.equal(run("AIModelCatalog.resolveId({id:'deepseek/deepseek-v4.1-flash'}, 'https://gateway.example/v1', ['deepseek/deepseek-v4.1-flash'])"), 'deepseek/deepseek-v4.1-flash');
@@ -60,14 +60,18 @@ await check('公开目录刷新按时间排序，排除非文本/批量/过期/�
   const model = (id, created, extras = {}) => ({ id, name: id, created,
     architecture: { input_modalities: ['text'], output_modalities: ['text'] }, ...extras });
   responder = () => Response.json({ data: [
-    model('openai/gpt-new-c', 100), model('openai/gpt-new-a', 300), model('openai/gpt-new-b', 200),
+    model('openai/gpt-new-c', 100), model('openai/gpt-new-a', 300), model('openai/gpt-new-b', 200), model('openai/gpt-new-d', 50),
+    model('deepseek/only-text-model', 50), null,
     model('openai/gpt-new-a', 300), model('openai/gpt-new-a:batch', 400),
     model('openai/image-new', 500, { architecture: { input_modalities: ['text'], output_modalities: ['text', 'image'] } }),
     model('openai/expired', 600, { expiration_date: '2020-01-01' })
   ] });
   const snapshot = await run('refreshModelCatalog()');
-  assert.deepEqual(Array.from(snapshot.providers[0].models, m => m.id), ['openai/gpt-new-a', 'openai/gpt-new-b', 'openai/gpt-new-c']);
-  assert.equal(snapshot.providers[1].stale, true);
+  assert.deepEqual(Array.from(snapshot.providers[0].models, m => m.id), ['openai/gpt-new-a', 'openai/gpt-new-b', 'openai/gpt-new-c', 'openai/gpt-new-d']);
+  assert.equal(snapshot.providers[1].models.length, 1); assert.equal(snapshot.providers[1].stale, false);
+  assert.equal(snapshot.providers[2].stale, true);
+  context.qaSnapshot = snapshot;
+  assert.equal(run('AIModelCatalog.normalizeSnapshot(qaSnapshot).providers[0].models.length'), 4);
   assert.equal(calls[0].url, 'https://openrouter.ai/api/v1/models');
   assert.equal(calls[0].options.headers, undefined);
   assert.equal(snapshot.providers.length, 10); assert.equal(storage.apiKey, 'test-only-key');

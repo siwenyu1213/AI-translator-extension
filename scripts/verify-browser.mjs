@@ -70,6 +70,8 @@ try {
   });
   await popup.goto(`chrome-extension://${extensionId}/popup.html`);
   await popup.locator('#explain-model option').first().waitFor({ state: 'attached' });
+  const settleCatalog = () => popup.waitForFunction(() => !catalogRefreshing && document.querySelector('#explain-model option'), null, { timeout: 25000 });
+  await settleCatalog();
   await check('实际 Edge 加载 MV3、旧配置迁移与至少 10 家厂家联动入口', async () => {
     assert.equal(await popup.locator('#explain-manufacturer option').count(), 11);
     assert.ok(await popup.locator('#explain-model option').count() >= 3);
@@ -78,12 +80,16 @@ try {
     assert.equal(await worker.evaluate(async () => (await chrome.storage.local.get(null)).qwenApiKey), undefined);
     assert.match(await popup.locator('#connection-msg').innerText(), /旧供应商/);
   });
-  await check('逐厂家显示 3 个最近文本模型；DeepSeek 三个兼容入口和历史提示', async () => {
+  await check('厂家模型不限 3 款；DeepSeek 兼容入口；调用名与通用设置仍显示', async () => {
     const makers = await popup.locator('#explain-manufacturer option').evaluateAll(options => options.map(o => o.value).filter(v => v !== 'custom'));
     for (const maker of makers) {
       await popup.locator('#explain-manufacturer').selectOption(maker);
-      assert.equal(await popup.locator('#explain-model optgroup').first().locator('option').count(), 3);
+      assert.ok(await popup.locator('#explain-model optgroup').first().locator('option').count() > 3);
     }
+    assert.equal(await popup.locator('#refresh-catalog').count(), 0);
+    assert.equal(await popup.locator('#catalog-status').isVisible(), false);
+    assert.equal(await popup.locator('#explain-custom-model').isVisible(), true);
+    assert.equal(await popup.locator('#api-base-url').isVisible(), true);
     await popup.locator('#explain-manufacturer').selectOption('deepseek');
     await popup.locator('#explain-model').selectOption('deepseek-v4-flash');
     assert.match(await popup.locator('#explain-model-detail').innerText(), /退役/);
@@ -93,13 +99,14 @@ try {
     await popup.locator('#explain-manufacturer').selectOption('openai');
     await popup.locator('#explain-model').selectOption('gpt-4.1-mini');
   });
-  await check('实时刷新实际公开目录，缓存时间更新且保持厂家/模型选择', async () => {
-    await popup.locator('#refresh-catalog').click();
-    await popup.waitForFunction(() => !document.querySelector('#refresh-catalog').disabled);
-    assert.match(await popup.locator('#catalog-status').innerText(), /已更新/);
+  await check('每次打开自动联网，即使缓存刚更新；成功无提示并保留模型', async () => {
+    const previous = await worker.evaluate(async () => (await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot.updatedAt);
+    await popup.reload(); await popup.locator('#explain-model option').first().waitFor({ state: 'attached' }); await settleCatalog();
+    assert.equal(await popup.locator('#catalog-status').isVisible(), false);
     const snapshot = await worker.evaluate(async () => (await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot);
     assert.equal(snapshot.providers.length, 10);
-    assert.ok(snapshot.providers.every(p => p.models.length === 3));
+    assert.ok(snapshot.providers.every(p => p.models.length > 3));
+    assert.notEqual(snapshot.updatedAt, previous);
     liveCatalog = { source: snapshot.source, updatedAt: snapshot.updatedAt,
       providers: snapshot.providers.map(p => ({ id: p.id, name: p.name, stale: p.stale,
         models: p.models.map(m => ({ id: m.id, name: m.name, created: m.created })) })) };
@@ -112,10 +119,10 @@ try {
         ? Promise.resolve(undefined) : qaSendMessage(message, ...args);
     });
     try {
-      await popup.locator('#refresh-catalog').click();
-      await popup.waitForFunction(() => !document.querySelector('#refresh-catalog').disabled);
+      await popup.evaluate(() => refreshCatalog()); await settleCatalog();
       await popup.locator('.container').screenshot({ path: resolve(evidence, 'catalog-recovery.png') });
-      assert.match(await popup.locator('#catalog-status').innerText(), /已更新.*设置页恢复/);
+      assert.equal(await popup.locator('#catalog-status').isVisible(), false);
+      assert.equal(await popup.evaluate(() => document.querySelector('#catalog-status').textContent), '');
       assert.equal(await popup.locator('#explain-model').inputValue(), 'gpt-4.1-mini');
     } finally {
       await popup.evaluate(() => { chrome.runtime.sendMessage = qaSendMessage; delete globalThis.qaSendMessage; });
@@ -131,15 +138,14 @@ try {
         p.models.map(m => ({ ...m, architecture: { input_modalities: ['text'], output_modalities: ['text'] } }))) }));
     });
     try {
-      await popup.locator('#refresh-catalog').click();
-      await popup.waitForFunction(() => !document.querySelector('#refresh-catalog').disabled);
-      assert.match(await popup.locator('#catalog-status').innerText(), /已更新.*设置页恢复/);
+      await popup.evaluate(() => refreshCatalog()); await settleCatalog();
+      assert.equal(await popup.locator('#catalog-status').isVisible(), false);
       const previous = await worker.evaluate(async () => JSON.stringify((await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot));
       await popup.evaluate(() => { globalThis.fetch = () => Promise.resolve(new Response('{}', { status: 503 })); });
       for (let retry = 0; retry < 2; retry++) {
-        await popup.locator('#refresh-catalog').click();
-        await popup.waitForFunction(() => !document.querySelector('#refresh-catalog').disabled);
-        assert.match(await popup.locator('#catalog-status').innerText(), /更新失败.*503.*保留/);
+        await popup.evaluate(() => refreshCatalog()); await settleCatalog();
+        assert.equal(await popup.locator('#catalog-status').innerText(), '暂时无法获取模型，已保留已有列表。');
+        assert.equal(await popup.locator('#catalog-status').isVisible(), true);
         assert.equal(await worker.evaluate(async () => JSON.stringify((await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot)), previous);
         assert.equal(await popup.locator('#explain-model').inputValue(), 'gpt-4.1-mini');
       }
@@ -159,12 +165,53 @@ try {
         ? Promise.resolve(new Response('{}', { status: 503 })) : qaOriginalFetch(url, ...args);
     });
     try {
-      await popup.locator('#refresh-catalog').click();
-      await popup.waitForFunction(() => !document.querySelector('#refresh-catalog').disabled);
-      assert.match(await popup.locator('#catalog-status').innerText(), /更新失败.*保留/);
+      await popup.reload(); await popup.locator('#explain-model option').first().waitFor({ state: 'attached' }); await settleCatalog();
+      assert.equal(await popup.locator('#catalog-status').innerText(), '暂时无法获取模型，已保留已有列表。');
+      assert.equal(await popup.locator('#catalog-status').evaluate(el => getComputedStyle(el).color), 'rgb(185, 28, 28)');
       assert.equal(await popup.locator('#explain-model').inputValue(), 'gpt-4.1-mini');
       assert.equal(await worker.evaluate(async () => JSON.stringify((await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot)), original);
     } finally { await worker.evaluate(() => { globalThis.fetch = qaOriginalFetch; delete globalThis.qaOriginalFetch; }); }
+    await popup.reload(); await popup.locator('#explain-model option').first().waitFor({ state: 'attached' }); await settleCatalog();
+    assert.equal(await popup.locator('#catalog-status').isVisible(), false);
+    await popup.locator('.container').screenshot({ path: resolve(evidence, 'popup-auto-success.png') });
+  });
+  await check('刷新保留中途选择和输入；移除下架目录项；部分失败仅显示红字（模拟）', async () => {
+    const removed = await worker.evaluate(async () => {
+      const snapshot = (await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot;
+      const model = snapshot.providers[0].models.find(m => AIModelCatalog.nativeId(m) !== 'gpt-4.1-mini');
+      const data = snapshot.providers.filter(p => p.id !== 'google').flatMap(p => p.models.filter(m => m.id !== model.id)
+        .map(m => ({ ...m, architecture: { input_modalities: ['text'], output_modalities: ['text'] } })));
+      globalThis.qaOriginalFetch = globalThis.fetch;
+      globalThis.fetch = (url, ...args) => url === AIModelCatalog.SOURCE
+        ? new Promise(resolve => { globalThis.qaReleaseCatalogFetch = () => resolve(Response.json({ data })); }) : qaOriginalFetch(url, ...args);
+      return AIModelCatalog.nativeId(model);
+    });
+    let pending;
+    try {
+      pending = popup.evaluate(() => refreshCatalog());
+      await popup.waitForFunction(() => catalogRefreshing);
+      assert.equal(await popup.locator('#catalog-status').isVisible(), false);
+      await popup.locator('#explain-manufacturer').selectOption('deepseek');
+      await popup.locator('#explain-model').selectOption('deepseek-flash');
+      await popup.locator('#explain-custom-model').fill('draft-model-not-yet-saved');
+      await worker.evaluate(async () => {
+        for (let retry = 0; retry < 200 && !globalThis.qaReleaseCatalogFetch; retry++) await new Promise(resolve => setTimeout(resolve, 10));
+        qaReleaseCatalogFetch();
+      });
+      await pending; await settleCatalog();
+      assert.equal(await popup.locator('#explain-manufacturer').inputValue(), 'deepseek');
+      assert.equal(await popup.locator('#explain-model').inputValue(), 'deepseek-flash');
+      assert.equal(await popup.locator('#explain-custom-model').inputValue(), 'draft-model-not-yet-saved');
+      assert.equal(await popup.locator('#catalog-status').innerText(), '部分厂家的模型暂未更新，已保留已有列表。');
+      assert.equal(await worker.evaluate(async id => (await chrome.storage.local.get('modelList')).modelList.includes(id), removed), false);
+    } finally {
+      await worker.evaluate(() => {
+        globalThis.qaReleaseCatalogFetch?.(); globalThis.fetch = qaOriginalFetch;
+        delete globalThis.qaOriginalFetch; delete globalThis.qaReleaseCatalogFetch;
+      });
+      if (pending) await pending;
+    }
+    await popup.reload(); await popup.locator('#explain-model option').first().waitFor({ state: 'attached' }); await settleCatalog();
   });
   await check('当前输入连接经实际 runtime 消息获取模型并持久保存', async () => {
     await popup.locator('#api-base-url').fill(`${base}/custom/v1/chat/completions/`);

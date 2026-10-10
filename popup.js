@@ -35,7 +35,6 @@ const $targetLanguage = document.getElementById('target-language');
 const $apiKey = document.getElementById('api-key');
 const $apiBaseUrl = document.getElementById('api-base-url');
 const $fetchModels = document.getElementById('fetch-models');
-const $refreshCatalog = document.getElementById('refresh-catalog');
 const $catalogStatus = document.getElementById('catalog-status');
 const $verifyModel = document.getElementById('verify-model');
 const $connectionMsg = document.getElementById('connection-msg');
@@ -51,6 +50,7 @@ let availableModels = [];
 let modelManufacturers = {};
 let hiddenCatalogModels = [];
 let catalogSnapshot = AIModelCatalog.BUILTIN;
+let catalogRefreshing = false;
 const metadata = new Map();
 
 const tabs = [
@@ -132,7 +132,8 @@ function updateModelDetail(tab) {
     : id ? `调用名：${id}${availableModels.includes(id) ? ' · 当前接口列表已列出' : ' · 请确认当前接口支持'}` : '该厂家暂无选定模型，可手动新增调用名。');
 }
 function catalogState(text = '') {
-  $catalogStatus.textContent = text || `目录更新时间：${new Date(catalogSnapshot.updatedAt).toLocaleString('zh-CN')} · ${catalogSnapshot.providers.length} 家厂家`;
+  $catalogStatus.textContent = text;
+  $catalogStatus.hidden = !text;
 }
 
 function clearModelMessage($msg) {
@@ -176,7 +177,7 @@ function renderModelOptions(tab) {
     if (optgroup.children.length) tab.select.appendChild(optgroup);
   }
   const provider = catalogSnapshot.providers.find(p => p.id === providerId);
-  if (provider) group(provider.stale ? '最近 3 款 · 上次缓存' : '最近 3 款 · 公开目录', provider.models.map(model => ({
+  if (provider) group(provider.stale ? '该厂家模型 · 已有列表' : '该厂家模型 · 公开目录', provider.models.map(model => ({
     id: AIModelCatalog.resolveId(model, $apiBaseUrl.value, availableModels), name: model.name
   })));
   group('常用 / 历史兼容型号', AIModelCatalog.COMPATIBILITY.filter(m => m.provider === providerId)
@@ -432,7 +433,7 @@ tabs.forEach(tab => {
   $enabled.checked = config.enabled !== false;
   $useContext.checked = config.usePageContext !== false;
   $triggerMode.value = config.triggerMode || 'auto';
-  if (Date.now() - Date.parse(config.catalogLastCheckedAt || catalogSnapshot.updatedAt) > AIModelCatalog.REFRESH_MS) refreshCatalog();
+  refreshCatalog();
 })().catch(err => showStatus('读取设置失败：' + err.message, 'error'));
 
 // ═══════════════════════════════════════════
@@ -550,7 +551,6 @@ async function requestCatalogSnapshot() {
     if (!/receiving end does not exist|could not establish connection|message port closed|message channel closed/i.test(err.message)) throw err;
   }
   if (result == null) {
-    catalogState('后台未回复，正在从设置页恢复公开目录更新…');
     const stored = await chrome.storage.local.get('catalogSnapshot');
     const snapshot = await AIModelCatalog.refresh(stored.catalogSnapshot);
     await chrome.storage.local.set({ catalogSnapshot: snapshot });
@@ -564,27 +564,35 @@ async function requestCatalogSnapshot() {
 }
 
 async function refreshCatalog() {
-  if ($refreshCatalog.disabled) return;
-  $refreshCatalog.disabled = true;
-  $refreshCatalog.setAttribute('aria-busy', 'true');
-  catalogState('正在检查 10 家厂家的公开模型目录…');
+  if (catalogRefreshing) return;
+  catalogRefreshing = true;
+  catalogState();
   try {
     const result = await requestCatalogSnapshot();
+    const savedSelections = await chrome.storage.local.get(['explainModel', 'translateModel']);
     const selections = tabs.map(tab => tab.select.value);
+    const drafts = tabs.map(tab => ({ manufacturer: tab.manufacturer.value, input: tab.input.value }));
+    const oldCatalogIds = new Set(AIModelCatalog.allModels(catalogSnapshot)
+      .map(model => AIModelCatalog.resolveId(model, $apiBaseUrl.value, availableModels)));
+    modelList = modelList.filter(id => !oldCatalogIds.has(id) || selections.includes(id) ||
+      Object.values(savedSelections).includes(id) || availableModels.includes(id) || Object.hasOwn(modelManufacturers, id));
     catalogSnapshot = AIModelCatalog.normalizeSnapshot(result.snapshot);
     renderManufacturers(); renderAllModelOptions();
-    tabs.forEach((tab, index) => setTabSelection(tab, selections[index]));
+    tabs.forEach((tab, index) => {
+      setTabSelection(tab, selections[index]);
+      if (!selections[index]) { tab.manufacturer.value = drafts[index].manufacturer; renderModelOptions(tab); }
+      tab.input.value = drafts[index].input;
+    });
     await chrome.storage.local.set({ modelList: modelList.slice(), catalogLastCheckedAt: new Date().toISOString() });
     const stale = catalogSnapshot.providers.filter(p => p.stale).length;
-    catalogState(`已更新 · ${new Date(catalogSnapshot.updatedAt).toLocaleString('zh-CN')}${stale ? ` · ${stale} 家保留上次缓存` : ''}${result.recovered ? ' · 设置页恢复成功，建议重新加载扩展以同步后台' : ''}`);
+    catalogState(stale ? '部分厂家的模型暂未更新，已保留已有列表。' : '');
   } catch (err) {
-    catalogState(`更新失败：${err.message}。保留已保存的目录和当前选择。`);
+    catalogState('暂时无法获取模型，已保留已有列表。');
+    console.warn('公开模型目录刷新失败：', err.message);
   } finally {
-    $refreshCatalog.disabled = false;
-    $refreshCatalog.removeAttribute('aria-busy');
+    catalogRefreshing = false;
   }
 }
-$refreshCatalog.addEventListener('click', refreshCatalog);
 function invalidateAvailableModels() {
   availableModels = []; // 旧接口列表不能作为新接口的 ID 匹配依据。
   renderAllModelOptions();
