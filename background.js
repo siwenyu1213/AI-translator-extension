@@ -528,16 +528,6 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function hashString(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const chr = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + chr;
-    hash |= 0; // 32-bit int
-  }
-  return hash.toString(36);
-}
-
 // ═══════════════════════════════════════════
 // 下载
 // ═══════════════════════════════════════════

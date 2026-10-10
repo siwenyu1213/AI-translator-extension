@@ -117,7 +117,10 @@
   async function load() {
     const raw = await chrome.storage.local.get(null);
     const config = migrate(raw);
-    if (JSON.stringify(raw) !== JSON.stringify(config)) await chrome.storage.local.set(config);
+    // storage 返回的键顺序可能不同；逐字段比较，只写真正需要迁移/归一化的值。
+    const updates = Object.fromEntries(Object.entries(config)
+      .filter(([key,value])=>JSON.stringify(raw[key]) !== JSON.stringify(value)));
+    if (Object.keys(updates).length) await chrome.storage.local.set(updates);
     const oldKeys = ['qwenApiKey', 'customModels', 'model', 'thinkingEnabled', 'reasoningEffort'];
     if (oldKeys.some(key => Object.hasOwn(raw, key))) await chrome.storage.local.remove(oldKeys);
     return config;

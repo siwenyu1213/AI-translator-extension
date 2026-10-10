@@ -98,15 +98,17 @@ function showStatus(message, type = 'success') {
 }
 
 // 每个厂家独立查询；仅将响应写回请求使用的连接，不覆盖中途修改的 Key/地址。
-async function requestProviderModels(connection) {
+async function queryWithFallback(message, fallback) {
   let result;
-  try { result = await chrome.runtime.sendMessage({type:'LIST_MODELS',connection}); }
+  try { result = await chrome.runtime.sendMessage(message); }
   catch (err) {
     if (!/receiving end does not exist|could not establish connection|message port closed|message channel closed/i.test(err.message)) throw err;
   }
-  // 旧 Worker 未处理该消息或通信中断时，直接查询同一个接口；明确的接口失败不绕过。
-  if (result == null) return AIModelCatalog.fetchInterface(connection);
-  return result;
+  // 无回复/通信中断才恢复；后台明确的接口错误交给各自调用方处理。
+  return result == null ? fallback() : result;
+}
+function requestProviderModels(connection) {
+  return queryWithFallback({type:'LIST_MODELS',connection},()=>AIModelCatalog.fetchInterface(connection));
 }
 function modelFailureMessage(result, provider) {
   const name = catalogSnapshot.providers.find(p=>p.id===provider)?.name || '模型接口';
@@ -176,17 +178,12 @@ async function refreshProviderModels(provider = connectionProvider) {
 }
 
 async function requestCatalogSnapshot() {
-  let result;
-  try { result = await chrome.runtime.sendMessage({type:'REFRESH_MODEL_CATALOG'}); }
-  catch (err) {
-    if (!/receiving end does not exist|could not establish connection|message port closed|message channel closed/i.test(err.message)) throw err;
-  }
-  if (result == null) {
+  const result = await queryWithFallback({type:'REFRESH_MODEL_CATALOG'},async()=>{
     const stored = await chrome.storage.local.get('catalogSnapshot');
     const snapshot = await AIModelCatalog.refresh(stored.catalogSnapshot);
     await chrome.storage.local.set({catalogSnapshot:snapshot});
-    return {snapshot};
-  }
+    return {ok:true,snapshot};
+  });
   if (!result.ok) throw new Error(result.error || '后台未提供更新结果');
   if (result.snapshot?.source !== AIModelCatalog.SOURCE || !Array.isArray(result.snapshot.providers)) throw new Error('模型目录无效');
   return {snapshot:result.snapshot};

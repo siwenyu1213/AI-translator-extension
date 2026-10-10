@@ -101,9 +101,10 @@ node scripts/verify-api.mjs
 ```powershell
 node scripts/verify-browser.mjs --playwright '<已安装的 playwright 包目录>'
 # 自定义 Edge 可再加 --edge '<msedge.exe 绝对路径>'
+# 检查样式简化是否改变界面，可再加 --compare-ref '<优化前提交>'
 ```
 
-每轮在 `.local/browser-profile/api-qa/run-<时间戳>/` 创建新的独立 profile，避免旧 Worker 脚本缓存，并启动 headless Edge 加载本仓库实际扩展。脚本只写入合成测试 Key，刷新真实公开模型目录，启动本机模拟 HTTP API，检查设置持久化、消息、SSE、划词与全文恢复，并保存 `artifacts/qa/browser-check.json` 和截图。它会重置这个专用 QA profile 中的扩展设置，不读取用户日常浏览器配置。
+每轮在 `.local/browser-profile/api-qa/run-<时间戳>/` 创建新的独立 profile，避免旧 Worker 脚本缓存，并启动 headless Edge 加载本仓库实际扩展。脚本只写入合成测试 Key，刷新真实公开模型目录，启动本机模拟 HTTP API，检查设置持久化、消息、SSE、划词与全文恢复，并保存 `artifacts/qa/browser-check.json` 和截图。结束后关闭浏览器、核对绝对路径并删除仅本轮创建的 profile，报告 `profileCleanup`；删除失败使验收非零退出。它会重置这个专用 QA profile 中的扩展设置，不读取用户日常浏览器配置。`--compare-ref` 在首次 Key、Key 已保存、自定义 dialog 三种状态下比较当前和指定 Git 提交的完整计算样式及元素矩形，不改产品样式。
 
 实际设置页在扩展页面中直接打开，划词通过页面 mouseup 路径触发，全文翻译通过真实后台 tabs 消息启动。原生工具栏弹出层及右键菜单鼠标操作仍需人工检查；真实供应商仍需使用其有效凭据检查成功、失败与模型能力。
 
@@ -144,3 +145,11 @@ v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重�
 `requestProviderModels` 在 `LIST_MODELS` 无回复或通道未建立/已断开时直接调用共享查询。后台明确返回的 API 错误不触发此恢复，避免把鉴权失败当作通信问题。顶部根据错误类型显示简短原因，有旧缓存时追加保留提示；控制台只记录厂家 ID、错误代码和 HTTP 状态。原有连接签名检查、独立缓存、成功静默和 Key 收起继续生效。
 
 浏览器工具另用不带凭据的实际 DeepSeek `/models` 请求检查 Edge Worker 到官方域名的连通性，预期 401。这只能证明测试 profile 当时的网络可达与鉴权入口，不能判断用户 Key 的有效性；日常 profile 的代理/网络也可能不同。列表成功、权限、生成仍使用明确模拟或本机 HTTP 样本。修复证据与未确认的用户失败原因见 [COMPACT_SETTINGS_QA.md](COMPACT_SETTINGS_QA.md)。
+
+## 保持行为的维护与清理
+
+`AIConfig.load` 按字段比较归一化前后的值，仅写变化字段，避免顶层键顺序变化导致全量重写；旧配置字段仍按原规则移除。`popup.js` 的两种模型查询共用 `queryWithFallback`，保留无回复/通信故障才恢复、明确接口错误不绕过的规则。全文翻译用 `visitDirectTextNodes` 保持读取/落盘范围一致，取消和重新开始共用 `restoreOriginalBlocks`，不改变标签过滤与恢复顺序。
+
+内置目录采用每款模型一行的格式，保留完整对象、顺序及所有元数据；修改这类静态数据格式时先与旧版本深度比较，不能用格式压缩删减型号。未引用函数和已移除控件样式可清除，当前 DOM 状态需做实际浏览器对比。
+
+任务结束仅清理该会话生成的临时脚本、独立 QA profiles 和过期生成证据；保留最新机器报告、关键截图、可复用工具及历史文档。旧验收文档所列生成文件可能已清理，保留的摘要是历史记录，当前证据以最新报告为准。2026-10-10 审查、验证与完整清理结果见 [MAINTENANCE_QA.md](MAINTENANCE_QA.md)。

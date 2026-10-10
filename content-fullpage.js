@@ -122,19 +122,18 @@
     'FIGCAPTION', 'DD', 'DT', 'LEGEND', 'SUMMARY', 'CAPTION' // 与 BLOCK_SELECTOR 保持一致
   ]);
 
-  function getDirectText(el) {
-    // 收集文本（递归 walk：跳过块级后代与不可见元素），与 applyTranslation 的落盘遍历规则一致
-    let text = '';
-    (function walk(node) {
-      for (const child of node.childNodes) {
-        if (child.nodeType === 3) {
-          text += child.textContent;
-        } else if (child.nodeType === 1) {
-          if (BLOCK_TAGS.has(child.tagName) || SKIP_TAGS.has(child.tagName)) continue;
-          walk(child);
-        }
+  // 读取与写入译文共用遍历范围，跳过块级后代和不翻译的标签。
+  function visitDirectTextNodes(node, visit) {
+    for (const child of node.childNodes) {
+      if (child.nodeType === 3) visit(child);
+      else if (child.nodeType === 1 && !BLOCK_TAGS.has(child.tagName) && !SKIP_TAGS.has(child.tagName)) {
+        visitDirectTextNodes(child,visit);
       }
-    })(el);
+    }
+  }
+  function getDirectText(el) {
+    let text = '';
+    visitDirectTextNodes(el,node=>{text+=node.textContent;});
     return text.trim();
   }
 
@@ -142,16 +141,7 @@
   function applyTranslation(el, buffer) {
     // 按 DOM 顺序收集可替换的文本节点（跳过块级后代与不可见元素内部）
     const textNodes = [];
-    (function walk(node) {
-      for (const child of node.childNodes) {
-        if (child.nodeType === 3) {
-          textNodes.push(child);
-        } else if (child.nodeType === 1) {
-          if (BLOCK_TAGS.has(child.tagName) || SKIP_TAGS.has(child.tagName)) continue;
-          walk(child);
-        }
-      }
-    })(el);
+    visitDirectTextNodes(el,node=>textNodes.push(node));
     if (textNodes.length === 0) {
       // 没有可替换文本节点（如纯媒体/控件块）：保持原文，不落盘
       return;
@@ -214,6 +204,16 @@
     }
   }
 
+  function restoreOriginalBlocks() {
+    for (const [el, html] of originalHTML) {
+      el.innerHTML = html;
+      el.removeAttribute('data-ds-original');
+      el.removeAttribute('data-ds-translated');
+      el.removeAttribute('data-ds-translation');
+      el.removeAttribute('data-ds-failed');
+    }
+  }
+
   function cancel() {
     aborted = true;
 
@@ -228,13 +228,7 @@
     if (mutationObserver) mutationObserver.disconnect();
 
     // 还原所有原文
-    for (const [el, html] of originalHTML) {
-      el.innerHTML = html;
-      el.removeAttribute('data-ds-original');
-      el.removeAttribute('data-ds-translated');
-      el.removeAttribute('data-ds-translation');
-      el.removeAttribute('data-ds-failed');
-    }
+    restoreOriginalBlocks();
 
     // 移除工具栏
     if (toolbar) toolbar.remove();
@@ -432,13 +426,7 @@
 
     // 还原上一会话的原文，随后全新翻译（重复触发 = 重新翻译整页）
     queue.queue.length = 0; // 清空旧会话队列残留
-    for (const [el, html] of originalHTML) {
-      el.innerHTML = html;
-      el.removeAttribute('data-ds-original');
-      el.removeAttribute('data-ds-translated');
-      el.removeAttribute('data-ds-translation');
-      el.removeAttribute('data-ds-failed');
-    }
+    restoreOriginalBlocks();
     translatedElements.clear();
     originalHTML.clear();
     totalBlocks = 0;

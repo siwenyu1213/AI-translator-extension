@@ -121,3 +121,5 @@ DeepSeek 的型号与显示名按 [官方模型列表接口](https://api-docs.de
 v4.3 的 10 家官方地址、地域说明、配置迁移与验收见 [docs/PROVIDER_ENDPOINTS_QA.md](docs/PROVIDER_ENDPOINTS_QA.md)。
 
 v4.4 的当前接口模型过滤、精简界面、Key 收起与验收见 [docs/COMPACT_SETTINGS_QA.md](docs/COMPACT_SETTINGS_QA.md)。
+
+保持现有功能与界面的代码简化、验证及工作目录清理见 [docs/MAINTENANCE_QA.md](docs/MAINTENANCE_QA.md)。

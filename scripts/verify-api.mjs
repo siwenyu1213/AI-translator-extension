@@ -7,14 +7,14 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const checks = [];
 const event = () => ({ listeners: [], addListener(fn) { this.listeners.push(fn); } });
-let storage = {}, calls = [], responder;
+let storage = {}, calls = [], storageWrites = [], responder;
 const changed = event();
 const chrome = {
   runtime: { onInstalled: event(), onMessage: event(), onConnect: event() },
   contextMenus: { onClicked: event() },
   storage: { onChanged: changed, local: {
     async get() { return structuredClone(storage); },
-    async set(values) { Object.assign(storage, values); changed.listeners.forEach(fn => fn({}, 'local')); },
+    async set(values) { storageWrites.push(Object.keys(values)); Object.assign(storage, values); changed.listeners.forEach(fn => fn({}, 'local')); },
     async remove(keys) { keys.forEach(key => delete storage[key]); }
   } }
 };
@@ -51,6 +51,21 @@ async function stream(data, request = {}) {
 }
 const content = '这是流式文本，长度足以验证完整结果与缓存。';
 const sse = `data:${JSON.stringify({ choices: [{ delta: { content } }] })}\r\n\r\ndata: [DONE]`;
+await check('配置字段顺序变化与重复读取不写 storage；已有配置值保持一致',async()=>{
+  const normalized=JSON.parse(JSON.stringify(run('AIConfig.migrate({})')));
+  storage=Object.fromEntries(Object.entries(normalized).reverse());storageWrites=[];
+  await run('AIConfig.load()');await run('AIConfig.load()');
+  assert.equal(storageWrites.length,0);assert.deepEqual(storage,Object.fromEntries(Object.entries(normalized).reverse()));
+});
+await check('配置归一化只写变化字段，保留目录/Key/未知字段，移除旧配置字段',async()=>{
+  storage={...JSON.parse(JSON.stringify(run('AIConfig.migrate({})'))),explainReasoningEffort:'invalid',
+    unrelatedPreference:{keep:true},qwenApiKey:'legacy-test-only'};storageWrites=[];
+  const beforeCatalog=JSON.stringify(storage.catalogSnapshot);
+  await run('AIConfig.load()');
+  assert.deepEqual(storageWrites,[['explainReasoningEffort']]);
+  assert.equal(storage.explainReasoningEffort,'high');assert.equal(JSON.stringify(storage.catalogSnapshot),beforeCatalog);
+  assert.equal(storage.unrelatedPreference.keep,true);assert.equal(storage.qwenApiKey,undefined);
+});
 await check('接口模型按厂家与文本能力过滤，排除其他厂家/嵌入/图像/过期且保留新型号', () => {
   context.modelFixture = [
     {id:'deepseek-flash',name:'DeepSeek Flash',input_modalities:['text','image'],output_modalities:['text']},

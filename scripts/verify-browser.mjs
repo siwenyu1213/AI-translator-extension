@@ -1,9 +1,9 @@
 // 可选 Edge 验收工具。使用外部已有 Playwright，不给扩展添加 npm 依赖。
-// node scripts/verify-browser.mjs --playwright <已有包目录> [--edge <msedge.exe>]
+// node scripts/verify-browser.mjs --playwright <已有包目录> [--edge <msedge.exe>] [--compare-ref <Git 提交>]
 import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
@@ -13,12 +13,18 @@ const require = createRequire(import.meta.url);
 const { chromium } = require(process.argv.includes('--playwright') ? arg('--playwright') : 'playwright');
 const evidence = resolve(root, 'artifacts/qa');
 mkdirSync(evidence, { recursive: true });
+const profileRoot=resolve(root,'.local/browser-profile/api-qa');
+const profile=resolve(profileRoot,`run-${Date.now()}`);
+assert.equal(dirname(profile),profileRoot);assert.equal(existsSync(profile),false);
+const compareRef=process.argv.includes('--compare-ref') ? arg('--compare-ref') : null;
+const oldPopupCss=compareRef ? execFileSync('git',['show',`${compareRef}:popup.css`],{cwd:root,encoding:'utf8'}) : null;
+const profileCleanup={path:relative(root,profile),removed:false};
 const checks = [], requests = [], providerRequests = [], errors = [];
 let browserVersion, context, liveCatalog, liveDeepSeekProbe;
 const server = createServer(async (req, res) => {
   if (req.url === '/sample') {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.end('<!doctype html><html><head><title>Extension QA fixture</title></head><body><h1>Browser acceptance fixture</h1><p id="word">ubiquitous</p><p id="paragraph">This is a longer English paragraph used to verify full page translation and preserve original text.</p></body></html>');
+    res.end('<!doctype html><html><head><title>Extension QA fixture</title></head><body><h1>Browser acceptance fixture</h1><p id="word">ubiquitous</p><p id="paragraph">This is a longer English paragraph used to verify full page translation and preserve original text.</p><p id="inline-fixture">Inline text <span>with a <a href="#fixture">preserved link</a></span><img alt="fixture" src="data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA="><script type="application/json">{"fixture":"preserve"}</script></p></body></html>');
     return;
   }
   let payload = ''; for await (const chunk of req) payload += chunk;
@@ -49,7 +55,7 @@ async function check(name, fn) {
   catch (err) { checks.push({ name, status: 'failed', error: err.message }); throw err; }
 }
 try {
-  context = await chromium.launchPersistentContext(resolve(root, `.local/browser-profile/api-qa/run-${Date.now()}`), {
+  context = await chromium.launchPersistentContext(profile, {
     ...(process.argv.includes('--edge') ? { executablePath: arg('--edge') } : { channel: 'msedge' }),
     headless: true, viewport: { width: 900, height: 1200 },
     args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`, '--no-first-run'],
@@ -112,6 +118,25 @@ try {
   await popup.goto('chrome-extension://'+extensionId+'/popup.html');
   await popup.locator('#explain-manufacturer option').first().waitFor({state:'attached'});
   const settle=()=>popup.waitForFunction(()=>!catalogRefreshing && providerRequests.size===0,null,{timeout:25000});
+  const compareAppearance=async state=>{
+    if(!oldPopupCss) return;
+    await check(`优化前后 ${state} 所有元素计算样式/布局一致`,async()=>{
+      const snapshots=await popup.evaluate(css=>{
+        const snapshot=()=>[...document.querySelectorAll('.container,.container *')].map(el=>{
+          const style=getComputedStyle(el),rect=el.getBoundingClientRect();
+          return {tag:el.tagName,id:el.id,className:el.className,
+            rect:[rect.x,rect.y,rect.width,rect.height],
+            style:Object.fromEntries([...style].map(key=>[key,style.getPropertyValue(key)]))};
+        });
+        const current=snapshot(),link=document.querySelector('link[rel="stylesheet"]');
+        const baseline=document.createElement('style');baseline.textContent=css;
+        document.head.append(baseline);link.disabled=true;
+        const original=snapshot();baseline.remove();link.disabled=false;
+        return {current,original};
+      },oldPopupCss);
+      assert.deepEqual(snapshots.current,snapshots.original);
+    });
+  };
   const saveKey=async key=>{
     if(await popup.locator('#rewrite-key').isVisible()) await popup.locator('#rewrite-key').click();
     await popup.locator('#api-key').fill(key);
@@ -129,6 +154,7 @@ try {
     port.postMessage(data);
   }),data);
   await settle();
+  await compareAppearance('首次 Key 输入');
   await check('实际 Edge 初次加载：10 家入口、调用名/通用设置/地址隐藏、首次 Key 输入可见',async()=>{
     assert.equal(await popup.locator('#explain-manufacturer option').count(),11);
     assert.equal(await popup.locator('#explain-custom-model').count(),0);
@@ -165,6 +191,7 @@ try {
     assert.deepEqual(await popup.locator('#explain-model option').evaluateAll(items=>items.map(o=>o.value)),['deepseek-flash','deepseek-v4-pro']);
     assert.equal(await popup.locator('#explain-model option[value="deepseek-v4-flash"]').count(),0);
     assert.equal(await popup.locator('#explain-model option[value="gpt-4.1"]').count(),0);
+    await compareAppearance('已保存厂家 Key');
     await popup.locator('.container').screenshot({path:resolve(evidence,'popup-compact-saved.png')});
   });
   await check('重新填写入口、空值提示和取消恢复；旧 Key 保留且不在界面显示',async()=>{
@@ -266,6 +293,7 @@ try {
     await popup.locator('#explain-manufacturer').selectOption('custom');
     assert.equal(await popup.locator('#api-base-url').isVisible(),false);
     await popup.locator('#custom-connection-button').click();
+    await compareAppearance('自定义地址弹窗');
     await popup.locator('#api-base-url').fill('not-url');await popup.locator('#custom-save').click();
     assert.match(await popup.locator('#custom-msg').innerText(),/有效/);
     await popup.locator('#api-base-url').fill(base+'/custom/v1/chat/completions/');
@@ -346,14 +374,20 @@ try {
     assert.ok(requests.some(r=>r.model==='gateway/model-large'&&r.authenticated));
   });
   await check('实际按需注入全文脚本，翻译与原文切换/取消恢复',async()=>{
+    const inlineOriginal=await page.locator('#inline-fixture').innerHTML();
     await worker.evaluate(async id=>chrome.tabs.sendMessage(id,{type:'TRIGGER_FULLPAGE_TRANSLATE'}),tabId);
     await page.locator('#paragraph').filter({hasText:'流式翻译结果。'}).waitFor();
+    await page.locator('#inline-fixture').filter({hasText:'流式翻译结果。'}).waitFor();
+    assert.equal(await page.locator('#inline-fixture img').count(),1);
+    assert.equal(await page.locator('#inline-fixture a').getAttribute('href'),'#fixture');
+    assert.equal(await page.locator('#inline-fixture script').textContent(),'{"fixture":"preserve"}');
     await page.locator('#ds-tb-show-original').click();
     await page.locator('#paragraph').filter({hasText:'This is a longer English paragraph'}).waitFor();
     await page.locator('#ds-tb-show-original').click();
     await page.locator('#paragraph').filter({hasText:'流式翻译结果。'}).waitFor();
     await page.locator('#ds-tb-cancel').click();
     await page.locator('#paragraph').filter({hasText:'This is a longer English paragraph'}).waitFor();
+    assert.equal(await page.locator('#inline-fixture').innerHTML(),inlineOriginal);
   });
   await check('无效 Key 的接口错误可见，重填后列表恢复；无相关页面异常',async()=>{
     await saveKey('invalid-test-only');
@@ -372,9 +406,15 @@ try {
 } finally {
   if (context) await context.close();
   await new Promise(resolve => server.close(resolve));
+  // 只删除本轮工具创建的配置目录；先核对解析后的绝对路径。
+  try {
+    assert.equal(dirname(resolve(profile)),profileRoot);
+    rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:200});
+    profileCleanup.removed=!existsSync(profile);
+  } catch(err) {profileCleanup.error=err.message;process.exitCode=1;}
   const report = { date: new Date().toISOString(), node: process.version, browserVersion,
     head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
-    kind: 'Actual Edge compact popup, live public directory, unauthenticated live DeepSeek probe, localhost API and intercepted provider model/generation fixtures, synthetic credentials', liveCatalog, liveDeepSeekProbe, checks, requests, providerRequests, errors,
+    kind: 'Actual Edge compact popup, live public directory, unauthenticated live DeepSeek probe, localhost API and intercepted provider model/generation fixtures, synthetic credentials', compareRef, profileCleanup, liveCatalog, liveDeepSeekProbe, checks, requests, providerRequests, errors,
     unverified: ['真实供应商/模型、账号权限、模型质量、原生扩展工具栏和右键菜单的鼠标操作'] };
   writeFileSync(resolve(evidence, 'browser-check.json'), JSON.stringify(report, null, 2) + '\n');
 }
