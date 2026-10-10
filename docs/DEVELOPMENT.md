@@ -113,4 +113,6 @@ node scripts/verify-browser.mjs --playwright '<已安装的 playwright 包目录
 
 后台 `REFRESH_MODEL_CATALOG` 消息协调并发刷新并保存 `catalogSnapshot`。设置页在打开后缓存超过 15 分钟时检查，也提供手动实时刷新。两个厂家选择器只筛模型，仍走通用 Base URL/Key。当前接口返回的模型精确 ID 优先；公开目录无法证明某个网关或账号权限。
 
+如果后台刷新消息无回复，或消息通道未建立/已断开，设置页调用同一份目录刷新逻辑并保存成功快照；后台明确返回的 HTTP/格式等失败不会被当成通信故障重试。恢复仍只访问公开目录，不读取或发送 Key。设置页提示恢复成功并建议重新加载扩展；网络连接、20 秒超时、HTTP 状态、非 JSON 和后台无效回复分别显示具体原因。浏览器脚本通过模拟无回复与通道断开验证这些路径，其中无回复恢复使用真实目录网络；恢复失败重复点击验证缓存/选择不被覆盖。详见 [CATALOG_REFRESH_FIX.md](CATALOG_REFRESH_FIX.md)。
+
 v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重复清 Key。`modelManufacturers` 记录自定义型号归属，`hiddenCatalogModels` 记录删除/修改的目录项，`availableModels` 记录当前接口返回的 ID；连接变更使当前接口列表失效。最近三款的来源与厂家官方发布日期的区别见 [MANUFACTURER_MODELS_QA.md](MANUFACTURER_MODELS_QA.md)。

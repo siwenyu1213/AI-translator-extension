@@ -33,7 +33,7 @@
 - **通用接口**：自定义 Base URL + 单一 API Key，解释/全文翻译各自选模型，共用接口连接，不再按模型名前缀路由
 - **厂家 → 模型两级选择**：OpenAI、DeepSeek、Anthropic、Google、阿里千问、月之暗面、智谱、MiniMax、xAI、Mistral AI 共 10 家，另有“其他厂家 / 自定义”。解释与全文翻译各自选择厂家和模型
 - **每家 3 款近期文本模型**：从公开模型目录筛选可输入文字、仅输出文字的模型，排除 batch/free 等重复后缀、重复 ID 和过期项，再按上架时间取最近 3 款。菜单显示模型名称，下方显示实际调用名；DeepSeek 另提供 V4.1 Flash、V4 Flash（历史兼容）、V4 Pro 入口
-- **实时目录更新**：点击“实时更新厂家模型”无 Key 查询 OpenRouter 公共目录；打开设置时，距上次检查超过 15 分钟会自动刷新。显示来源、更新时间；刷新失败保留缓存和当前选择，缺少 3 款的厂家保留上次缓存
+- **实时目录更新**：点击“实时更新厂家模型”无 Key 查询 OpenRouter 公共目录；打开设置时，距上次检查超过 15 分钟会自动刷新。显示来源、更新时间；后台无回复或消息通道断开时由设置页恢复刷新，并建议重新加载扩展。网络失败显示连接、20 秒超时、HTTP 状态或格式错误；失败保留缓存和当前选择，缺少 3 款的厂家保留上次缓存
 - **在线获取更多模型**：点击“获取接口模型列表”，向当前输入的地址请求 `/models`，去重后合并到两个标签共用的列表；网关的带路径模型 ID 会原样保留。列表可能包括嵌入/图像等模型，应选择支持文本 Chat Completions 的模型
 - **手动模型管理**：列表和调用名输入框同步，所有模型都可新增、修改、删除；两个标签可以选择不同模型
 - **可选保存前检测**：默认查询 `/models`；无效调用名或 Key 会提示并阻止保存。若接口没有 `/models`，取消“保存模型前查询 /models 检测”即可手动保存。查询成功只表示模型 ID 在列表内，不等于完成真实生成
@@ -116,3 +116,5 @@ node scripts/verify.mjs --report artifacts/qa/static-check.json
 DeepSeek 官方当前使用 `deepseek-flash` 调用 V4.1 Flash；`deepseek-v4-flash` 是历史兼容名，在官方接口转到 V4.1 Flash。本扩展保留这个选择并在界面提示，参考 [DeepSeek 官方说明](https://api-docs.deepseek.com/quick_start/pricing-details-cny/)。对于 OpenRouter 端点使用带厂家前缀的 ID；当前接口返回的精确 ID 优先，必要时可在输入框自行调整。
 
 本次 10 家目录、实时网络验收和边界见 [docs/MANUFACTURER_MODELS_QA.md](docs/MANUFACTURER_MODELS_QA.md)。
+
+若更新显示“更新失败：更新失败”，旧提示没有说明后台回复缺失。已增加设置页恢复路径，原因、复现和修复验收见 [docs/CATALOG_REFRESH_FIX.md](docs/CATALOG_REFRESH_FIX.md)。修改后请在扩展管理页重新加载，关闭旧设置面板再打开。

@@ -293,9 +293,19 @@
     return [...snapshot.providers.flatMap(p => p.models.map(m => ({ ...m, provider: p.id }))), ...COMPATIBILITY];
   }
   async function refresh(previous = BUILTIN) {
-    const res = await fetch(SOURCE, { cache: 'no-store', signal: AbortSignal.timeout(20000) });
+    let res;
+    try {
+      res = await fetch(SOURCE, { cache: 'no-store', signal: AbortSignal.timeout(20000) });
+    } catch (err) {
+      if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+        throw new Error('公开模型目录请求超时（20 秒），请检查网络后重试');
+      }
+      throw new Error(`无法连接公开模型目录 openrouter.ai，请检查网络或代理（${err.message || '网络请求失败'}）`);
+    }
     if (!res.ok) throw new Error(`公开模型目录请求失败 (${res.status})`);
-    const payload = await res.json();
+    let payload;
+    try { payload = await res.json(); }
+    catch { throw new Error('公开模型目录未返回有效 JSON，请检查网络或代理响应'); }
     if (!Array.isArray(payload?.data)) throw new Error('公开模型目录格式无效，保留已保存列表');
     const timestamp = new Date().toISOString();
     const existing = normalizeSnapshot(previous);

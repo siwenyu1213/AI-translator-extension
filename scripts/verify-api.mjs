@@ -82,6 +82,19 @@ await check('目录失败不覆盖存储，损坏缓存回退且厂家归类不�
     context.modelId = id; assert.equal(run('AIModelCatalog.providerFor(modelId)'), maker);
   }
 });
+await check('目录网络、超时和非 JSON 提供具体原因，失败不覆盖缓存', async () => {
+  await config();
+  const previous = JSON.stringify(storage.catalogSnapshot);
+  for (const [response, expected] of [
+    [() => { throw new TypeError('Failed to fetch'); }, /无法连接.*openrouter.ai.*Failed to fetch/],
+    [() => { const err = new Error('aborted'); err.name = 'TimeoutError'; throw err; }, /超时.*20 秒/],
+    [() => new Response('<html>proxy error</html>'), /未返回有效 JSON/]
+  ]) {
+    responder = response;
+    await assert.rejects(() => run('refreshModelCatalog()'), expected);
+    assert.equal(JSON.stringify(storage.catalogSnapshot), previous);
+  }
+});
 await check('v4→厂家目录升级保留已保存的 Key/连接/选定模型且仅追加一次', () => {
   const once = run("AIConfig.migrate({apiConfigVersion:1,apiBaseUrl:'https://saved.example/v1',apiKey:'saved-test',modelList:['local/model'],explainModel:'local/model',translateModel:'local/model'})");
   context.once = once;

@@ -105,6 +105,52 @@ try {
         models: p.models.map(m => ({ id: m.id, name: m.name, created: m.created })) })) };
     assert.equal(await popup.locator('#explain-model').inputValue(), 'gpt-4.1-mini');
   });
+  await check('旧后台未识别刷新消息时，设置页恢复刷新（模拟无回复，真实目录网络）', async () => {
+    await popup.evaluate(() => {
+      globalThis.qaSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime);
+      chrome.runtime.sendMessage = (message, ...args) => message.type === 'REFRESH_MODEL_CATALOG'
+        ? Promise.resolve(undefined) : qaSendMessage(message, ...args);
+    });
+    try {
+      await popup.locator('#refresh-catalog').click();
+      await popup.waitForFunction(() => !document.querySelector('#refresh-catalog').disabled);
+      await popup.locator('.container').screenshot({ path: resolve(evidence, 'catalog-recovery.png') });
+      assert.match(await popup.locator('#catalog-status').innerText(), /已更新.*设置页恢复/);
+      assert.equal(await popup.locator('#explain-model').inputValue(), 'gpt-4.1-mini');
+    } finally {
+      await popup.evaluate(() => { chrome.runtime.sendMessage = qaSendMessage; delete globalThis.qaSendMessage; });
+    }
+  });
+  await check('后台消息通道断开时恢复；恢复网络失败可重试且保留缓存（模拟）', async () => {
+    await popup.evaluate(() => {
+      globalThis.qaSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime);
+      globalThis.qaPageFetch = globalThis.fetch;
+      chrome.runtime.sendMessage = (message, ...args) => message.type === 'REFRESH_MODEL_CATALOG'
+        ? Promise.reject(new Error('Could not establish connection. Receiving end does not exist.')) : qaSendMessage(message, ...args);
+      globalThis.fetch = () => Promise.resolve(Response.json({ data: AIModelCatalog.BUILTIN.providers.flatMap(p =>
+        p.models.map(m => ({ ...m, architecture: { input_modalities: ['text'], output_modalities: ['text'] } }))) }));
+    });
+    try {
+      await popup.locator('#refresh-catalog').click();
+      await popup.waitForFunction(() => !document.querySelector('#refresh-catalog').disabled);
+      assert.match(await popup.locator('#catalog-status').innerText(), /已更新.*设置页恢复/);
+      const previous = await worker.evaluate(async () => JSON.stringify((await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot));
+      await popup.evaluate(() => { globalThis.fetch = () => Promise.resolve(new Response('{}', { status: 503 })); });
+      for (let retry = 0; retry < 2; retry++) {
+        await popup.locator('#refresh-catalog').click();
+        await popup.waitForFunction(() => !document.querySelector('#refresh-catalog').disabled);
+        assert.match(await popup.locator('#catalog-status').innerText(), /更新失败.*503.*保留/);
+        assert.equal(await worker.evaluate(async () => JSON.stringify((await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot)), previous);
+        assert.equal(await popup.locator('#explain-model').inputValue(), 'gpt-4.1-mini');
+      }
+      await popup.locator('.container').screenshot({ path: resolve(evidence, 'catalog-recovery-error.png') });
+    } finally {
+      await popup.evaluate(() => {
+        chrome.runtime.sendMessage = qaSendMessage; globalThis.fetch = qaPageFetch;
+        delete globalThis.qaSendMessage; delete globalThis.qaPageFetch;
+      });
+    }
+  });
   await check('目录刷新失败时保留缓存和当前选择（浏览器内模拟 503）', async () => {
     const original = await worker.evaluate(async () => JSON.stringify((await chrome.storage.local.get('catalogSnapshot')).catalogSnapshot));
     await worker.evaluate(() => {

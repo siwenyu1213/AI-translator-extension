@@ -541,21 +541,42 @@ $fetchModels.addEventListener('click', async () => {
   finally { $fetchModels.disabled = false; }
 });
 
+async function requestCatalogSnapshot() {
+  let result;
+  try {
+    result = await chrome.runtime.sendMessage({ type: 'REFRESH_MODEL_CATALOG' });
+  } catch (err) {
+    // 升级后旧 Worker、已关闭的消息通道或尚未建立的监听器。
+    if (!/receiving end does not exist|could not establish connection|message port closed|message channel closed/i.test(err.message)) throw err;
+  }
+  if (result == null) {
+    catalogState('后台未回复，正在从设置页恢复公开目录更新…');
+    const stored = await chrome.storage.local.get('catalogSnapshot');
+    const snapshot = await AIModelCatalog.refresh(stored.catalogSnapshot);
+    await chrome.storage.local.set({ catalogSnapshot: snapshot });
+    return { snapshot, recovered: true };
+  }
+  if (!result.ok) throw new Error(result.error || '后台返回了失败回复，但没有提供错误详情；请重新加载扩展');
+  if (result.snapshot?.source !== AIModelCatalog.SOURCE || !Array.isArray(result.snapshot.providers)) {
+    throw new Error('后台返回的模型目录无效；请重新加载扩展');
+  }
+  return { snapshot: result.snapshot, recovered: false };
+}
+
 async function refreshCatalog() {
   if ($refreshCatalog.disabled) return;
   $refreshCatalog.disabled = true;
   $refreshCatalog.setAttribute('aria-busy', 'true');
   catalogState('正在检查 10 家厂家的公开模型目录…');
   try {
-    const result = await chrome.runtime.sendMessage({ type: 'REFRESH_MODEL_CATALOG' });
-    if (!result?.ok) throw new Error(result?.error || '更新失败');
+    const result = await requestCatalogSnapshot();
     const selections = tabs.map(tab => tab.select.value);
     catalogSnapshot = AIModelCatalog.normalizeSnapshot(result.snapshot);
     renderManufacturers(); renderAllModelOptions();
     tabs.forEach((tab, index) => setTabSelection(tab, selections[index]));
     await chrome.storage.local.set({ modelList: modelList.slice(), catalogLastCheckedAt: new Date().toISOString() });
     const stale = catalogSnapshot.providers.filter(p => p.stale).length;
-    catalogState(`已更新 · ${new Date(catalogSnapshot.updatedAt).toLocaleString('zh-CN')}${stale ? ` · ${stale} 家保留上次缓存` : ''}`);
+    catalogState(`已更新 · ${new Date(catalogSnapshot.updatedAt).toLocaleString('zh-CN')}${stale ? ` · ${stale} 家保留上次缓存` : ''}${result.recovered ? ' · 设置页恢复成功，建议重新加载扩展以同步后台' : ''}`);
   } catch (err) {
     catalogState(`更新失败：${err.message}。保留已保存的目录和当前选择。`);
   } finally {
