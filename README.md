@@ -55,7 +55,7 @@
 git clone https://github.com/siwenyu666-beep/AI-translator-extension.git
 ```
 
-克隆后可以删除 `.git` 文件夹与 `README.md` 文件（不影响扩展运行），保持文件夹干净。
+开发工作目录请保留 `.git` 文件夹与 `README.md`，以便更新代码和保存版本。分发时可以另建只包含扩展运行文件的副本。
 
 1. 打开 Edge，地址栏输入 `edge://extensions`（或在扩展图标中点击"管理扩展"）
 2. 开启左侧「开发人员模式」
@@ -87,3 +87,15 @@ git clone https://github.com/siwenyu666-beep/AI-translator-extension.git
 ## 许可证
 
 MIT
+
+## 开发与验收
+
+本项目直接加载源码目录运行，无需构建或安装 npm 依赖。开发规则见 [AGENTS.md](AGENTS.md)，环境准备、静态检查、浏览器验收与版本保存方法见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
+
+在项目根目录运行静态检查：
+
+```powershell
+node scripts/verify.mjs --report artifacts/qa/static-check.json
+```
+
+静态检查通过仅说明 JavaScript 语法及已检查的本地资源引用通过；浏览器功能和真实 API 请求需按开发说明另行验收。
