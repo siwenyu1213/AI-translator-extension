@@ -30,9 +30,13 @@ async function check(name, fn) {
   catch (err) { checks.push({ name, status: 'failed', error: err.message }); }
 }
 async function config(values = {}) {
-  storage = { ...JSON.parse(JSON.stringify(run('AIConfig.migrate({})'))),
+  const fixture = { ...JSON.parse(JSON.stringify(run('AIConfig.migrate({})'))),
     apiBaseUrl: 'https://gateway.example/v1', apiKey: 'test-only-key',
     explainModel: 'gpt-4.1-mini', translateModel: 'gpt-4o-mini', ...values };
+  delete fixture.providerConfigVersion; delete fixture.providerConnections;
+  delete fixture.explainManufacturer; delete fixture.translateManufacturer;
+  context.fixture = fixture;
+  storage = JSON.parse(JSON.stringify(run('AIConfig.migrate(fixture)')));
   calls = [];
   changed.listeners.forEach(fn => fn({}, 'local'));
 }
@@ -164,8 +168,44 @@ await check('全文翻译与 B 分类使用独立翻译模型，思考开启只�
 });
 await check('配置和目标语言更改清缓存，缓存不混用不同端点', async () => {
   await config(); await stream(sse); await stream(sse); assert.equal(calls.length, 1);
-  await chrome.storage.local.set({ apiBaseUrl: 'https://other.example/v1', targetLanguage: 'ja' });
+  await chrome.storage.local.set({ providerConnections: { custom: { ...storage.providerConnections.custom, apiBaseUrl: 'https://other.example/v1' } }, targetLanguage: 'ja' });
   await stream(sse); assert.equal(calls.length, 2); assert.equal(calls[1].url, 'https://other.example/v1/chat/completions');
+});
+await check('10 家官方地址固定；自定义保留地址；不借用全局 Key', () => {
+  assert.equal(run('Object.keys(AIConfig.PROVIDER_ENDPOINTS).length'), 10);
+  const connection = run("AIConfig.connectionFor({providerConfigVersion:1,explainManufacturer:'deepseek',apiKey:'legacy-only',providerConnections:{deepseek:{apiBaseUrl:'https://wrong.example/v1'}}})");
+  assert.equal(connection.apiBaseUrl, 'https://api.deepseek.com'); assert.equal(connection.apiKey, '');
+  assert.equal(run("AIConfig.connectionFor({providerConfigVersion:1,explainManufacturer:'custom',providerConnections:{custom:{apiBaseUrl:'http://localhost:1234/v1',apiKey:'custom-only'}}}).apiBaseUrl"), 'http://localhost:1234/v1');
+});
+await check('原网关配置迁移为自定义；重载保持显式厂家和 Key', async () => {
+  await config(); assert.equal(storage.explainManufacturer, 'custom');
+  assert.equal(storage.providerConnections.custom.apiKey, 'test-only-key');
+  await run('AIConfig.load()'); assert.equal(storage.explainManufacturer, 'custom');
+  assert.equal(storage.translateManufacturer, 'custom');
+  assert.equal(storage.providerConnections.custom.apiBaseUrl, 'https://gateway.example/v1');
+});
+await check('解释走 DeepSeek，B 与全文走 Gemini；各自地址、Key、模型准确（模拟）', async () => {
+  await config();
+  await chrome.storage.local.set({ explainManufacturer: 'deepseek', translateManufacturer: 'google',
+    explainModel: 'deepseek-flash', translateModel: 'gemini-3.8-flash',
+    modelList: ['deepseek-flash', 'gemini-3.8-flash'],
+    providerConnections: { deepseek: { apiKey: 'ds-test-only' }, google: { apiKey: 'google-test-only' } } });
+  for (const [request, provider, key, model] of [
+    [{mode:'C'}, 'deepseek', 'ds-test-only', 'deepseek-flash'],
+    [{mode:'B'}, 'google', 'google-test-only', 'gemini-3.8-flash'],
+    [{mode:undefined,promptType:'translate',text:'全文'}, 'google', 'google-test-only', 'gemini-3.8-flash']
+  ]) {
+    await stream(sse, request);
+    assert.equal(calls.at(-1).url, run(`AIConfig.PROVIDER_ENDPOINTS['${provider}']`) + '/chat/completions');
+    assert.equal(calls.at(-1).options.headers.Authorization, 'Bearer ' + key);
+    assert.equal(JSON.parse(calls.at(-1).options.body).model, model);
+  }
+});
+await check('切换到未配置厂家阻止请求；另一厂家 Key 不外发（模拟）', async () => {
+  await config(); await chrome.storage.local.set({ explainManufacturer: 'xai' });
+  const messages = await stream(sse);
+  assert.equal(calls.length, 0); assert.equal(messages[0].type, 'error');
+  assert.match(messages[0].error, /所选厂家/);
 });
 for (const [name, data] of [
   ['流内错误', 'data: {"error":{"message":"quota unavailable"}}\n'],

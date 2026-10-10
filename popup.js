@@ -34,6 +34,7 @@ const $targetLanguage = document.getElementById('target-language');
 // 通用
 const $apiKey = document.getElementById('api-key');
 const $apiBaseUrl = document.getElementById('api-base-url');
+const $apiAddressHint = document.getElementById('api-address-hint');
 const $fetchModels = document.getElementById('fetch-models');
 const $catalogStatus = document.getElementById('catalog-status');
 const $verifyModel = document.getElementById('verify-model');
@@ -51,6 +52,9 @@ let modelManufacturers = {};
 let hiddenCatalogModels = [];
 let catalogSnapshot = AIModelCatalog.BUILTIN;
 let catalogRefreshing = false;
+let providerConnections = {};
+let activeTabIndex = 0;
+let connectionProvider = 'openai';
 const metadata = new Map();
 
 const tabs = [
@@ -82,6 +86,44 @@ const tabs = [
   }
 ];
 
+function captureConnection(normalizedBaseUrl) {
+  const previous = providerConnections[connectionProvider] || {};
+  const apiBaseUrl = AIConfig.PROVIDER_ENDPOINTS[connectionProvider] || normalizedBaseUrl || $apiBaseUrl.value;
+  const apiKey = $apiKey.value.trim();
+  const changed = apiBaseUrl !== previous.apiBaseUrl || apiKey !== (previous.apiKey || '');
+  providerConnections[connectionProvider] = { apiBaseUrl, apiKey,
+    availableModels: changed ? [] : (previous.availableModels || []).slice() };
+  availableModels = providerConnections[connectionProvider].availableModels;
+}
+function showConnection() {
+  connectionProvider = tabs[activeTabIndex].manufacturer.value || 'custom';
+  const entry = providerConnections[connectionProvider] || {};
+  $apiBaseUrl.value = AIConfig.PROVIDER_ENDPOINTS[connectionProvider] || entry.apiBaseUrl || AIConfig.DEFAULT_BASE_URL;
+  $apiBaseUrl.readOnly = connectionProvider !== 'custom';
+  $apiKey.value = entry.apiKey || '';
+  availableModels = (entry.availableModels || []).slice();
+  const name = tabs[activeTabIndex].manufacturer.selectedOptions[0]?.textContent || '自定义接口';
+  $apiKey.placeholder = `填写${name}的 API Key`;
+  $apiAddressHint.textContent = connectionProvider === 'custom'
+    ? '填写服务商提供的兼容地址，保留 /v1 等路径。'
+    : connectionProvider === 'qwen' ? '已填写百炼北京接口；其他地域可选择自定义接口。'
+    : connectionProvider === 'minimax' ? '已填写 MiniMax 国际接口；国内平台可选择自定义接口。'
+    : '已自动填写官方兼容接口，填写对应厂家的 Key 即可。';
+  clearModelMessage($connectionMsg);
+}
+function tabConnection(tab) {
+  const provider = tab.manufacturer.value || 'custom';
+  if (tab === tabs[activeTabIndex]) return { apiBaseUrl: AIConfig.PROVIDER_ENDPOINTS[provider] || $apiBaseUrl.value,
+    apiKey: $apiKey.value.trim(), availableModels };
+  const entry = providerConnections[provider] || {};
+  return { apiBaseUrl: AIConfig.PROVIDER_ENDPOINTS[provider] || entry.apiBaseUrl || AIConfig.DEFAULT_BASE_URL,
+    apiKey: entry.apiKey || '', availableModels: entry.availableModels || [] };
+}
+function manufacturerSettings() {
+  return { providerConfigVersion: 1, providerConnections: AIConfig.normalizeConnections(providerConnections),
+    explainManufacturer: tabs[0].manufacturer.value, translateManufacturer: tabs[1].manufacturer.value };
+}
+
 // ═══════════════════════════════════════════
 // 模型名称工具
 // ═══════════════════════════════════════════
@@ -108,16 +150,16 @@ function manufacturerFor(model) {
 function refreshMetadata() {
   metadata.clear();
   AIModelCatalog.allModels(catalogSnapshot).forEach(model => {
-    const id = AIModelCatalog.resolveId(model, $apiBaseUrl.value, availableModels);
-    if (!metadata.has(id) || model.note) metadata.set(id, model);
-    if (!hiddenCatalogModels.includes(id) && !modelList.includes(id)) modelList.push(id);
+    for (const id of [model.id, AIModelCatalog.nativeId(model)]) {
+      if (!metadata.has(id) || model.note) metadata.set(id, model);
+    }
   });
 }
 function renderManufacturers() {
   tabs.forEach(tab => {
     const current = tab.manufacturer.value || 'openai';
     tab.manufacturer.replaceChildren();
-    [...catalogSnapshot.providers, {id:'custom', name:'其他厂家 / 自定义'}].forEach(provider => {
+    [...catalogSnapshot.providers, {id:'custom', name:'自定义接口'}].forEach(provider => {
       const option = document.createElement('option'); option.value = provider.id; option.textContent = provider.name;
       tab.manufacturer.appendChild(option);
     });
@@ -129,7 +171,7 @@ function updateModelDetail(tab) {
   const model = metadata.get(id);
   tab.detail.textContent = model?.note || (id.includes('deepseek-v4-flash')
     ? 'V4 Flash / Vision Exp 为历史型号，DeepSeek 官方已将其调用转到 V4.1 Flash。'
-    : id ? `调用名：${id}${availableModels.includes(id) ? ' · 当前接口列表已列出' : ' · 请确认当前接口支持'}` : '该厂家暂无选定模型，可手动新增调用名。');
+    : id ? `调用名：${id}${tabConnection(tab).availableModels.includes(id) ? ' · 当前接口列表已列出' : ' · 请确认当前接口支持'}` : '该厂家暂无选定模型，可手动新增调用名。');
 }
 function catalogState(text = '') {
   $catalogStatus.textContent = text;
@@ -164,6 +206,7 @@ function syncThinkingForTab(tab) {
 
 function renderModelOptions(tab) {
   const current = tab.select.value, providerId = tab.manufacturer.value;
+  const connection = tabConnection(tab);
   tab.select.replaceChildren();
   const displayed = new Set();
   function group(label, entries) {
@@ -171,6 +214,7 @@ function renderModelOptions(tab) {
     entries.forEach(({id, name}) => {
       if (displayed.has(id) || hiddenCatalogModels.includes(id)) return;
       displayed.add(id);
+      if (!modelList.includes(id)) modelList.push(id);
       const option = document.createElement('option'); option.value = id; option.textContent = name;
       optgroup.appendChild(option);
     });
@@ -178,11 +222,15 @@ function renderModelOptions(tab) {
   }
   const provider = catalogSnapshot.providers.find(p => p.id === providerId);
   if (provider) group(provider.stale ? '该厂家模型 · 已有列表' : '该厂家模型 · 公开目录', provider.models.map(model => ({
-    id: AIModelCatalog.resolveId(model, $apiBaseUrl.value, availableModels), name: model.name
+    id: AIModelCatalog.resolveId(model, connection.apiBaseUrl, connection.availableModels), name: model.name
   })));
   group('常用 / 历史兼容型号', AIModelCatalog.COMPATIBILITY.filter(m => m.provider === providerId)
-    .map(model => ({ id: AIModelCatalog.resolveId(model, $apiBaseUrl.value, availableModels), name: model.name })));
-  group('当前接口 / 已保存的模型', modelList.filter(id => manufacturerFor(id) === providerId)
+    .map(model => ({ id: AIModelCatalog.resolveId(model, connection.apiBaseUrl, connection.availableModels), name: model.name })));
+  if (providerId === 'custom' && /^https:\/\/openrouter\.ai\//i.test(connection.apiBaseUrl)) {
+    group('网关公开目录', AIModelCatalog.allModels(catalogSnapshot).map(model => ({
+      id: AIModelCatalog.resolveId(model, connection.apiBaseUrl, connection.availableModels), name: model.name })));
+  }
+  group('当前接口 / 已保存的模型', modelList.filter(id => providerId === 'custom' || manufacturerFor(id) === providerId || connection.availableModels.includes(id))
     .map(id => ({id, name:modelDisplayName(id)})));
   if (displayed.has(current)) tab.select.value = current;
   else tab.select.selectedIndex = -1;
@@ -194,7 +242,6 @@ function renderAllModelOptions() {
 
 function setTabSelection(tab, modelId) {
   if (modelId && modelList.includes(modelId)) {
-    tab.manufacturer.value = manufacturerFor(modelId);
     renderModelOptions(tab);
     tab.select.value = modelId;
     tab.input.value = modelId;
@@ -231,12 +278,18 @@ function startNewModel(tab) {
 
 $tabBtns.forEach(btn => {
   btn.addEventListener('click', () => {
+    captureConnection();
     const tab = btn.dataset.tab;
+    activeTabIndex = tab === 'translate' ? 1 : 0;
     $tabBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     $tabPanels.forEach(p => {
       p.classList.toggle('active', p.id === `panel-${tab}`);
     });
+    showConnection();
+    const selected = tabs[activeTabIndex].select.value;
+    renderAllModelOptions();
+    setTabSelection(tabs[activeTabIndex], selected);
   });
 });
 
@@ -277,10 +330,15 @@ async function saveCurrentModel(tab) {
   let result;
   try {
     const connection = getConnection();
+    const provider = connectionProvider, tabIndex = activeTabIndex;
     result = $verifyModel.checked
       ? await chrome.runtime.sendMessage({ type: 'VALIDATE_MODEL', model: requested, connection })
       : { ok: true, model: { id: requested } };
-    if (result?.ok) await saveConnection(connection);
+    assertConnectionUnchanged(connection, provider, tabIndex);
+    if (result?.ok) {
+      await saveConnection(connection);
+      assertConnectionUnchanged(connection, provider, tabIndex);
+    }
   } catch (err) {
     result = { ok: false, error: err.message || '模型检测失败' };
   } finally {
@@ -302,7 +360,7 @@ async function saveCurrentModel(tab) {
     if (!current) {
       renderAllModelOptions();
       setTabSelection(tab, targetId);
-      await chrome.storage.local.set({ modelList: modelList.slice(), [tab.key]: targetId });
+      await chrome.storage.local.set({ ...manufacturerSettings(), modelList: modelList.slice(), [tab.key]: targetId });
       showModelMessage(tab.msg, `✅ 已选择：${targetId}`, 'success', 3000);
       return;
     }
@@ -340,7 +398,7 @@ async function saveCurrentModel(tab) {
 
   renderAllModelOptions();
   tabs.forEach(item => setTabSelection(item, desiredSelections.get(item) || ''));
-  await chrome.storage.local.set(updates);
+  await chrome.storage.local.set({ ...updates, ...manufacturerSettings() });
 
   const action = currentInList ? '修改' : '新增';
   showModelMessage(tab.msg, `✅ 已保存${action}：${targetId}`, 'success', 3000);
@@ -353,10 +411,8 @@ async function deleteCurrentModel(tab) {
     return;
   }
 
-  const index = modelList.indexOf(model);
   hiddenCatalogModels.push(model);
   modelList = modelList.filter(item => item !== model);
-  const fallback = modelList[Math.min(index, modelList.length - 1)] || '';
 
   const updates = { modelList: modelList.slice(), modelManufacturers: { ...modelManufacturers }, hiddenCatalogModels: hiddenCatalogModels.slice() };
   const desiredSelections = new Map();
@@ -364,21 +420,26 @@ async function deleteCurrentModel(tab) {
   tabs.forEach(item => {
     let desired = item.select.value || '';
     if (desired === model || (desired && !modelList.includes(desired))) {
-      desired = fallback;
+      desired = '';
     }
     desiredSelections.set(item, desired);
     updates[item.key] = desired || '';
   });
 
   renderAllModelOptions();
-  tabs.forEach(item => setTabSelection(item, desiredSelections.get(item) || ''));
-  await chrome.storage.local.set(updates);
+  tabs.forEach(item => {
+    const desired = desiredSelections.get(item) || item.select.options[0]?.value || '';
+    setTabSelection(item, desired);
+    updates[item.key] = desired;
+  });
+  await chrome.storage.local.set({ ...updates, ...manufacturerSettings() });
 
   showModelMessage(tab.msg, `✅ 已删除模型：${model}`, 'success', 3000);
 }
 
 tabs.forEach(tab => {
   tab.manufacturer.addEventListener('change', () => {
+    if (tab === tabs[activeTabIndex]) { captureConnection(); showConnection(); }
     renderModelOptions(tab);
     tab.select.selectedIndex = tab.select.options.length ? 0 : -1;
     syncInputFromSelect(tab);
@@ -408,10 +469,8 @@ tabs.forEach(tab => {
   modelManufacturers = config.modelManufacturers || {};
   hiddenCatalogModels = config.hiddenCatalogModels || [];
   catalogSnapshot = AIModelCatalog.normalizeSnapshot(config.catalogSnapshot);
-  $apiBaseUrl.value = config.apiBaseUrl;
+  providerConnections = AIConfig.normalizeConnections(config.providerConnections);
   $verifyModel.checked = config.verifyModel !== false;
-  if (config.requiresApiSetup) showModelMessage($connectionMsg,
-    '已升级为通用接口。旧供应商 Key 和预设已移除，请填写新的接口地址和 API Key。', 'info', 0);
 
   // ── 填充 UI ──
   $explainThinking.checked = config.explainThinkingEnabled === true;
@@ -423,12 +482,16 @@ tabs.forEach(tab => {
   $targetLanguage.value = config.targetLanguage || 'zh';
 
   renderManufacturers();
+  tabs[0].manufacturer.value = config.explainManufacturer;
+  tabs[1].manufacturer.value = config.translateManufacturer;
+  showConnection();
+  if (config.requiresApiSetup) showModelMessage($connectionMsg,
+    '旧供应商 Key 已移除，请选择厂家并填写对应的 API Key。', 'info', 0);
   renderAllModelOptions();
   catalogState();
   setTabSelection(tabs[0], config.explainModel);
   setTabSelection(tabs[1], config.translateModel);
 
-  $apiKey.value = config.apiKey || '';
 
   $enabled.checked = config.enabled !== false;
   $useContext.checked = config.usePageContext !== false;
@@ -447,6 +510,7 @@ $saveBtn.addEventListener('click', async () => {
   catch (err) { showStatus(err.message, 'error'); return; }
 
   const config = {
+    ...manufacturerSettings(),
     apiKey: apiKey,
     ...connection,
     verifyModel: $verifyModel.checked,
@@ -476,8 +540,8 @@ $saveBtn.addEventListener('click', async () => {
 
   try {
     await chrome.storage.local.set(config);
-    if (!apiKey) {
-      showStatus('⚠️ 已保存，但未设置任何 API Key，扩展将无法使用', 'error');
+    if (tabs.some(tab => !tabConnection(tab).apiKey)) {
+      showStatus('已保存，请补充所选厂家的 API Key。', 'error');
     } else {
       showStatus('✅ 设置已保存！现在去任意页面试试吧', 'success');
     }
@@ -515,26 +579,41 @@ function showStatus(msg, type) {
 
 // 获取列表和保存模型均使用当前输入的连接，不需要先点总保存。
 function getConnection() {
-  return { apiBaseUrl: AIConfig.normalizeBaseUrl($apiBaseUrl.value), apiKey: $apiKey.value.trim() };
+  const apiBaseUrl = AIConfig.normalizeBaseUrl(AIConfig.PROVIDER_ENDPOINTS[connectionProvider] || $apiBaseUrl.value);
+  captureConnection(apiBaseUrl);
+  $apiBaseUrl.value = apiBaseUrl;
+  return { apiBaseUrl, apiKey: $apiKey.value.trim() };
+}
+function assertConnectionUnchanged(connection, provider, tabIndex) {
+  if (provider !== connectionProvider || tabIndex !== activeTabIndex ||
+      connection.apiKey !== $apiKey.value.trim() ||
+      connection.apiBaseUrl !== AIConfig.normalizeBaseUrl(AIConfig.PROVIDER_ENDPOINTS[connectionProvider] || $apiBaseUrl.value)) {
+    throw new Error('连接已切换，请重试。');
+  }
 }
 async function saveConnection(connection) {
-  await chrome.storage.local.set({ ...connection, availableModels: availableModels.slice(), verifyModel: $verifyModel.checked, requiresApiSetup: false });
-  $apiBaseUrl.value = connection.apiBaseUrl;
+  const provider = connectionProvider;
+  providerConnections[provider] = { ...connection, availableModels: availableModels.slice() };
+  await chrome.storage.local.set({ ...connection, ...manufacturerSettings(), availableModels: availableModels.slice(), verifyModel: $verifyModel.checked, requiresApiSetup: false });
+  if (connectionProvider === provider) $apiBaseUrl.value = connection.apiBaseUrl;
 }
 $fetchModels.addEventListener('click', async () => {
   $fetchModels.disabled = true;
   showModelMessage($connectionMsg, '正在获取接口模型列表…', 'info', 0);
   try {
     const connection = getConnection();
+    const provider = connectionProvider, tabIndex = activeTabIndex;
     const result = await chrome.runtime.sendMessage({ type: 'LIST_MODELS', connection });
+    assertConnectionUnchanged(connection, provider, tabIndex);
     if (!result?.ok) throw new Error(result?.error || '获取模型失败');
     availableModels = result.models;
+    providerConnections[connectionProvider] = { ...connection, availableModels: availableModels.slice() };
     hiddenCatalogModels = hiddenCatalogModels.filter(id => !result.models.includes(id));
     modelList = normalizeModelList([...modelList, ...result.models]);
-    const selected = tabs.map(tab => tab.select.value || result.models[0]);
+    const selected = tabs.map(tab => tab.select.value || (tab === tabs[activeTabIndex] ? result.models[0] : ''));
     renderAllModelOptions();
     tabs.forEach((tab, index) => setTabSelection(tab, selected[index]));
-    await chrome.storage.local.set({ ...connection, modelList: modelList.slice(), availableModels, hiddenCatalogModels,
+    await chrome.storage.local.set({ ...connection, ...manufacturerSettings(), modelList: modelList.slice(), availableModels, hiddenCatalogModels,
       explainModel: tabs[0].select.value, translateModel: tabs[1].select.value,
       verifyModel: $verifyModel.checked, requiresApiSetup: false });
     showModelMessage($connectionMsg, `✅ 获取 ${result.models.length} 个模型并合并到列表。请选择支持文本对话的模型，列表存在不代表生成已验证。`, 'success', 0);
@@ -573,9 +652,10 @@ async function refreshCatalog() {
     const selections = tabs.map(tab => tab.select.value);
     const drafts = tabs.map(tab => ({ manufacturer: tab.manufacturer.value, input: tab.input.value }));
     const oldCatalogIds = new Set(AIModelCatalog.allModels(catalogSnapshot)
-      .map(model => AIModelCatalog.resolveId(model, $apiBaseUrl.value, availableModels)));
+      .flatMap(model => [model.id, AIModelCatalog.nativeId(model)]));
+    const interfaceModels = Object.values(providerConnections).flatMap(entry => entry.availableModels || []).concat(availableModels);
     modelList = modelList.filter(id => !oldCatalogIds.has(id) || selections.includes(id) ||
-      Object.values(savedSelections).includes(id) || availableModels.includes(id) || Object.hasOwn(modelManufacturers, id));
+      Object.values(savedSelections).includes(id) || interfaceModels.includes(id) || Object.hasOwn(modelManufacturers, id));
     catalogSnapshot = AIModelCatalog.normalizeSnapshot(result.snapshot);
     renderManufacturers(); renderAllModelOptions();
     tabs.forEach((tab, index) => {
@@ -594,7 +674,7 @@ async function refreshCatalog() {
   }
 }
 function invalidateAvailableModels() {
-  availableModels = []; // 旧接口列表不能作为新接口的 ID 匹配依据。
+  captureConnection(); // 仅清除当前厂家旧连接的列表匹配依据。
   renderAllModelOptions();
   tabs.forEach(tab => syncInputFromSelect(tab));
 }

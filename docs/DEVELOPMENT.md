@@ -111,8 +111,16 @@ node scripts/verify-browser.mjs --playwright '<已安装的 playwright 包目录
 
 `model-catalog.js` 内置从公开 `/api/v1/models` 取得的 10 家文本目录及获取时间，供两端共用；v4.2 首次快照有 210 款，数量随来源变化。动态刷新返回纯数据，使用白名单厂家与字段、长度/时间/模态检查；不加载远程 JavaScript，也不发送用户 API Key、Base URL、浏览器 storage 或网页数据。去重并按目录上架时间排序，不截断为 3 款；一家有 1 款也可正常更新，完全缺失则保留该厂家缓存。规范化缓存同样不截断。
 
-后台 `REFRESH_MODEL_CATALOG` 消息协调并发刷新并保存 `catalogSnapshot`。设置页每次初始化都自动请求，即使上次刚更新也不跳过；没有手动刷新按钮、15 分钟节流、来源卡片或成功提示。先显示缓存，成功后静默更新；失败显示顶部红字，部分厂家未更新显示简短部分失败提示。选择和输入草稿在请求完成时保留；目录中下架的非选定、非手动、非接口模型从自动列表移除。两个厂家选择器只筛模型，仍走通用 Base URL/Key。当前接口返回的模型精确 ID 优先；公开目录无法证明某个网关或账号权限。
+后台 `REFRESH_MODEL_CATALOG` 消息协调并发刷新并保存 `catalogSnapshot`。设置页每次初始化都自动请求，即使上次刚更新也不跳过；没有手动刷新按钮、15 分钟节流、来源卡片或成功提示。先显示缓存，成功后静默更新；失败显示顶部红字，部分厂家未更新显示简短部分失败提示。选择和输入草稿在请求完成时保留；目录中下架的非选定、非手动、非接口模型从自动列表移除。v4.3 两个厂家选择器还决定各自连接；模型 ID 分别按对应地址及该厂家接口列表适配。当前接口返回的模型精确 ID 优先；公开目录无法证明某个网关或账号权限。
 
 如果后台刷新消息无回复，或消息通道未建立/已断开，设置页调用同一份目录刷新逻辑并保存成功快照；后台明确返回的 HTTP/格式等失败不会被当成通信故障重试。恢复仍只访问公开目录，不读取或发送 Key，成功不显示反馈。底层仍区分连接、20 秒超时、HTTP 状态、非 JSON 和后台无效回复，技术原因记录为设置页控制台 warning，用户只看到简短红字。浏览器脚本通过模拟无回复与通道断开验证恢复，真实网络验证每次打开自动刷新；新增草稿保留、目录下架清理、部分失败提示、错误颜色以及重开后恢复静默等检查。历史原因见 [CATALOG_REFRESH_FIX.md](CATALOG_REFRESH_FIX.md)，当前验收见 [AUTO_MODEL_CATALOG_QA.md](AUTO_MODEL_CATALOG_QA.md)。
 
 v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重复清 Key。`modelManufacturers` 记录自定义型号归属，`hiddenCatalogModels` 记录删除/修改的目录项，`availableModels` 记录当前接口返回的 ID；连接变更使当前接口列表失效。历史 v4.1 的最近三款记录见 [MANUFACTURER_MODELS_QA.md](MANUFACTURER_MODELS_QA.md)；v4.2 已取消这个数量限制。
+
+## 厂家连接配置（v4.3）
+
+`AIConfig.PROVIDER_ENDPOINTS` 固定 10 家官方兼容地址；厂家字段 `explainManufacturer` / `translateManufacturer` 显式决定路由，不根据模型名覆盖用户选择。`providerConnections` 按厂家记录 Key 与 `/models` ID，自定义额外记录可编辑 Base URL。`providerConfigVersion: 1` 表示新结构，读取时只做一次迁移：原地址匹配该厂家预设才交给该厂家，其他原连接保留为 custom，不借用全局 Key。旧顶层 `apiBaseUrl/apiKey/availableModels` 保留兼容存储，新后台请求读取 `connectionFor(config, kind)`。
+
+设置页地址与 Key 随当前标签和厂家显示；切换前保留连接草稿，保存设置时写入各厂家的连接。官方地址只读，所有自定义/网关地址须选择 custom；厂家地址即使被改写到 storage，也由固定预设还原。改变地址或 Key 仅使该连接的接口列表失效。查询/检测完成时检查厂家、标签、地址和 Key 是否仍一致，期间切换则不写入返回结果。后台解释和 A/C/D 分类读取解释连接，B 分类及全文 STREAM_BATCH 读取翻译连接，缺少该厂家 Key 时不发请求。
+
+验证新增 10 家地址联动、独立 Key 恢复、旧网关迁移、厂家路由、未配置拦截与异步切换处理。浏览器内官方域名请求由 Worker fetch 模拟拦截，仅核对路由/消息/SSE，不向供应商发送合成 Key。真实公开目录仍联网；本机模拟接口继续验证完整划词与全文路径。端点来源、地域和真实凭据缺口见 [PROVIDER_ENDPOINTS_QA.md](PROVIDER_ENDPOINTS_QA.md)。

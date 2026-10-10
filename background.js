@@ -145,11 +145,6 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
     port.disconnect();
     return;
   }
-  if (!config.apiKey) {
-    port.postMessage({ type: 'error', error: '请先设置 API Key', batchId });
-    port.disconnect();
-    return;
-  }
 
   let prompt, systemPrompt, model, thinkingEnabled, reasoningEffort;
 
@@ -198,13 +193,23 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
     return;
   }
   let baseUrl;
-  try { baseUrl = AIConfig.normalizeBaseUrl(config.apiBaseUrl); }
+  let connection;
+  try {
+    const kind = mode ? (mode === 'B' ? 'translate' : 'explain') : (promptType === 'explain' ? 'explain' : 'translate');
+    connection = AIConfig.connectionFor(config, kind);
+    baseUrl = AIConfig.normalizeBaseUrl(connection.apiBaseUrl);
+  }
   catch (err) {
     port.postMessage({ type: 'error', error: err.message, batchId });
     port.disconnect();
     return;
   }
-  const apiKey = config.apiKey;
+  const apiKey = connection.apiKey;
+  if (!apiKey) {
+    port.postMessage({ type: 'error', error: '请先填写所选厂家的 API Key', batchId });
+    port.disconnect();
+    return;
+  }
 
   // 缓存检查（键包含思考开关，避免开关切换后命中旧缓存）
   const cacheKey = JSON.stringify([cacheRevision, baseUrl, model, systemPrompt, prompt,
@@ -486,7 +491,7 @@ async function parseApiError(res) {
 // ═══════════════════════════════════════════
 
 async function listModels(connection) {
-  const config = connection || await getConfig();
+  const config = connection || AIConfig.connectionFor(await getConfig());
   let baseUrl;
   try { baseUrl = AIConfig.normalizeBaseUrl(config.apiBaseUrl); }
   catch (err) { return { ok: false, error: err.message }; }

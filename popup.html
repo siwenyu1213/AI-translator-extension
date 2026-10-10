@@ -8,7 +8,7 @@
 </head>
 <body>
 <div class="container">
-  <h1 class="title">AI 智能解释 &amp; 翻译 <span class="version">v4.2.0</span></h1>
+  <h1 class="title">AI 智能解释 &amp; 翻译 <span class="version">v4.3.0</span></h1>
   <p id="catalog-status" class="catalog-error" role="alert" hidden></p>
 
   <!-- ═══ 标签切换 ═══ -->
@@ -34,7 +34,7 @@
         <button type="button" id="explain-custom-delete" class="mini-btn danger" disabled>删除</button>
       </div>
       <div id="explain-model-msg" class="model-msg" role="status"></div>
-      <p class="hint">先选厂家，再选模型。下方显示实际调用名，可新增或修改。所有厂家共用你配置的兼容接口；没有 /models 的接口可关闭保存前检测。</p>
+      <p class="hint">先选厂家，再选模型，接口地址自动填写。自定义接口可手动输入地址。下方调用名可新增或修改；没有 /models 的接口可关闭保存前检测。</p>
     </div>
 
     <div class="section">
@@ -81,7 +81,7 @@
         <button type="button" id="translate-custom-delete" class="mini-btn danger" disabled>删除</button>
       </div>
       <div id="translate-model-msg" class="model-msg" role="status"></div>
-      <p class="hint">先选厂家，再选模型。下方显示实际调用名，可新增或修改。所有厂家共用你配置的兼容接口；没有 /models 的接口可关闭保存前检测。</p>
+      <p class="hint">先选厂家，再选模型，接口地址自动填写。自定义接口可手动输入地址。下方调用名可新增或修改；没有 /models 的接口可关闭保存前检测。</p>
     </div>
 
     <div class="section">
@@ -124,12 +124,12 @@
   <div class="section">
     <label class="label" for="api-base-url">API Base URL（OpenAI 兼容接口）</label>
     <input type="url" id="api-base-url" class="input" placeholder="https://api.openai.com/v1" autocomplete="off">
-    <p class="hint">填服务商给出的地址，保留 /v1 等路径。也可粘贴完整 /chat/completions 地址。</p>
+    <p id="api-address-hint" class="hint">选择厂家后自动填写；自定义接口可手动输入。</p>
   </div>
   <div class="section">
     <label class="label" for="api-key">API Key</label>
     <input type="password" id="api-key" class="input" placeholder="填写此接口的 API Key" autocomplete="off">
-    <p class="hint">使用 Authorization: Bearer 鉴权。Key 必须属于当前接口，保存在本机扩展设置中。</p>
+    <p class="hint">填写所选厂家的 Key，各厂家分别保存。解释与全文翻译可使用不同厂家。</p>
   </div>
   <div class="section">
     <button type="button" id="fetch-models" class="fetch-btn">↻ 获取接口模型列表</button>

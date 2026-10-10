@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require(process.argv.includes('--playwright') ? arg('--playwright') : 'playwright');
 const evidence = resolve(root, 'artifacts/qa');
 mkdirSync(evidence, { recursive: true });
-const checks = [], requests = [], errors = [];
+const checks = [], requests = [], providerRequests = [], errors = [];
 let browserVersion, context, liveCatalog;
 const server = createServer(async (req, res) => {
   if (req.url === '/sample') {
@@ -85,6 +85,9 @@ try {
     for (const maker of makers) {
       await popup.locator('#explain-manufacturer').selectOption(maker);
       assert.ok(await popup.locator('#explain-model optgroup').first().locator('option').count() > 3);
+      assert.equal(await popup.locator('#api-base-url').inputValue(), await worker.evaluate(id => AIConfig.PROVIDER_ENDPOINTS[id], maker));
+      assert.equal(await popup.locator('#api-base-url').evaluate(el => el.readOnly), true);
+      assert.equal(await popup.locator('#api-key').inputValue(), '');
     }
     assert.equal(await popup.locator('#refresh-catalog').count(), 0);
     assert.equal(await popup.locator('#catalog-status').isVisible(), false);
@@ -214,6 +217,8 @@ try {
     await popup.reload(); await popup.locator('#explain-model option').first().waitFor({ state: 'attached' }); await settleCatalog();
   });
   await check('当前输入连接经实际 runtime 消息获取模型并持久保存', async () => {
+    await popup.locator('#explain-manufacturer').selectOption('custom');
+    assert.equal(await popup.locator('#api-base-url').evaluate(el => el.readOnly), false);
     await popup.locator('#api-base-url').fill(`${base}/custom/v1/chat/completions/`);
     await popup.locator('#api-key').fill('local-qa-only');
     await popup.locator('#fetch-models').click();
@@ -222,21 +227,98 @@ try {
     const saved = await worker.evaluate(async () => chrome.storage.local.get(['apiBaseUrl', 'apiKey']));
     assert.equal(saved.apiBaseUrl, `${base}/custom/v1`); assert.equal(saved.apiKey, 'local-qa-only');
   });
+  await check('异步查询期间切换厂家不覆盖新厂家连接或 Key（模拟延迟）', async () => {
+    await popup.evaluate(() => {
+      globalThis.qaSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime);
+      chrome.runtime.sendMessage = (message, ...args) => message.type === 'LIST_MODELS'
+        ? new Promise(resolve => { globalThis.qaReleaseModelList = () => resolve({ok:true,models:['race-only-model']}); })
+        : qaSendMessage(message, ...args);
+    });
+    try {
+      await popup.locator('#fetch-models').click();
+      await popup.waitForFunction(() => Boolean(globalThis.qaReleaseModelList));
+      await popup.locator('#explain-manufacturer').selectOption('deepseek');
+      await popup.evaluate(() => qaReleaseModelList());
+      await popup.locator('#connection-msg.error').waitFor();
+      assert.match(await popup.locator('#connection-msg').innerText(), /连接已切换/);
+      assert.equal(await popup.locator('#api-key').inputValue(), '');
+      assert.equal(await popup.locator('#api-base-url').inputValue(), 'https://api.deepseek.com');
+      assert.equal(await popup.locator('#explain-model option[value="race-only-model"]').count(), 0);
+    } finally {
+      await popup.evaluate(() => { chrome.runtime.sendMessage = qaSendMessage; delete globalThis.qaSendMessage; delete globalThis.qaReleaseModelList; });
+    }
+  });
   await check('不同厂家分别保存到解释/翻译，重开保留厂家、模型、连接和 Key', async () => {
     await popup.locator('#explain-manufacturer').selectOption('deepseek');
     await popup.locator('#explain-model').selectOption('deepseek-flash');
+    await popup.locator('#api-key').fill('local-ds-only');
     await popup.locator('[data-tab="translate"]').click();
     await popup.locator('#translate-manufacturer').selectOption('google');
     await popup.locator('#translate-model').selectOption('gemini-3.8-flash');
+    assert.equal(await popup.locator('#api-key').inputValue(), '');
+    assert.equal(await popup.locator('#api-base-url').inputValue(), 'https://generativelanguage.googleapis.com/v1beta/openai');
+    await popup.locator('#api-key').fill('local-google-only');
     await popup.locator('#save-btn').click(); await popup.locator('#status.success').waitFor();
     await popup.reload(); await popup.locator('#explain-manufacturer option').first().waitFor({ state: 'attached' });
     assert.equal(await popup.locator('#explain-manufacturer').inputValue(), 'deepseek');
     assert.equal(await popup.locator('#explain-model').inputValue(), 'deepseek-flash');
     assert.equal(await popup.locator('#translate-manufacturer').inputValue(), 'google');
     assert.equal(await popup.locator('#translate-model').inputValue(), 'gemini-3.8-flash');
-    assert.equal(await popup.locator('#api-key').inputValue(), 'local-qa-only');
+    assert.equal(await popup.locator('#api-key').inputValue(), 'local-ds-only');
+    assert.equal(await popup.locator('#api-base-url').inputValue(), 'https://api.deepseek.com');
+    await popup.locator('[data-tab="translate"]').click();
+    assert.equal(await popup.locator('#api-key').inputValue(), 'local-google-only');
+    await popup.locator('[data-tab="explain"]').click();
+    const saved = await worker.evaluate(async () => (await chrome.storage.local.get('providerConnections')).providerConnections);
+    assert.equal(saved.deepseek.apiKey, 'local-ds-only'); assert.equal(saved.google.apiKey, 'local-google-only');
+    assert.equal(saved.custom.apiKey, 'local-qa-only');
+    await popup.locator('.container').screenshot({ path: resolve(evidence, 'popup-provider-autofill.png') });
+  });
+  await check('实际 Edge 端口按解释/翻译厂家发送独立连接，缺 Key 拦截（网络模拟）', async () => {
+    await settleCatalog();
+    await worker.evaluate(() => {
+      globalThis.qaOriginalFetch = globalThis.fetch;
+      globalThis.qaProviderRequests = [];
+      globalThis.fetch = (url, options) => {
+        if (url === AIModelCatalog.SOURCE) return qaOriginalFetch(url, options);
+        const expectedKey = url.startsWith(AIConfig.PROVIDER_ENDPOINTS.deepseek) ? 'local-ds-only' : 'local-google-only';
+        qaProviderRequests.push({ url, authenticated: options.headers.Authorization === `Bearer ${expectedKey}`, model: JSON.parse(options.body).model });
+        return Promise.resolve(new Response('data: {"choices":[{"delta":{"content":"浏览器内模拟流式输出，验证两厂家的连接和路由。"}}]}\n\ndata: [DONE]\n', {headers:{'Content-Type':'text/event-stream'}}));
+      };
+    });
+    const request = data => popup.evaluate(data => new Promise((resolve, reject) => {
+      const port = chrome.runtime.connect({name:'stream-provider-qa'}), messages = [];
+      const timer = setTimeout(() => {port.disconnect();reject(new Error('流式消息超时'));}, 10000);
+      port.onMessage.addListener(msg => {
+        messages.push(msg);
+        if (msg.type === 'done' || msg.type === 'error') {clearTimeout(timer);port.disconnect();resolve(messages);}
+      });
+      port.postMessage(data);
+    }), data);
+    try {
+      for (const data of [
+        {type:'STREAM_REQUEST',mode:'C',text:'浏览器验证解释'},
+        {type:'STREAM_REQUEST',mode:'B',text:'browser translation'},
+        {type:'STREAM_BATCH',promptType:'translate',text:'browser full page',batchId:'qa-provider'}
+      ]) assert.equal((await request(data)).at(-1).type, 'done');
+      providerRequests.push(...await worker.evaluate(() => qaProviderRequests));
+      assert.deepEqual(providerRequests.map(r => [r.url,r.authenticated,r.model]), [
+        ['https://api.deepseek.com/chat/completions',true,'deepseek-flash'],
+        ['https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',true,'gemini-3.8-flash'],
+        ['https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',true,'gemini-3.8-flash']
+      ]);
+      await worker.evaluate(async () => chrome.storage.local.set({explainManufacturer:'xai'}));
+      assert.equal((await request({type:'STREAM_REQUEST',mode:'C',text:'缺 Key'}))[0].type, 'error');
+      assert.equal(await worker.evaluate(() => qaProviderRequests.length), 3);
+      await worker.evaluate(async () => chrome.storage.local.set({explainManufacturer:'deepseek'}));
+    } finally {await worker.evaluate(() => {globalThis.fetch=qaOriginalFetch;delete globalThis.qaOriginalFetch;delete globalThis.qaProviderRequests;});}
   });
   await check('无效模型拒绝保存；新增/修改/删除模型同步到两标签', async () => {
+    await popup.locator('[data-tab="translate"]').click();
+    await popup.locator('#translate-manufacturer').selectOption('custom');
+    await popup.locator('[data-tab="explain"]').click();
+    await popup.locator('#explain-manufacturer').selectOption('custom');
+    assert.equal(await popup.locator('#api-key').inputValue(), 'local-qa-only');
     await popup.locator('#explain-custom-new').click();
     await popup.locator('#explain-custom-model').fill('missing-model');
     await popup.locator('#explain-custom-add').click();
@@ -326,7 +408,7 @@ try {
   await new Promise(resolve => server.close(resolve));
   const report = { date: new Date().toISOString(), node: process.version, browserVersion,
     head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
-    kind: 'Actual Edge extension, live public model directory, localhost mock inference API, synthetic credentials', liveCatalog, checks, requests, errors,
+    kind: 'Actual Edge extension, live public model directory, localhost and Worker-intercepted mock inference API, synthetic credentials', liveCatalog, checks, requests, providerRequests, errors,
     unverified: ['真实供应商/模型、账号权限、模型质量、原生扩展工具栏和右键菜单的鼠标操作'] };
   writeFileSync(resolve(evidence, 'browser-check.json'), JSON.stringify(report, null, 2) + '\n');
 }

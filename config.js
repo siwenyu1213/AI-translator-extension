@@ -1,9 +1,18 @@
-// 设置页与后台共用配置；不按模型名称猜测供应商。
+// 设置页与后台共用配置；显式厂家决定连接，不按模型名称路由。
 (() => {
   const DEFAULT_MODEL = 'gpt-4.1-mini';
   const DEFAULT_MODELS = [DEFAULT_MODEL, 'gpt-4.1', 'gpt-4.1-nano',
     'gpt-4o', 'gpt-4o-mini', 'gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'o3', 'o4-mini'];
   const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
+  const PROVIDER_ENDPOINTS = Object.freeze({
+    openai: DEFAULT_BASE_URL, deepseek: 'https://api.deepseek.com',
+    anthropic: 'https://api.anthropic.com/v1',
+    google: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    moonshot: 'https://api.moonshot.cn/v1', zai: 'https://open.bigmodel.cn/api/paas/v4',
+    minimax: 'https://api.minimax.io/v1', xai: 'https://api.x.ai/v1', mistral: 'https://api.mistral.ai/v1'
+  });
+  const validProvider = id => id === 'custom' || Object.hasOwn(PROVIDER_ENDPOINTS, id);
   const normalizeModel = model => typeof model === 'string' ? model.trim() : '';
   const normalizeModels = list => [...new Set((Array.isArray(list) ? list : [])
     .map(normalizeModel).filter(Boolean))];
@@ -57,13 +66,50 @@
     for (const key of ['explainModel', 'translateModel']) {
       config[key] = normalizeModel(config[key]);
       if (!config.modelList.includes(config[key])) config[key] = config.modelList[0] || '';
-      config[key.replace('Model', 'Manufacturer')] = AIModelCatalog.providerFor(config[key], config.modelManufacturers);
+      const manufacturerKey = key.replace('Model', 'Manufacturer');
+      if (!validProvider(config[manufacturerKey])) config[manufacturerKey] = AIModelCatalog.providerFor(config[key], config.modelManufacturers);
     }
+    if (raw.providerConfigVersion !== 1) {
+      // 把原来的连接只交给匹配的厂家；第三方网关保留为自定义，不转发旧 Key。
+      config.providerConnections = {};
+      let oldBase = config.apiBaseUrl;
+      try { oldBase = normalizeBaseUrl(oldBase); } catch {}
+      for (const kind of ['explain', 'translate']) {
+        const maker = config[kind + 'Manufacturer'];
+        const provider = PROVIDER_ENDPOINTS[maker] === oldBase ? maker : 'custom';
+        config[kind + 'Manufacturer'] = provider;
+        config.providerConnections[provider] = { apiBaseUrl: oldBase, apiKey: config.apiKey,
+          availableModels: config.availableModels.slice() };
+      }
+      config.providerConfigVersion = 1;
+    }
+    config.providerConnections = normalizeConnections(config.providerConnections);
     for (const key of ['explainReasoningEffort', 'translateReasoningEffort']) {
       if (!['low', 'medium', 'high'].includes(config[key])) config[key] = 'high';
     }
     for (const key of ['qwenApiKey', 'customModels', 'model', 'thinkingEnabled', 'reasoningEffort']) delete config[key];
     return config;
+  }
+
+  function normalizeConnections(value) {
+    const connections = {};
+    for (const id of [...Object.keys(PROVIDER_ENDPOINTS), 'custom']) {
+      const entry = value?.[id];
+      if (!entry || typeof entry !== 'object') continue;
+      connections[id] = { apiBaseUrl: PROVIDER_ENDPOINTS[id] || String(entry.apiBaseUrl || DEFAULT_BASE_URL),
+        apiKey: typeof entry.apiKey === 'string' ? entry.apiKey.trim() : '',
+        availableModels: normalizeModels(entry.availableModels) };
+    }
+    return connections;
+  }
+  function connectionFor(config, kind = 'explain') {
+    if (config.providerConfigVersion !== 1) return { apiBaseUrl: config.apiBaseUrl, apiKey: config.apiKey,
+      availableModels: normalizeModels(config.availableModels) };
+    const provider = config[kind + 'Manufacturer'];
+    if (!validProvider(provider)) throw new Error('请先选择接口厂家并保存设置');
+    const entry = config.providerConnections?.[provider] || {};
+    return { apiBaseUrl: PROVIDER_ENDPOINTS[provider] || entry.apiBaseUrl || DEFAULT_BASE_URL,
+      apiKey: entry.apiKey || '', availableModels: normalizeModels(entry.availableModels) };
   }
 
   async function load() {
@@ -76,5 +122,6 @@
   }
 
   globalThis.AIConfig = { DEFAULT_MODEL, DEFAULT_MODELS, DEFAULT_BASE_URL,
+    PROVIDER_ENDPOINTS, validProvider, normalizeConnections, connectionFor,
     normalizeModel, normalizeModels, normalizeBaseUrl, migrate, load };
 })();
