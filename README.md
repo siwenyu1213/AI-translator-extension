@@ -20,9 +20,13 @@
 
 结果浮层支持 Markdown：标题、加粗/斜体、列表、引用、行内代码/代码块、表格、链接、删除线、任务列表与分隔线。流式期间约每150毫秒重新解析已收到的内容，较长文本适当降低刷新频率（最高600毫秒），完成时立即最终渲染。尚未闭合的语法可能随后续文本调整。表格和长代码行可独立横向滚动，用户向上阅读时保留滚动位置。
 
+首次完整回答从顶部显示，流式更新保留代码块、表格和链接的键盘焦点。浮层随回答高度和窗口大小重新约束位置，操作按钮保持在视口内；选中结果文字后滚动仍以原文为锚点。关闭后的浮层不再参与键盘聚焦。
+
 解释优先使用 Markdown 清晰、结构化地表达，不强制简短、编号列表、固定开场方式或要点数。浮层翻译区分原意与文中含义；二者一致时可说明一致，缺少语境时保留歧义。全文翻译继续只替换译文，不向网页加入解释。
 
 接口返回思考内容时会按原有纯文本帧队列显示思考过程；支持复制 Markdown 原文、下载包含原文和 Markdown 回答的 TXT、点击外部或 Esc 关闭。鼠标移出或选区折叠不会自动关闭卡片。下载文件保存在浏览器下载目录的 `笔记/` 子目录。
+
+下载按钮等待后台确认，显示“下载中…”、“已开始下载”或“下载失败，重试”；开始下载不代表文件已经保存完成，最终状态可在浏览器下载管理器中查看。目录展示名和查询时间刷新会保留已有回答缓存，更换生成语言、模型、Key或接口等配置仍使缓存失效。
 
 模型返回的 HTML 作为文本显示，渲染结果经过标签/属性白名单清理；仅HTTP/HTTPS链接可点击，图片语法仅显示说明文字，不自动加载远程图片。当前未提供代码语法高亮、LaTeX公式或Mermaid图渲染。实现、实际Edge验收和边界见 [Markdown浮层验收](docs/MARKDOWN_RENDERING_QA.md)，本地第三方库来源及许可证见 [vendor说明](vendor/README.md)。
 
@@ -122,6 +126,7 @@ git clone https://github.com/siwenyu1213/AI-translator-extension.git
 - [docs/ADVERSARIAL_FIX_QA.md](docs/ADVERSARIAL_FIX_QA.md)：15 项问题修复、重写范围和实际 Edge 回归证据。
 - [docs/MARKDOWN_RENDERING_QA.md](docs/MARKDOWN_RENDERING_QA.md)：v4.6 Markdown浮层、回答格式、实际Edge渲染与失败恢复验收。
 - [docs/MARKDOWN_ADVERSARIAL_REVIEW.md](docs/MARKDOWN_ADVERSARIAL_REVIEW.md)：两个子agent对抗审查、待修复交互、功能建议和已验证的冗余代码清理。
+- [docs/MARKDOWN_FIX_QA.md](docs/MARKDOWN_FIX_QA.md)：审查问题修复、25项定向回归、13项旧版对照及相关完整回归。
 
 最低静态检查：
 

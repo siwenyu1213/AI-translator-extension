@@ -9,6 +9,9 @@ let isLoading = false;
 let currentStreamPort = null;
 let currentRenderers = [];
 let scrollRaf = null;
+let tooltipAnchor = null;
+let tooltipFocusReturn = null;
+let downloadRequest = null;
 
 // ── 触发模式 ──
 let triggerMode = 'auto';
@@ -42,10 +45,12 @@ function getTooltip() {
   if (!tooltip) {
     tooltip = document.createElement('div');
     tooltip.id = 'deepseek-explain-tooltip';
+    tooltip.inert = true;
+    tooltip.setAttribute('aria-hidden', 'true');
     tooltip.innerHTML = `
       <div class="ds-header">
         <span class="ds-brand">AI 解释</span>
-        <button class="ds-close" title="关闭">×</button>
+        <button class="ds-close" title="关闭" aria-label="关闭结果">×</button>
       </div>
       <div class="ds-reasoning" style="display:none">
         <div class="ds-reasoning-title">思考中…</div>
@@ -76,6 +81,7 @@ function getTooltip() {
     tooltip.querySelector('.ds-btn-copy').addEventListener('click', handleCopy);
     tooltip.querySelector('.ds-btn-download').addEventListener('click', handleDownload);
     document.body.appendChild(tooltip);
+    new ResizeObserver(scheduleTooltipPosition).observe(tooltip);
   }
   return tooltip;
 }
@@ -84,17 +90,16 @@ function getTooltip() {
 // 坐标计算
 // ═══════════════════════════════════════════
 
-function getSelectionDocCoords() {
-  const sel = window.getSelection();
-  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
-  const rect = sel.getRangeAt(0).getBoundingClientRect();
+function getSelectionDocCoords(range = currentSelection?.range) {
+  if (!range?.startContainer.isConnected || !range.endContainer.isConnected ||
+      isInTooltip(range.commonAncestorContainer)) return null;
+  const rect = range.getBoundingClientRect();
   if (!rect || (rect.width === 0 && rect.height === 0)) return null;
   return {
     left: rect.left + window.scrollX,
     bottom: rect.bottom + window.scrollY,
     right: rect.right + window.scrollX,
-    top: rect.top + window.scrollY,
-    viewportBottom: rect.bottom
+    top: rect.top + window.scrollY
   };
 }
 
@@ -102,9 +107,10 @@ function positionTooltip(docCoords) {
   const el = getTooltip();
   el.classList.remove('ds-hidden');
   el.classList.add('ds-visible');
-  el.style.left = '-9999px';
-  el.style.top = '-9999px';
-  el.style.display = 'block';
+  el.inert = false;
+  el.setAttribute('aria-hidden', 'false');
+  el.style.display = 'flex';
+  el.style.setProperty('--ds-viewport-height', `${window.innerHeight}px`);
 
   const rect = el.getBoundingClientRect();
   const gap = 10;
@@ -115,23 +121,47 @@ function positionTooltip(docCoords) {
   if (left + rect.width > window.scrollX + window.innerWidth - 10) {
     left = docCoords.right - rect.width;
   }
-  if (left < window.scrollX + 10) left = window.scrollX + 10;
+  left = Math.max(window.scrollX + gap,
+    Math.min(left, window.scrollX + window.innerWidth - gap - rect.width));
 
-  const viewportBottom = docCoords.viewportBottom + gap + rect.height;
+  const viewportBottom = docCoords.bottom - window.scrollY + gap + rect.height;
   if (viewportBottom > window.innerHeight - 10) {
     top = docCoords.top - rect.height - gap;
   }
-  if (top < window.scrollY + 10) top = window.scrollY + 10;
+  top = Math.max(window.scrollY + gap,
+    Math.min(top, window.scrollY + window.innerHeight - gap - rect.height));
 
   el.style.left = left + 'px';
   el.style.top = top + 'px';
 }
 
+// 原文 Range 是定位锚点；用户在结果内选字不会改变锚点。
+function scheduleTooltipPosition() {
+  if (!isTooltipVisible() || scrollRaf) return;
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = null;
+    if (!isTooltipVisible()) return;
+    tooltipAnchor = getSelectionDocCoords() || tooltipAnchor;
+    if (tooltipAnchor) positionTooltip(tooltipAnchor);
+  });
+}
+
 function hideTooltip() {
   if (!tooltip) return;
   abortStream();
+  if (scrollRaf) cancelAnimationFrame(scrollRaf);
+  scrollRaf = null;
+  if (tooltip.contains(document.activeElement)) {
+    document.activeElement.blur();
+    if (tooltipFocusReturn?.isConnected) tooltipFocusReturn.focus({ preventScroll: true });
+  }
+  tooltip.inert = true;
+  tooltip.setAttribute('aria-hidden', 'true');
   tooltip.classList.add('ds-hidden');
   tooltip.classList.remove('ds-visible');
+  resetDownloadAction();
+  tooltipAnchor = null;
+  tooltipFocusReturn = null;
   currentText = null;
   currentSelection = null;
   currentExplanation = null;
@@ -229,15 +259,17 @@ async function triggerWithStream({ text, mode, popupTitle, snapshot }) {
   isLoading = true;
   currentExplanation = null;
 
-  const coords = getSelectionDocCoords() || {
+  const coords = getSelectionDocCoords(snapshot.range) || {
     left: lastContextMenuPos.x,
     bottom: lastContextMenuPos.y,
     right: lastContextMenuPos.x,
-    top: lastContextMenuPos.y,
-    viewportBottom: lastContextMenuPos.y - window.scrollY
+    top: lastContextMenuPos.y
   };
 
   const el = getTooltip();
+  if (!el.contains(document.activeElement)) tooltipFocusReturn = document.activeElement;
+  tooltipAnchor = coords;
+  resetDownloadAction();
   const bodyEl = el.querySelector('.ds-body');
   const reasoningEl = el.querySelector('.ds-reasoning');
   const reasoningTitleEl = el.querySelector('.ds-reasoning-title');
@@ -372,19 +404,40 @@ async function handleCopy(e) {
   }
 }
 
-function handleDownload(e) {
+function resetDownloadAction() {
+  clearTimeout(downloadRequest?.timer);
+  downloadRequest = null;
+  const button = tooltip?.querySelector('.ds-btn-download');
+  if (!button) return;
+  button.disabled = false;
+  button.querySelector('.ds-btn-label').textContent = '下载';
+  button.querySelector('.ds-btn-label').style.color = '';
+}
+
+async function handleDownload(e) {
   e.stopPropagation();
-  if (!currentText || !currentExplanation) return;
-  safeSendMessage({
-    type: 'DOWNLOAD',
-    text: currentText,
-    explanation: currentExplanation
-  });
-  const btn = tooltip.querySelector('.ds-btn-download .ds-btn-label');
-  const original = btn.textContent;
-  btn.textContent = '已下载';
-  btn.style.color = '#16a34a';
-  setTimeout(() => { btn.textContent = original; btn.style.color = ''; }, 1500);
+  if (!currentText || !currentExplanation || downloadRequest?.pending) return;
+  resetDownloadAction();
+  const request = { pending: true, timer: null };
+  downloadRequest = request;
+  const button = tooltip.querySelector('.ds-btn-download');
+  const label = button.querySelector('.ds-btn-label');
+  button.disabled = true;
+  label.textContent = '下载中…';
+  let timeout;
+  const result = await Promise.race([
+    safeSendMessage({ type: 'DOWNLOAD', text: currentText, explanation: currentExplanation }),
+    new Promise(resolve => { timeout = setTimeout(() => resolve(null), 15000); })
+  ]);
+  clearTimeout(timeout);
+  if (downloadRequest !== request) return;
+  request.pending = false;
+  button.disabled = false;
+  label.textContent = result?.ok ? '已开始下载' : '下载失败，重试';
+  label.style.color = result?.ok ? '#16a34a' : '#dc2626';
+  if (result?.ok) request.timer = setTimeout(() => {
+    if (downloadRequest === request) resetDownloadAction();
+  }, 1500);
 }
 
 // 🆕 显示/隐藏 B 类"解释此句"额外按钮
@@ -432,7 +485,10 @@ async function handleExplainThis(e) {
   el.querySelector('.ds-brand').textContent = `AI ${modeLabel('D')}`;
   el.classList.add('ds-visible');
   el.classList.remove('ds-hidden');
-  el.style.display = 'block';
+  el.style.display = 'flex';
+  el.inert = false;
+  el.setAttribute('aria-hidden', 'false');
+  resetDownloadAction();
   el.querySelector('.ds-actions').style.display = 'none';
   el.querySelector('.ds-model-tag').textContent = '';
 
@@ -628,13 +684,5 @@ function handleDocumentKeyDown(e) {
 document.addEventListener('pointerdown', handleDocumentPointerDown, true);
 document.addEventListener('keydown', handleDocumentKeyDown, true);
 
-// 滚动时仅在有选区坐标时重新定位，不因为选区折叠而隐藏。
-window.addEventListener('scroll', () => {
-  if (!tooltip?.classList.contains('ds-visible')) return;
-  if (scrollRaf) return;
-  scrollRaf = requestAnimationFrame(() => {
-    scrollRaf = null;
-    const coords = getSelectionDocCoords();
-    if (coords) positionTooltip(coords);
-  });
-}, { passive: true });
+window.addEventListener('scroll', scheduleTooltipPosition, { passive: true });
+window.addEventListener('resize', scheduleTooltipPosition, { passive: true });

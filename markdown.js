@@ -14,8 +14,17 @@
 
   function render(container, source) {
     const top = container.scrollTop;
-    const atBottom = container.scrollHeight - container.clientHeight - top <= 24;
+    const atBottom = container.hasChildNodes() && container.scrollHeight - container.clientHeight - top <= 24;
     const horizontal = [...container.querySelectorAll('pre, .ds-md-table')].map(el => el.scrollLeft);
+    const focusable = [...container.querySelectorAll('pre, .ds-md-table, a[href]')];
+    const focused = focusable.find(el => el === document.activeElement);
+    const focus = focused ? {
+      tag: focused.tagName, table: focused.classList.contains('ds-md-table'),
+      href: focused.getAttribute('href'), text: focused.textContent.slice(0, 128),
+      index: focusable.filter(el => el.tagName === focused.tagName &&
+        el.getAttribute('href') === focused.getAttribute('href') &&
+        el.textContent.startsWith(focused.textContent.slice(0, 128))).indexOf(focused)
+    } : null;
     try {
       const fragment = DOMPurify.sanitize(parser.parse(String(source || '')), {
         ALLOWED_TAGS: tags,
@@ -44,6 +53,13 @@
       [...container.querySelectorAll('pre, .ds-md-table')].forEach((el, index) => {
         el.scrollLeft = horizontal[index] || 0;
       });
+      if (focus) {
+        const candidates = [...container.querySelectorAll('pre, .ds-md-table, a[href]')]
+          .filter(el => el.tagName === focus.tag && el.classList.contains('ds-md-table') === focus.table &&
+            el.getAttribute('href') === focus.href && el.textContent.startsWith(focus.text));
+        const target = candidates[focus.index] || candidates[0];
+        target?.focus({ preventScroll: true });
+      }
     } catch {
       // A parser failure must still leave the model response readable and inert.
       container.textContent = String(source || '');

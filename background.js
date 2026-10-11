@@ -59,8 +59,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message.type === 'DOWNLOAD') {
-    handleDownload(message.text, message.explanation);
-    return false;
+    handleDownload(message.text, message.explanation)
+      .then(sendResponse)
+      .catch(() => sendResponse({ ok: false, error: '下载失败，请重试' }));
+    return true;
   }
   // 全文翻译注入
   if (message.type === 'INJECT_FULLPAGE_TRANSLATE') {
@@ -541,8 +543,34 @@ ${text}
 let configCache = null;
 let configLoad = null;
 let configRevision = 0;
+const GENERATION_FIELDS = new Set(['enabled', 'usePageContext', 'triggerMode',
+  'language', 'targetLanguage', 'explainModel', 'translateModel',
+  'explainManufacturer', 'translateManufacturer', 'explainThinkingEnabled',
+  'translateThinkingEnabled', 'explainReasoningEffort', 'translateReasoningEffort',
+  'apiBaseUrl', 'apiKey', 'availableModels', 'modelList', 'modelManufacturers',
+  'apiConfigVersion', 'providerConfigVersion', 'modelCatalogVersion',
+  'qwenApiKey', 'customModels', 'model', 'thinkingEnabled', 'reasoningEffort']);
+function generationConnections(value) {
+  return Object.entries(value || {}).sort(([a], [b]) => a.localeCompare(b))
+    .map(([id, value]) => {
+      const entry = value || {}, models = AIConfig.normalizeModels(entry.availableModels).sort();
+      return [id, entry.apiBaseUrl, entry.apiKey, models, Boolean(entry.modelsCheckedAt || models.length)];
+    });
+}
+function affectsGeneration(changes) {
+  return Object.keys(changes).length === 0 || Object.entries(changes).some(([key, change]) => {
+    if (key === 'providerConnections') {
+      return JSON.stringify(generationConnections(change.oldValue)) !==
+        JSON.stringify(generationConnections(change.newValue));
+    }
+    return GENERATION_FIELDS.has(key) && JSON.stringify(change.oldValue) !== JSON.stringify(change.newValue);
+  });
+}
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local') { configCache = null; configLoad = null; configRevision++; cacheRevision++; CACHE.clear(); }
+  if (area !== 'local') return;
+  // 每次保存都防止陈旧配置读回；仅生成语义变化使回答缓存失效。
+  configCache = null; configLoad = null; configRevision++;
+  if (affectsGeneration(changes)) { cacheRevision++; CACHE.clear(); }
 });
 async function getConfig() {
   while (!configCache) {
@@ -688,7 +716,10 @@ function sleep(ms) {
 // 下载
 // ═══════════════════════════════════════════
 
-function handleDownload(selectedText, explanation) {
+async function handleDownload(selectedText, explanation) {
+  if (typeof selectedText !== 'string' || typeof explanation !== 'string' || !explanation.trim()) {
+    return { ok: false, error: '没有可下载的内容' };
+  }
   const now = new Date();
   const pad = n => String(n).padStart(2, '0');
   const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
@@ -714,9 +745,10 @@ function handleDownload(selectedText, explanation) {
   }
   const dataUrl = 'data:text/plain;charset=utf-8;base64,' + btoa(binary);
 
-  chrome.downloads.download({
+  const downloadId = await chrome.downloads.download({
     url: dataUrl,
     filename: filename,
     saveAs: false
-  }).catch(() => {});
+  });
+  return Number.isInteger(downloadId) ? { ok: true, downloadId } : { ok: false, error: '下载未启动' };
 }

@@ -1,5 +1,7 @@
 # Markdown 浮层对抗性审查与安全清理
 
+后续状态：本报告保留当时的审查证据。F1～F5、全文观察器重复扫描和缓存失效范围已在同一任务分支修复，最终行为及回归见 [MARKDOWN_FIX_QA.md](MARKDOWN_FIX_QA.md)。下文“尚未修复”为审查基线状态，不代表当前代码。
+
 日期：2026-10-11，Asia/Shanghai。审查基线 `codex/markdown-result-renderer@35c1d0232927fb967803e67342de552c17c67272`，开始时工作区干净。origin 为 `https://github.com/siwenyu1213/AI-translator-extension.git`。复用现有任务分支，版本仍为 4.6.0。
 
 用户要求两个子 agent 对功能和冗余代码进行对抗性审查，随后明确授权直接清理已证实不影响使用的冗余代码并测试。功能 agent 独立验证交互、长回答与流式阅读；清理 agent 验证调用关系、兼容路径和全文观察器。主 agent 核对源码、报告、截图，并独立比较实际修改与 Git 基线，复现隐藏焦点和下载失败反馈。两位子 agent 均未修改受跟踪文件。

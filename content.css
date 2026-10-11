@@ -5,6 +5,9 @@
   z-index: 2147483647;
   width: 360px;
   max-width: calc(100vw - 24px);
+  max-height: calc(var(--ds-viewport-height, 100vh) - 20px);
+  box-sizing: border-box;
+  flex-direction: column;
   background: #ffffff;
   border: 1px solid #e8e8ed;
   border-radius: 12px;
@@ -24,7 +27,7 @@
 }
 
 #deepseek-explain-tooltip.ds-visible {
-  display: block;
+  display: flex;
   opacity: 1;
 }
 
@@ -93,7 +96,8 @@
   font-size: 13px;
   color: #334155;
   word-break: break-word;
-  min-height: 28px;
+  min-height: 0;
+  flex: 0 1 auto;
   max-height: 40vh;
   overflow-y: auto;
   white-space: pre-line;
@@ -328,3 +332,13 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* 卡片整体受视口约束，正文与思考可收缩，操作按钮保持可见。 */
+#deepseek-explain-tooltip :is(.ds-header,.ds-actions,.ds-footer,.ds-quote) { flex-shrink: 0; }
+#deepseek-explain-tooltip .ds-quote { max-height: min(72px, 12vh); overflow-y: auto; }
+#deepseek-explain-tooltip .ds-reasoning { min-height: 0; flex: 0 1 auto; overflow-y: auto; }
+#deepseek-explain-tooltip :is(.ds-close,.ds-btn):focus-visible {
+  outline: 2px solid #2563eb; outline-offset: 2px;
+}
+#deepseek-explain-tooltip .ds-btn:disabled { cursor: wait; opacity: .65; }
+#deepseek-explain-tooltip .ds-actions { flex-wrap: wrap; }

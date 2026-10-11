@@ -12,6 +12,8 @@
 
 v4.6 Markdown浮层的两子agent对抗性审查与安全清理见 [MARKDOWN_ADVERSARIAL_REVIEW.md](MARKDOWN_ADVERSARIAL_REVIEW.md)：5项功能问题、全文观察器重复扫描、阅读/导出功能建议，以及移除28行无用代码后的差分与实际Edge回归。通过回归不表示所列未修复问题已解决。
 
+这些问题随后已修复，见 [MARKDOWN_FIX_QA.md](MARKDOWN_FIX_QA.md)：25项实际Edge定向回归、13项旧提交负向对照、完整相关回归和剩余限制。`scripts/verify-markdown-fixes.mjs` 默认断言修复行为；加 `--ref eeb5ed6 --expect-vulnerable` 加载临时基线副本复现旧缺陷，不改当前Git工作区。生成证据在artifacts/qa/markdown-fix-2026-10-11/。
+
 随后在 `codex/verify-adversarial-findings` 的实际扩展复现见 [ADVERSARIAL_VALIDATION.md](ADVERSARIAL_VALIDATION.md)，修复和最新回归见 [ADVERSARIAL_FIX_QA.md](ADVERSARIAL_FIX_QA.md)。三个 adversarial 工具当前默认断言修复行为，退出0表示所列回归通过；历史缺陷复现脚本保存在提交 `bfb3f65`，旧证据不覆盖。browser/config 使用已有 Playwright、隔离 Edge profile 和本机合成接口；background 提供离线时序对照，也支持在旧源码上使用 `--expect-vulnerable`。profiles 每轮独立且保留，浏览器与服务器结束时关闭。
 
 在 PowerShell 中进入项目：
@@ -191,6 +193,8 @@ node scripts/verify-selection.mjs --playwright '<已安装的 playwright 包目�
 自动注入顺序：selection.js → vendor/marked/marked.umd.js → vendor/dompurify/purify.min.js → markdown.js → content.js。固定版本、本地来源与许可证见 [vendor/README.md](../vendor/README.md)。不引入包管理或构建环境；不要在扩展中加载CDN脚本。markdown.js使用独立Marked实例和DOMPurify标签/属性白名单，在内容脚本隔离环境中工作。
 
 正文两处入口（划词、解释此句）使用AIMarkdown.createStreamingRenderer，每150～600ms重新解析累计原文，完成时立即刷新，取消时清定时器。思考文本继续使用createStreamingTextRenderer。保留Markdown原文用于复制/现有TXT下载，不再调用cleanMarkdown。样式只作用于结果区域；表格和代码块可横向滚动，正文保持阅读位置。
+
+当前浮层以原文snapshot Range及文档坐标回退定位，尺寸/窗口变化节流重新约束；整体高度受视口限制，关闭状态inert。Markdown重绘恢复代码/表格/链接焦点，首次整答从顶部显示。DOWNLOAD使用异步消息确认，只显示“已开始下载”而不声称文件已完成；失败可重试并隔离晚回包。全文scan提前跳过扩展UI子树。后台每次local保存继续失效配置读，仅生成字段或连接语义变化清结果缓存，展示元数据刷新保留缓存。
 
 background.js的buildSelectionPrompt及旧浮层兼容入口共用MARKDOWN_OUTPUT_GUIDANCE，优先结构化Markdown，不要求简短、编号列表或固定要点数。A/B浮层翻译给出原意及文中含义，不提供例句；buildTranslatePrompt和buildBatchTranslatePrompt保留全文纯译文/ID协议。系统提示词仍要求材料作为数据、证据不足保留歧义。语言和模型路由继续沿用已有设置。
 
