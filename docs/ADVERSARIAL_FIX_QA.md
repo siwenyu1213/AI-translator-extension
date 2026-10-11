@@ -1,5 +1,7 @@
 # 对抗式问题修复与回归验收
 
+本文主体记录修复完成提交 `7b4912a` 时的验证和上传状态；后续主分支合并记录见末节，不能把主体中的“未推送”当作后续实时状态。
+
 日期：2026-10-11，北京时间。分支：`codex/verify-adversarial-findings`。修复起点：`bfb3f658800cb712f00827d1a854873bcffdd5d9`，工作区干净；该提交是此前15项缺陷的实际扩展复现版本。远程仍为 `origin https://github.com/siwenyu666-beep/AI-translator-extension.git`，本轮仅保存本地版本，没有推送、合并或发布。
 
 ## 修复结果
@@ -83,3 +85,11 @@ git diff --check
 未使用用户有效凭据验证供应商生成、模型质量、权限、reasoning_effort兼容性、真实限流/计费；未执行原生工具栏弹出层或右键菜单鼠标操作、任意网站/iframe/Shadow DOM兼容验收。
 
 按Text片段翻译保住链接/强调文字及结构，但行内分句可能影响翻译语序和质量；取消恢复以节点当前值仍等于扩展写入为依据。固定顶部工具栏可能遮挡页面顶端内容，未重写通用布局方案。配置迁移isCurrent防止已确认的旧读晚到写回，但chrome.storage没有跨上下文CAS，本修复不提供所有并发写的原子事务保证。
+
+## 后续主分支合并（2026-10-11）
+
+用户要求合并后，fetch确认原开发分支已通过PR #9合入origin/main，基线为 `f3b51241946853ea9d7a174ac37597509283b9cf`；本地主分支仅落后17个提交，无独有提交。`git merge-tree --write-tree origin/main codex/verify-adversarial-findings` 无冲突，结果树 `c76906840f3eb8e24885408b3d2d0e03300f067e` 与修复提交7b4912a的完整树一致。因此没有新的运行代码组合，无需将此前完整浏览器回归重复当作本轮新执行。
+
+修复源分支已推送，主分支合并入口为 [PR #10](https://github.com/siwenyu1213/AI-translator-extension/pull/10)，采用merge保留审查、复现与修复提交。仓库canonical地址已迁移至 `siwenyu1213/AI-translator-extension`，原origin地址仍有效并保留。README改用main安装入口、交接标记旧分支快照；Description.md仅本地更新。合并前再次执行20项静态与git diff --check通过，GitHub检查列表为空，不代表远程CI通过。
+
+最终PR状态、merge提交、同步结果和运行文件哈希核对保存在 `artifacts/qa/adversarial-merge-2026-10-11/merge-result.json`；准确GitHub合并结果以PR记录为准。已有真实供应商及复杂网站的未验证边界继续保留。

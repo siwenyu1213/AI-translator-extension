@@ -70,12 +70,10 @@
 
 需要 Edge、对应服务的 API Key，以及支持 OpenAI 格式 Chat Completions 和模型列表的接口。
 
-当前 v4.4 代码位于开发分支，安装这一版本可运行：
-
-2026-10-11 的 15 项问题修复目前保存在本机 `codex/verify-adversarial-findings` 分支，尚未推送 GitHub；下述远程开发分支不能视为已包含本机修复。使用本机修复时直接加载当前根目录，详情见 [修复回归记录](docs/ADVERSARIAL_FIX_QA.md)。
+2026-10-11 的 15 项问题修复通过 [PR #10](https://github.com/siwenyu1213/AI-translator-extension/pull/10) 交付到 `main`，完整证据见 [修复回归记录](docs/ADVERSARIAL_FIX_QA.md)。安装主分支版本可运行：
 
 ```bash
-git clone --branch codex/openai-compatible-api https://github.com/siwenyu666-beep/AI-translator-extension.git
+git clone https://github.com/siwenyu1213/AI-translator-extension.git
 ```
 
 1. 打开 `edge://extensions`，开启“开发人员模式”。
