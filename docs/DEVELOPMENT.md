@@ -8,6 +8,8 @@
 
 2026-10-11 两个子 agent 的版本残留与逻辑对抗式审查见 [ADVERSARIAL_REVIEW.md](ADVERSARIAL_REVIEW.md)，包含未修复发现、源码定位、可复现证据和验证边界。其模拟/页面样本结果不替代完整扩展或真实 API 验收。
 
+随后在 `codex/verify-adversarial-findings` 的实际扩展复现见 [ADVERSARIAL_VALIDATION.md](ADVERSARIAL_VALIDATION.md)。`scripts/verify-adversarial-browser.mjs` 与 `scripts/verify-adversarial-config.mjs` 使用已有 Playwright、隔离 Edge profile 和本机合成接口，`scripts/verify-adversarial-background.mjs` 提供离线时序对照。这些工具的退出0表示预期缺陷复现成功，不能当作产品功能验收通过；profiles 每轮独立且保留，浏览器与服务器在结束时关闭。
+
 在 PowerShell 中进入项目：
 
 ```powershell

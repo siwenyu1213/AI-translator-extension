@@ -1,5 +1,7 @@
 # 对抗式代码审查：版本残留与逻辑错误
 
+后续验证：见 [ADVERSARIAL_VALIDATION.md](ADVERSARIAL_VALIDATION.md)。2026-10-11 已在新分支实际加载 Edge 扩展复现 R01–R15；R05/R09 的真实 Worker 时序及 R04 应用请求/网络连接的边界已补充。本报告以下保留初次审查的历史证据等级。
+
 日期：2026-10-11，北京时间。审查源码基线：`9f860f956da17e25f95e1908d2e906f7088e74aa`，分支 `codex/openai-compatible-api`，扩展版本 4.4.0。开始时工作区干净，远程为 `origin https://github.com/siwenyu666-beep/AI-translator-extension.git`。本轮没有 fetch、切换分支、修改产品源码或真实供应商请求；新增本报告和开发说明入口，Description.md 仅本地维护。
 
 ## 审查方法与结果
