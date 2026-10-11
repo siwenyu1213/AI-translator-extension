@@ -447,7 +447,10 @@ try {
     await worker.evaluate(()=>CACHE.clear());
     batchFixtureDelay=600;const before=requests.length;
     await worker.evaluate(async id=>chrome.tabs.sendMessage(id,{type:'TRIGGER_FULLPAGE_TRANSLATE'}),tabId);
-    await page.waitForFunction(()=>document.querySelector('.ds-translating-indicator'));
+    // 全文工具栏显示总体状态；以真实接口已收到请求确认取消发生在途中。
+    const startedAt=Date.now();
+    while(requests.length===before && Date.now()-startedAt<10000) await page.waitForTimeout(30);
+    assert.ok(requests.length>before,'全文请求应在取消前实际开始');
     await page.locator('#ds-tb-cancel').click();
     batchFixtureDelay=0;
     await worker.evaluate(async id=>chrome.tabs.sendMessage(id,{type:'TRIGGER_FULLPAGE_TRANSLATE'}),tabId);

@@ -1,5 +1,5 @@
-// Deterministic, offline reproductions of R05/R09. Confirmed defects mean this
-// reproduction succeeded; a missing reproduction or a broken check exits nonzero.
+// Offline regression checks for R05/R09. Use --expect-vulnerable on the old
+// source to reproduce its defects; the default expects the corrected behavior.
 // Actual config.js/background.js run in a VM; AIConfig.load is never replaced.
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -10,9 +10,11 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const expectVulnerable = process.argv.includes('--expect-vulnerable');
 const argument = process.argv.indexOf('--report');
 const reportPath = resolve(root, argument < 0
-  ? 'artifacts/qa/adversarial-validation-2026-10-11/background/results.json'
+  ? (expectVulnerable ? 'artifacts/qa/adversarial-fix-2026-10-11/background/vulnerable-results.json'
+    : 'artifacts/qa/adversarial-fix-2026-10-11/background/results.json')
   : process.argv[argument + 1]);
 const event = () => ({
   listeners: [],
@@ -109,7 +111,8 @@ function harness() {
   function holdNextRead() {
     const gate = { started: deferred(), delivery: deferred() };
     nextReadGate = gate;
-    return { started: gate.started.promise, release: () => gate.delivery.resolve() };
+    return { started: gate.started.promise, release: () => gate.delivery.resolve(),
+      reject: error => gate.delivery.reject(error) };
   }
   function port() {
     return {
@@ -139,6 +142,7 @@ function fields(config) {
   return {
     explainManufacturer: config.explainManufacturer, explainModel: config.explainModel,
     language: config.language, targetLanguage: config.targetLanguage,
+    explainReasoningEffort: config.explainReasoningEffort,
     apiBaseUrl: connection.apiBaseUrl,
     credentialFixture: connection.apiKey === 'synthetic-old-key' ? 'old synthetic credential'
       : connection.apiKey === 'synthetic-new-key' ? 'new synthetic credential' : 'unexpected credential'
@@ -160,7 +164,7 @@ async function check(id, name, operation, isControl = false) {
     const matched = evidence.matched;
     delete evidence.matched;
     (isControl ? controls : results).push({ id, name,
-      status: isControl ? (matched ? 'passed' : 'failed') : (matched ? 'confirmed' : 'not_reproduced'),
+      status: isControl || !expectVulnerable ? (matched ? 'passed' : 'failed') : (matched ? 'confirmed' : 'not_reproduced'),
       evidence, timeline: env.timeline });
   } catch (error) {
     (isControl ? controls : results).push({ id, name, status: 'check_failed', error: error.stack,
@@ -180,8 +184,10 @@ await check('R05', 'A storage change during an old AIConfig.load repopulates sta
   const next = await env.run('getConfig()');
   const observed = fields(next), expected = fields(newConfig);
   assert.equal(env.storageWrites.length, 1, 'Unexpected migration storage writes would confound this race');
-  return { matched: observed.apiBaseUrl === fields(oldConfig).apiBaseUrl && observed.explainModel === 'old-chat',
-    oldReadResult: fields(initial), nextRequestConfig: observed, currentStorageConfig: expected,
+  const stale = observed.apiBaseUrl === fields(oldConfig).apiBaseUrl && observed.explainModel === 'old-chat';
+  const corrected = JSON.stringify(observed) === JSON.stringify(expected) && JSON.stringify(fields(initial)) === JSON.stringify(expected);
+  return { matched: expectVulnerable ? stale : corrected,
+    firstRequestConfig: fields(initial), nextRequestConfig: observed, currentStorageConfig: expected,
     currentStorageMatchesNextRequest: JSON.stringify(observed) === JSON.stringify(expected),
     storageReads: env.timeline.filter(item => item.event === 'storage.get:start').length,
     migrationStorageWrites: 0 };
@@ -211,7 +217,9 @@ await check('R09', 'Disconnect before a deferred config read completes still sta
   const terminalError = await bounded(pending, 'R09 request settles');
   const call = env.calls[0];
   assert.equal(env.storageWrites.length, 0, 'Unexpected fixture migration write');
-  return { matched: listenerCountAtCancel === 0 && env.calls.length === 1 && !call.options.signal.aborted,
+  const vulnerable = listenerCountAtCancel === 0 && env.calls.length === 1 && !call.options.signal.aborted;
+  const corrected = listenerCountAtCancel === 1 && env.calls.length === 0 && terminalError === null;
+  return { matched: expectVulnerable ? vulnerable : corrected,
     listenerCountAtCancel, listenerCountAfterLoad: port.onDisconnect.listeners.length,
     fetchCalls: env.calls.length, endpoint: call?.url,
     signalAbortedAfterCancelledRequest: call?.options.signal.aborted,
@@ -238,13 +246,103 @@ await check('R09-control', 'Disconnect after generation starts aborts the instal
     postedMessages: port.messages, terminalError };
 }, true);
 
-const success = results.every(result => result.status === 'confirmed') && controls.every(control => control.status === 'passed');
+if (!expectVulnerable) {
+  await check('R05-self-migration-control', 'A migration invalidating its own revision is reread once and stabilizes', async env => {
+    const raw = env.fixture('old'); raw.explainModel = ' old-chat '; raw.explainReasoningEffort = 'invalid';
+    env.setFixture(raw);
+    const observed = fields(await bounded(env.run('getConfig()'), 'R05 own migration stabilizes'));
+    const storageReads = env.timeline.filter(item => item.event === 'storage.get:start').length;
+    return { matched: observed.explainModel === 'old-chat' && observed.explainReasoningEffort === 'high' && storageReads === 2 && env.storageWrites.length === 1,
+      observed, storageReads, storageWrites: env.storageWrites };
+  }, true);
+
+  await check('R05-migration-control', 'An invalidated old raw snapshot cannot migrate over newly saved fields', async env => {
+    const oldRaw = env.fixture('old');
+    oldRaw.explainModel = ' old-chat ';
+    oldRaw.explainReasoningEffort = 'invalid';
+    env.setFixture(oldRaw);
+    const gate = env.holdNextRead();
+    const pending = env.run('getConfig()');
+    await bounded(gate.started, 'R05 stale migration read starts');
+    const newConfig = env.fixture('new'); newConfig.explainReasoningEffort = 'low';
+    await env.changeFixture(newConfig);
+    gate.release();
+    const observed = fields(await bounded(pending, 'R05 stale migration read settles'));
+    const expected = fields(newConfig);
+    return { matched: JSON.stringify(observed) === JSON.stringify(expected) && env.storageWrites.length === 1,
+      oldRawSelectedModel: oldRaw.explainModel, oldRawEffort: oldRaw.explainReasoningEffort,
+      observed, expected, storageWrites: env.storageWrites,
+      unexpectedMigrationWriteCount: env.storageWrites.length - 1 };
+  }, true);
+
+  await check('R05-pending-control', 'Concurrent cache readers share one pending read and return the current revision', async env => {
+    env.setFixture(env.fixture('old'));
+    const gate = env.holdNextRead();
+    const first = env.run('getConfig()'), second = env.run('getConfig()');
+    await bounded(gate.started, 'R05 pending read starts');
+    const readsWhilePending = env.timeline.filter(item => item.event === 'storage.get:start').length;
+    const newConfig = env.fixture('new');
+    await env.changeFixture(newConfig);
+    gate.release();
+    const values = await bounded(Promise.all([first, second]), 'R05 concurrent readers settle');
+    const observed = values.map(fields), expected = fields(newConfig);
+    const totalReads = env.timeline.filter(item => item.event === 'storage.get:start').length;
+    return { matched: readsWhilePending === 1 && totalReads === 2 && observed.every(value => JSON.stringify(value) === JSON.stringify(expected)),
+      readsWhilePending, totalReads, observed, expected };
+  }, true);
+
+  await check('R09-load-error-control', 'A failed configuration read sends one error and closes safely', async env => {
+    env.setFixture(env.fixture('old'));
+    const gate = env.holdNextRead(), port = env.port();
+    env.context.testPort = port;
+    const pending = env.run("handleStreamRequest(testPort,{mode:'C',text:'Synthetic input'})")
+      .then(() => null, error => error.message);
+    await bounded(gate.started, 'R09 failed config read starts');
+    gate.reject(new Error('Synthetic storage failure'));
+    const terminalError = await bounded(pending, 'R09 failed config read settles');
+    return { matched: terminalError === null && env.calls.length === 0 && port.closed && port.messages.length === 1 && port.messages[0].type === 'error',
+      terminalError, fetchCalls: env.calls.length, closed: port.closed, messages: port.messages };
+  }, true);
+
+  await check('R09-cancelled-load-error-control', 'A configuration read failing after cancel does not reject or post', async env => {
+    env.setFixture(env.fixture('old'));
+    const gate = env.holdNextRead(), port = env.port();
+    env.context.testPort = port;
+    const pending = env.run("handleStreamRequest(testPort,{mode:'C',text:'Synthetic input'})")
+      .then(() => null, error => error.message);
+    await bounded(gate.started, 'R09 cancelled config read starts');
+    port.disconnect(); gate.reject(new Error('Synthetic storage failure'));
+    const terminalError = await bounded(pending, 'R09 cancelled failed read settles');
+    return { matched: terminalError === null && env.calls.length === 0 && port.messages.length === 0,
+      terminalError, fetchCalls: env.calls.length, messages: port.messages };
+  }, true);
+
+  await check('R09-cache-cancel-control', 'Cancelling during cached playback stops output without a rejected handler', async env => {
+    env.setFixture(env.fixture('old'));
+    env.setFetch(async () => new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Synthetic cached text. '.repeat(200) } }] })}\n\ndata: [DONE]\n`));
+    const warmPort = env.port(); env.context.testPort = warmPort;
+    await env.run("handleStreamRequest(testPort,{mode:'C',text:'Cache input'})");
+    assert.equal(warmPort.messages.at(-1).type, 'done');
+    const cachedPort = env.port();
+    const post = cachedPort.postMessage;
+    cachedPort.postMessage = function(message) { post.call(this, message); if (message.type === 'token') this.disconnect(); };
+    env.context.testPort = cachedPort;
+    const terminalError = await env.run("handleStreamRequest(testPort,{mode:'C',text:'Cache input'})")
+      .then(() => null, error => error.message);
+    return { matched: terminalError === null && env.calls.length === 1 && cachedPort.messages.length === 1 && cachedPort.messages[0].type === 'token',
+      terminalError, fetchCallsIncludingWarmup: env.calls.length,
+      cachedOutputTypes: cachedPort.messages.map(message => message.type), closed: cachedPort.closed };
+  }, true);
+}
+
+const success = results.every(result => result.status === (expectVulnerable ? 'confirmed' : 'passed')) && controls.every(control => control.status === 'passed');
 const report = {
   date: new Date().toISOString(), node: process.version, head: git(['rev-parse', 'HEAD']),
   branch: git(['branch', '--show-current']), workingTree: git(['status', '--porcelain=v1', '--untracked-files=all']),
   kind: 'Offline Node VM with actual config.js/background.js, synthetic storage snapshots, credentials, ports and fetch; no network',
+  mode: expectVulnerable ? 'expect-vulnerable' : 'regression',
   unchangedProductSources: Object.fromEntries(sourceFiles.map(name => [name, createHash('sha256').update(sources[name]).digest('hex')])),
-  statusMeaning: { confirmed: 'Defect reproduced; this reproduction check succeeded', not_reproduced: 'Fixture ran but expected defect was absent', check_failed: 'Fixture/assertion/runtime failed; no defect conclusion' },
+  statusMeaning: { passed: 'Corrected behavior or positive control observed', failed: 'Expected corrected behavior/control was absent', confirmed: 'Vulnerable behavior reproduced', not_reproduced: 'Fixture ran but expected vulnerable behavior was absent', check_failed: 'Fixture/assertion/runtime failed; no defect conclusion' },
   success, results, controls,
   unverified: ['Real Edge service worker scheduling and chrome.storage event delivery', 'Real provider response, credentials, or billing']
 };

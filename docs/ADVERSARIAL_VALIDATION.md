@@ -1,5 +1,7 @@
 # 对抗式审查问题的复现验证
 
+后续状态：本地已修复 R01–R15，当前脚本默认要求修复行为通过，详见 [ADVERSARIAL_FIX_QA.md](ADVERSARIAL_FIX_QA.md)。以下是提交 `bfb3f65` 的漏洞存在性验证历史；“仍待修复”、退出0的旧含义及以下工具行为仅适用于那个提交。
+
 日期：2026-10-11，北京时间。新分支：`codex/verify-adversarial-findings`。创建分支前 HEAD 为 `ed721fed61bc6ea9972cf270cb78db865aa91a0e`，工作区干净。该提交的产品源码与原审查基线 `9f860f9` 一致。
 
 本轮只新增可复用验证工具和维护文档，未修复或修改根目录产品源码。没有推送 GitHub。远程仍为 `origin https://github.com/siwenyu666-beep/AI-translator-extension.git`；未进行远程整合，以保留审查基线。

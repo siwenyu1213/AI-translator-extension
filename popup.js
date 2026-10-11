@@ -97,6 +97,22 @@ function showStatus(message, type = 'success') {
   $status.hideTimer = setTimeout(() => {$status.textContent='';$status.className='status';}, 4000);
 }
 
+function renderEnabledState() { $('disabled-extension').hidden = savedConfig.enabled !== false; }
+chrome.storage.onChanged.addListener((changes,area) => {
+  if (area === 'local' && changes.enabled) {
+    savedConfig.enabled = changes.enabled.newValue !== false;
+    renderEnabledState();
+  }
+});
+$('enable-extension').addEventListener('click',async()=>{
+  $('enable-extension').disabled=true;
+  try {
+    await chrome.storage.local.set({enabled:true});
+    savedConfig.enabled=true; renderEnabledState(); showStatus('扩展已启用。');
+  } catch {showStatus('启用失败，请重试。','error');}
+  finally {$('enable-extension').disabled=false;}
+});
+
 // 每个厂家独立查询；仅将响应写回请求使用的连接，不覆盖中途修改的 Key/地址。
 async function queryWithFallback(message, fallback) {
   let result;
@@ -150,8 +166,16 @@ async function refreshProviderModels(provider = connectionProvider) {
       const currentSelections = tabs.map(tab => tab.select.value);
       renderAllModelOptions();
       tabs.forEach((tab,index) => setTabSelection(tab,currentSelections[index]));
+      const renderedSelections = tabs.map(tab => tab.select.value);
       const stored = await chrome.storage.local.get(['providerConnections','explainManufacturer','translateManufacturer','explainModel','translateModel','modelList']);
       if (!unchanged()) return;
+      // 首次从无缓存加载列表时恢复仍开放的已保存型号，不把自动首项当作用户选择。
+      tabs.forEach((tab,index)=>{
+        if (!currentSelections[index] && tab.select.value===renderedSelections[index] &&
+            tab.manufacturer.value===provider && stored[tab.kind+'Manufacturer']===provider) {
+          setTabSelection(tab,stored[tab.key]);
+        }
+      });
       const connections = AIConfig.normalizeConnections(stored.providerConnections);
       connections[provider] = providerConnections[provider];
       const updates = {providerConnections:connections,modelList:AIConfig.normalizeModels([...(stored.modelList||[]),...entries.map(m=>m.id)])};
@@ -263,19 +287,33 @@ $('custom-connection-button').addEventListener('click',()=>{
 });
 $('custom-cancel').addEventListener('click',()=>$('custom-connection-dialog').close());
 $('custom-save').addEventListener('click',async()=>{
+  let previous;
+  $('custom-save').disabled=true;
   try {
     const apiBaseUrl=AIConfig.normalizeBaseUrl($apiBaseUrl.value);
-    const previous=providerConnection('custom');
-    const profile={...previous,apiBaseUrl,
+    previous=providerConnection('custom');
+    // 先使旧地址的在途列表响应失效；内存仍保留未保存的 Key 草稿。
+    const draftProfile={...previous,apiBaseUrl,
       ...(previous.apiBaseUrl!==apiBaseUrl ? {availableModels:[],modelEntries:[],modelsCheckedAt:''} : {})};
-    const stored=await chrome.storage.local.get('providerConnections');
+    providerConnections.custom=draftProfile;
+    const stored=await chrome.storage.local.get(['providerConnections','explainManufacturer','translateManufacturer']);
     const connections=AIConfig.normalizeConnections(stored.providerConnections);
+    const saved=connections.custom || {apiKey:'',availableModels:[],modelEntries:[],modelsCheckedAt:''};
+    const changed=(saved.apiBaseUrl || AIConfig.DEFAULT_BASE_URL)!==apiBaseUrl;
+    // 地址保存只保存地址和已保存 Key，不能顺带保存切换标签时捕获的 Key 草稿。
+    const profile={...saved,apiBaseUrl,
+      ...(changed ? {availableModels:[],modelEntries:[],modelsCheckedAt:''} : {})};
     connections.custom=profile;
-    await chrome.storage.local.set({providerConnections:connections});
-    providerConnections.custom=profile;
+    const updates={providerConnections:connections};
+    if (changed) for (const tab of tabs) if (stored[tab.kind+'Manufacturer']==='custom') updates[tab.key]='';
+    await chrome.storage.local.set(updates);
+    providerConnections.custom={...profile,apiKey:draftProfile.apiKey};
+    if (draftProfile.apiKey!==profile.apiKey) Object.assign(providerConnections.custom,{availableModels:[],modelEntries:[],modelsCheckedAt:''});
+    providerErrors.delete('custom');
     $('custom-connection-dialog').close(); renderAllModelOptions();
     refreshProviderModels('custom');
-  } catch(err) {$('custom-msg').textContent=err.message;}
+  } catch(err) {if(previous) providerConnections.custom=previous;$('custom-msg').textContent=err.message;}
+  finally {$('custom-save').disabled=false;}
 });
 $('save-btn').addEventListener('click',async()=>{
   try {
@@ -298,6 +336,7 @@ $('save-btn').addEventListener('click',async()=>{
 
 (async()=>{
   const config=await AIConfig.load(); savedConfig=config;
+  renderEnabledState();
   modelList=config.modelList.slice();
   catalogSnapshot=AIModelCatalog.normalizeSnapshot(config.catalogSnapshot);
   providerConnections=AIConfig.normalizeConnections(config.providerConnections);

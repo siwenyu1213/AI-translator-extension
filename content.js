@@ -161,13 +161,26 @@ function hideTooltip() {
 
 function abortStream() {
   if (currentStreamPort) {
-    try { currentStreamPort.disconnect(); } catch {}
+    const port = currentStreamPort;
     currentStreamPort = null;
+    try { port.disconnect(); } catch {}
   }
   for (const renderer of currentRenderers) {
     try { renderer.cancel(); } catch {}
   }
   currentRenderers = [];
+}
+
+function showStreamFailure(el, error) {
+  abortStream();
+  isLoading = false;
+  currentExplanation = null;
+  el.querySelector('.ds-reasoning').style.display = 'none';
+  const body = el.querySelector('.ds-body');
+  body.classList.remove('ds-streaming');
+  body.innerHTML = `<span class="ds-error">${escapeHtml(error)}</span>`;
+  el.querySelector('.ds-actions').style.display = 'none';
+  el.querySelector('.ds-model-tag').textContent = '';
 }
 
 // 真流式文本渲染器：网络 chunk 先进入播放队列，再每帧定量追加。
@@ -322,19 +335,10 @@ async function triggerWithStream({ text, mode, popupTitle }) {
       el.querySelector('.ds-model-tag').textContent = msg.model || '';
       // 🆕 模式 B：翻译完成后显示“解释此句”按钮
       updateExtraActions(mode);
-      port.disconnect();
       currentStreamPort = null;
+      try { port.disconnect(); } catch {}
     } else if (msg.type === 'error') {
-      isLoading = false;
-      currentExplanation = null;
-      reasoningRenderer.cancel();
-      bodyRenderer.cancel();
-      reasoningEl.style.display = 'none';
-      bodyEl.classList.remove('ds-streaming');
-      bodyEl.innerHTML = `<span class="ds-error">${escapeHtml(msg.error)}</span>`;
-      el.querySelector('.ds-actions').style.display = 'none';
-      port.disconnect();
-      currentStreamPort = null;
+      showStreamFailure(el, msg.error);
     }
   });
 
@@ -343,23 +347,18 @@ async function triggerWithStream({ text, mode, popupTitle }) {
     if (currentStreamPort !== port) return;
     currentStreamPort = null;
     if (isLoading) {
-      isLoading = false;
-      if (!currentExplanation) {
-        bodyRenderer.cancel();
-        bodyEl.classList.remove('ds-streaming');
-        bodyRenderer.setFinal('⚠️ 连接中断，请重试');
-      }
+      showStreamFailure(el, '⚠️ 连接中断，请重试');
     }
   });
 
   // 发送请求（根据开关决定是否携带上下文）
   const context = usePageContext ? getPageContext() : null;
-  port.postMessage({
+  try { port.postMessage({
     type: 'STREAM_REQUEST',
     mode,
     text,
     context
-  });
+  }); } catch { showStreamFailure(el, '⚠️ 连接中断，请重试'); }
 }
 
 // ═══════════════════════════════════════════
@@ -402,34 +401,22 @@ function getPageContext() {
   if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
 
   const range = sel.getRangeAt(0);
-  const selectedText = sel.toString();
-
   const blockTags = new Set(['P', 'DIV', 'LI', 'TD', 'TH', 'SECTION', 'ARTICLE', 'BLOCKQUOTE', 'PRE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'FIGCAPTION', 'DD', 'DT', 'ASIDE', 'MAIN', 'SUMMARY']);
   let container = range.commonAncestorContainer;
   while (container && container !== document.body) {
     if (container.nodeType === 1 && blockTags.has(container.tagName)) break;
     container = container.parentElement;
   }
-  if (!container || container === document.body) {
-    const bodyText = document.body.innerText || '';
-    return { title: document.title, before: bodyText.substring(0, 800), after: '' };
-  }
-
-  const fullText = container.innerText || container.textContent || '';
-  const selIndex = fullText.indexOf(selectedText);
-  if (selIndex === -1) {
-    let beforeText = '';
-    if (range.startContainer.nodeType === 3) {
-      beforeText = range.startContainer.textContent.substring(0, range.startOffset);
-    }
-    return { title: document.title, before: beforeText.slice(-300), after: '' };
-  }
-
-  const before = fullText.substring(Math.max(0, selIndex - 300), selIndex);
-  const afterStart = selIndex + selectedText.length;
-  const after = fullText.substring(afterStart, afterStart + 300);
-
-  return { title: document.title, before, after };
+  container ||= document.body;
+  try {
+    const beforeRange = document.createRange();
+    beforeRange.selectNodeContents(container);
+    beforeRange.setEnd(range.startContainer, range.startOffset);
+    const afterRange = document.createRange();
+    afterRange.selectNodeContents(container);
+    afterRange.setStart(range.endContainer, range.endOffset);
+    return { title: document.title, before: beforeRange.toString().slice(-300), after: afterRange.toString().slice(0, 300) };
+  } catch { return null; }
 }
 
 // ═══════════════════════════════════════════
@@ -511,18 +498,20 @@ async function handleExplainThis(e) {
 
   abortStream();
   isLoading = true;
+  currentExplanation = null;
 
   // 确保 tooltip 可见
   const el = getTooltip();
+  el.querySelector('.ds-brand').textContent = `AI ${modeLabel('D')}`;
   el.classList.add('ds-visible');
   el.classList.remove('ds-hidden');
   el.style.display = 'block';
+  el.querySelector('.ds-actions').style.display = 'none';
+  el.querySelector('.ds-model-tag').textContent = '';
 
   const port = safeConnect(`stream-${Date.now()}`);
   if (!port) {
-    isLoading = false;
-    btn.disabled = false;
-    btn.querySelector('.ds-btn-label').textContent = '重试（需刷新页面）';
+    showStreamFailure(el, '扩展已重载，请刷新页面后重试');
     return;
   }
   currentStreamPort = port;
@@ -562,12 +551,11 @@ async function handleExplainThis(e) {
     } else if (msg.type === 'done') {
       currentExplanation = cleanMarkdown(buffer);
       bodyRenderer.setFinal(currentExplanation);
+      el.querySelector('.ds-actions').style.display = 'flex';
+      el.querySelector('.ds-model-tag').textContent = msg.model || '';
       cleanup();
     } else if (msg.type === 'error') {
-      reasoningRenderer.cancel();
-      bodyRenderer.cancel();
-      reasoningEl.style.display = 'none';
-      bodyEl.innerHTML = `<span class="ds-error">${escapeHtml(msg.error)}</span>`;
+      showStreamFailure(el, msg.error);
       cleanup();
     }
   });
@@ -576,20 +564,17 @@ async function handleExplainThis(e) {
     // 旧流被新流顶替时（abortStream），其回调不得干扰新流状态
     if (currentStreamPort !== port) return;
     if (isLoading) {
-      if (!buffer.trim()) {
-        bodyRenderer.cancel();
-        bodyEl.textContent = '⚠️ 连接中断';
-      }
+      showStreamFailure(el, '⚠️ 连接中断，请重试');
       cleanup();
     }
   });
 
-  port.postMessage({
+  try { port.postMessage({
     type: 'STREAM_REQUEST',
     mode: 'D',
     text: textToExplain,
     context: usePageContext ? getPageContext() : null
-  });
+  }); } catch { showStreamFailure(el, '⚠️ 连接中断，请重试'); cleanup(); }
 }
 
 // ═══════════════════════════════════════════
