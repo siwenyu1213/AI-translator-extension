@@ -121,6 +121,7 @@ git clone https://github.com/siwenyu1213/AI-translator-extension.git
 - [docs/MERGE_CONFLICT_QA.md](docs/MERGE_CONFLICT_QA.md)：main 冲突整合、通用批量路由和取消恢复验收。
 - [docs/ADVERSARIAL_FIX_QA.md](docs/ADVERSARIAL_FIX_QA.md)：15 项问题修复、重写范围和实际 Edge 回归证据。
 - [docs/MARKDOWN_RENDERING_QA.md](docs/MARKDOWN_RENDERING_QA.md)：v4.6 Markdown浮层、回答格式、实际Edge渲染与失败恢复验收。
+- [docs/MARKDOWN_ADVERSARIAL_REVIEW.md](docs/MARKDOWN_ADVERSARIAL_REVIEW.md)：两个子agent对抗审查、待修复交互、功能建议和已验证的冗余代码清理。
 
 最低静态检查：
 

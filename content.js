@@ -94,7 +94,6 @@ function getSelectionDocCoords() {
     bottom: rect.bottom + window.scrollY,
     right: rect.right + window.scrollX,
     top: rect.top + window.scrollY,
-    viewportLeft: rect.left,
     viewportBottom: rect.bottom
   };
 }
@@ -172,30 +171,20 @@ function showStreamFailure(el, error) {
 const MAX_CHARS_PER_FRAME = 2048;
 
 function createStreamingTextRenderer(container) {
-  let textNode = document.createTextNode('');
+  const textNode = document.createTextNode('');
   container.textContent = '';
   container.appendChild(textNode);
 
   let pending = '';
   let rafId = 0;
-  let idleCallback = null;
 
   const schedule = () => {
     if (!rafId && pending) rafId = requestAnimationFrame(step);
   };
 
-  const finishIfIdle = () => {
-    if (!pending && idleCallback) {
-      const cb = idleCallback;
-      idleCallback = null;
-      cb();
-    }
-  };
-
   function step() {
     rafId = 0;
     if (!pending) {
-      finishIfIdle();
       return;
     }
 
@@ -206,7 +195,6 @@ function createStreamingTextRenderer(container) {
     pending = pending.slice(take);
 
     if (pending) schedule();
-    else finishIfIdle();
   }
 
   return {
@@ -215,25 +203,10 @@ function createStreamingTextRenderer(container) {
       pending += chunk;
       schedule();
     },
-    setFinal(text) {
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = 0;
-      pending = '';
-      container.textContent = '';
-      textNode = document.createTextNode('');
-      container.appendChild(textNode);
-      pending = String(text || '');
-      schedule();
-    },
-    onIdle(callback) {
-      if (!pending) callback();
-      else idleCallback = callback;
-    },
     cancel() {
       if (rafId) cancelAnimationFrame(rafId);
       rafId = 0;
       pending = '';
-      idleCallback = null;
     }
   };
 }
@@ -261,7 +234,6 @@ async function triggerWithStream({ text, mode, popupTitle, snapshot }) {
     bottom: lastContextMenuPos.y,
     right: lastContextMenuPos.x,
     top: lastContextMenuPos.y,
-    viewportLeft: lastContextMenuPos.x - window.scrollX,
     viewportBottom: lastContextMenuPos.y - window.scrollY
   };
 

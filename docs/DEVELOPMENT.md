@@ -10,6 +10,8 @@
 
 2026-10-11 两个子 agent 的版本残留与逻辑对抗式审查见 [ADVERSARIAL_REVIEW.md](ADVERSARIAL_REVIEW.md)，包含未修复发现、源码定位、可复现证据和验证边界。其模拟/页面样本结果不替代完整扩展或真实 API 验收。
 
+v4.6 Markdown浮层的两子agent对抗性审查与安全清理见 [MARKDOWN_ADVERSARIAL_REVIEW.md](MARKDOWN_ADVERSARIAL_REVIEW.md)：5项功能问题、全文观察器重复扫描、阅读/导出功能建议，以及移除28行无用代码后的差分与实际Edge回归。通过回归不表示所列未修复问题已解决。
+
 随后在 `codex/verify-adversarial-findings` 的实际扩展复现见 [ADVERSARIAL_VALIDATION.md](ADVERSARIAL_VALIDATION.md)，修复和最新回归见 [ADVERSARIAL_FIX_QA.md](ADVERSARIAL_FIX_QA.md)。三个 adversarial 工具当前默认断言修复行为，退出0表示所列回归通过；历史缺陷复现脚本保存在提交 `bfb3f65`，旧证据不覆盖。browser/config 使用已有 Playwright、隔离 Edge profile 和本机合成接口；background 提供离线时序对照，也支持在旧源码上使用 `--expect-vulnerable`。profiles 每轮独立且保留，浏览器与服务器结束时关闭。
 
 在 PowerShell 中进入项目：
