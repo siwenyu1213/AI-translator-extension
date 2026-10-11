@@ -54,7 +54,7 @@ function getTooltip() {
       <div class="ds-quote"></div>
       <div class="ds-body"></div>
       <div class="ds-actions">
-        <button class="ds-btn ds-btn-copy" title="复制内容">
+        <button class="ds-btn ds-btn-copy" title="复制 Markdown 原文">
           <span class="ds-btn-icon">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
           </span>
@@ -279,7 +279,7 @@ async function triggerWithStream({ text, mode, popupTitle, snapshot }) {
   el.querySelector('.ds-actions').style.display = 'none';
   el.querySelector('.ds-model-tag').textContent = '';
 
-  const bodyRenderer = createStreamingTextRenderer(bodyEl);
+  const bodyRenderer = AIMarkdown.createStreamingRenderer(bodyEl);
   const reasoningRenderer = createStreamingTextRenderer(reasoningBodyEl);
   currentRenderers = [bodyRenderer, reasoningRenderer];
   let buffer = '';
@@ -314,10 +314,8 @@ async function triggerWithStream({ text, mode, popupTitle, snapshot }) {
       bodyRenderer.push(msg.token);
     } else if (msg.type === 'done') {
       isLoading = false;
-      const isExplainLike = mode === 'A' || mode === 'C' || mode === 'D';
-      const display = isExplainLike ? cleanMarkdown(buffer) : buffer;
-      currentExplanation = display;
-      bodyRenderer.setFinal(display);
+      currentExplanation = buffer;
+      bodyRenderer.setFinal(buffer);
       bodyEl.classList.remove('ds-streaming');
       el.querySelector('.ds-actions').style.display = 'flex';
       el.querySelector('.ds-model-tag').textContent = msg.model || '';
@@ -353,19 +351,6 @@ async function triggerWithStream({ text, mode, popupTitle, snapshot }) {
 // ═══════════════════════════════════════════
 // 工具函数
 // ═══════════════════════════════════════════
-
-function cleanMarkdown(text) {
-  if (!text) return '';
-  return text
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/`(.+?)`/g, '$1')
-    .replace(/~~(.+?)~~/g, '$1')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/^[-*+]\s+/gm, '')
-    .trim();
-}
 
 function truncate(text, max) {
   return text.length > max ? text.slice(0, max) + '…' : text;
@@ -494,7 +479,7 @@ async function handleExplainThis(e) {
   bodyEl.classList.add('ds-streaming');
   reasoningEl.style.display = 'none';
   reasoningTitleEl.textContent = '思考中…';
-  const bodyRenderer = createStreamingTextRenderer(bodyEl);
+  const bodyRenderer = AIMarkdown.createStreamingRenderer(bodyEl);
   const reasoningRenderer = createStreamingTextRenderer(reasoningBodyEl);
   currentRenderers = [bodyRenderer, reasoningRenderer];
   let buffer = '';
@@ -519,7 +504,7 @@ async function handleExplainThis(e) {
       buffer += msg.token;
       bodyRenderer.push(msg.token);
     } else if (msg.type === 'done') {
-      currentExplanation = cleanMarkdown(buffer);
+      currentExplanation = buffer;
       bodyRenderer.setFinal(currentExplanation);
       el.querySelector('.ds-actions').style.display = 'flex';
       el.querySelector('.ds-model-tag').textContent = msg.model || '';

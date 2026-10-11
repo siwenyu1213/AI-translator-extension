@@ -2,7 +2,7 @@
 
 ## 环境与目录
 
-这是直接加载的 Manifest V3 浏览器扩展，没有开发服务器、打包流程或 npm 依赖。扩展运行需要支持 MV3 的 Edge / Chrome；静态检查需要 Node.js，版本管理需要 Git。当前机器已核实的版本和起始状态见 [WORK_ENVIRONMENT.md](WORK_ENVIRONMENT.md)。
+这是直接加载的 Manifest V3 浏览器扩展，没有开发服务器、打包流程或 npm 安装步骤。Markdown解析及清理由本地vendor脚本提供，不从CDN执行代码。扩展运行需要支持 MV3 的 Edge / Chrome；静态检查需要 Node.js，版本管理需要 Git。当前机器已核实的版本和起始状态见 [WORK_ENVIRONMENT.md](WORK_ENVIRONMENT.md)。
 
 当前使用说明见 [README.md](../README.md)，2026-10-11 项目状态、分支分叉、功能与验收边界见 [交接.md](../交接.md)。交接文档为接手快照，实时 Git 状态仍需在任务开始核实。
 
@@ -170,11 +170,11 @@ v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重�
 
 上述 main 整合记录是历史基线。当前全文批量/回退共享最多 50 个实际端口请求配额，每批最多 8 个 Text 片段/3500 字符；长片段单独处理。任务 Map 以节点身份及 expected 值丢弃失效响应；restore 仅还原仍由扩展拥有的写入。MutationObserver 覆盖新增行内节点、characterData、保护属性、style/class/hidden/open；祖先过滤覆盖可编辑、代码、SVG/MathML 和 translate=no。详细回归、质量边界见 [ADVERSARIAL_FIX_QA.md](ADVERSARIAL_FIX_QA.md)。
 
-划词采用帧播放队列，单条消息最多 2048 字符，兼容返回的 reasoning_content。点击卡片内部、鼠标移出或选区折叠不误关，点击外部/Esc 可关闭；当前端口检查防止旧流更新新卡片。验证与整合取舍见 [MERGE_CONFLICT_QA.md](MERGE_CONFLICT_QA.md)。
+v4.6划词正文采用下节Markdown节流渲染，思考内容保留帧播放队列，单条消息最多2048字符，兼容返回的reasoning_content。点击卡片内部、鼠标移出或选区折叠不误关，点击外部/Esc可关闭；当前端口检查防止旧流更新新卡片。历史验证与整合取舍见 [MERGE_CONFLICT_QA.md](MERGE_CONFLICT_QA.md)。
 
 ## v4.5 选区分析与上下文回归
 
-`manifest.json` 先注入 `selection.js`，再注入 `content.js`。`AISelection.analyze` 提供可独立验证的文字构成、结构类别、可信度、依赖信号和A/B/C/D路由；`capture` 提取有边界和预算的DOM材料；`same` 对比位置及快照。`background.js` 收到 `analysis` 时采用单次选区提示词，未携带该字段的旧路径及全文批量保留兼容。
+`manifest.json` 在 `content.js` 前注入 `selection.js`；v4.6同时加载下节的Markdown依赖。`AISelection.analyze` 提供可独立验证的文字构成、结构类别、可信度、依赖信号和A/B/C/D路由；`capture` 提取有边界和预算的DOM材料；`same` 对比位置及快照。`background.js` 收到 `analysis` 时采用单次选区提示词，未携带该字段的旧路径及全文批量保留兼容。
 
 无需为扩展安装依赖；使用本机已有 Playwright 验证实际 Edge 扩展：
 
@@ -183,3 +183,17 @@ node scripts/verify-selection.mjs --playwright '<已安装的 playwright 包目�
 ```
 
 脚本先在 Node VM 检查文本语料，再在隔离 Edge 中验证真实 Range、DOM过滤、预算、模型路由、右键消息及本机HTTP SSE。只使用合成凭据和合成页面；报告及截图在 `artifacts/qa/selection/`，独立profile在 `.local/browser-profile/selection/run-<时间戳>/`，结束关闭浏览器和服务器，保留profile复查。固定输出不证明真实模型的解释准确率、耗时或token账单。修改报告、分类样本及未验证项见 [SELECTION_CONTEXT_QA.md](SELECTION_CONTEXT_QA.md)。
+
+## v4.6 Markdown浮层与回答格式
+
+自动注入顺序：selection.js → vendor/marked/marked.umd.js → vendor/dompurify/purify.min.js → markdown.js → content.js。固定版本、本地来源与许可证见 [vendor/README.md](../vendor/README.md)。不引入包管理或构建环境；不要在扩展中加载CDN脚本。markdown.js使用独立Marked实例和DOMPurify标签/属性白名单，在内容脚本隔离环境中工作。
+
+正文两处入口（划词、解释此句）使用AIMarkdown.createStreamingRenderer，每150～600ms重新解析累计原文，完成时立即刷新，取消时清定时器。思考文本继续使用createStreamingTextRenderer。保留Markdown原文用于复制/现有TXT下载，不再调用cleanMarkdown。样式只作用于结果区域；表格和代码块可横向滚动，正文保持阅读位置。
+
+background.js的buildSelectionPrompt及旧浮层兼容入口共用MARKDOWN_OUTPUT_GUIDANCE，优先结构化Markdown，不要求简短、编号列表或固定要点数。A/B浮层翻译给出原意及文中含义，不提供例句；buildTranslatePrompt和buildBatchTranslatePrompt保留全文纯译文/ID协议。系统提示词仍要求材料作为数据、证据不足保留歧义。语言和模型路由继续沿用已有设置。
+
+```powershell
+node scripts/verify-markdown.mjs --playwright '<已安装的playwright包目录>'
+```
+
+该工具加载实际扩展和隔离Edge profile，用本机HTTP SSE返回合成Markdown；检查流式/最终结构、复制/下载、缓存回放、提示词、再次解释、链接/HTML处理、节流、宽内容/窄屏/键盘滚动、取消与错误重试。下载TXT在context关闭前保存为artifacts/qa/markdown/markdown-download.txt；报告和截图在同目录。profile在.local/browser-profile/markdown/run-<时间戳>/，结束关闭浏览器和服务器，保留profile复查。合成回答不代表真实模型遵守了新提示词；真实生成需有效凭据单独验收。完整结果与限制见 [MARKDOWN_RENDERING_QA.md](MARKDOWN_RENDERING_QA.md)。

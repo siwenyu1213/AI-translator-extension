@@ -49,7 +49,7 @@ async function select(selector,text,occurrence=0,trigger=false){
  },{selector,text,occurrence,trigger});
  return isolated('capture',actual);
 }
-async function done(){await page.waitForFunction(()=>document.querySelector('#deepseek-explain-tooltip .ds-actions')?.style.display==='flex' && document.querySelector('#deepseek-explain-tooltip .ds-body')?.textContent==='Synthetic QA result.');}
+async function done(){await page.waitForFunction(()=>document.querySelector('#deepseek-explain-tooltip .ds-actions')?.style.display==='flex' && document.querySelector('#deepseek-explain-tooltip .ds-body')?.textContent.trim()==='Synthetic QA result.');}
 try{
  const cases=[
   ['好的','response','C'],['好','response','C'],['bank','word','A'],['break the ice','phrase','A'],
