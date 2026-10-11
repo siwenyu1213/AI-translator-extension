@@ -138,7 +138,7 @@ v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重�
 
 窗口移除调用名编辑/新增/删除、通用控件和常驻 API 地址；通用配置仍取读取时的保存值，首次默认启用扩展、使用上下文与自动触发。Key 保存后输入区隐藏，只留重填按钮，取消重填从已保存连接恢复，空输入不会清除旧 Key。官方地址自动匹配，自定义地址只在单独 dialog 中编辑。
 
-`usePageContext` 隐藏后仍沿用旧值，不强制开启。划词 `getPageContext` 以真实 Range 起止边界取前后各最多 300 字符，无块级容器时使用 body 内真实选区；部分提示词使用标题，不包含网页地址。全文脚本不采用划词前后文：单条 `buildTranslatePrompt` 没有 before/after 时不加入上下文，批量 `buildBatchTranslatePrompt` 使用标题，但不读取 url。旧停用值继续保留，但设置页提供仅停用时可见的启用按钮。
+`usePageContext` 隐藏后仍沿用旧值，不强制开启。v4.5 划词由 `selection.js` 保存真实 Range，分别分析文字构成/结构/可信度，再按 1500/2500 字符预算补段落、邻近块及结构信息，长选区额外预算800；后台再限制额外材料最多3000字符。相同文本按位置和上下文区分；右键与解释按钮复用快照。无法确认选区时只处理文字，不搜索猜位置；不发送网页地址。全文脚本不采用划词前后文：单条 `buildTranslatePrompt` 没有 before/after 时不加入上下文，批量 `buildBatchTranslatePrompt` 使用标题，但不读取 url。旧停用值继续保留，但设置页提供仅停用时可见的启用按钮。
 
 `LIST_MODELS` 保留原 IDs，并增加过滤后的 `entries`（ID/名称）；有效空列表也是成功结果。`AIModelCatalog.interfaceModels` 排除重复、非法 ID、明确非文本模态/过期和常见嵌入/图像/音频等用途，按型号归属筛当前厂家；自定义接受该接口的文本型号。字段不完整时采用名称规则，不能据此证明 Chat Completions 的全部能力。
 
@@ -171,3 +171,15 @@ v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重�
 上述 main 整合记录是历史基线。当前全文批量/回退共享最多 50 个实际端口请求配额，每批最多 8 个 Text 片段/3500 字符；长片段单独处理。任务 Map 以节点身份及 expected 值丢弃失效响应；restore 仅还原仍由扩展拥有的写入。MutationObserver 覆盖新增行内节点、characterData、保护属性、style/class/hidden/open；祖先过滤覆盖可编辑、代码、SVG/MathML 和 translate=no。详细回归、质量边界见 [ADVERSARIAL_FIX_QA.md](ADVERSARIAL_FIX_QA.md)。
 
 划词采用帧播放队列，单条消息最多 2048 字符，兼容返回的 reasoning_content。点击卡片内部、鼠标移出或选区折叠不误关，点击外部/Esc 可关闭；当前端口检查防止旧流更新新卡片。验证与整合取舍见 [MERGE_CONFLICT_QA.md](MERGE_CONFLICT_QA.md)。
+
+## v4.5 选区分析与上下文回归
+
+`manifest.json` 先注入 `selection.js`，再注入 `content.js`。`AISelection.analyze` 提供可独立验证的文字构成、结构类别、可信度、依赖信号和A/B/C/D路由；`capture` 提取有边界和预算的DOM材料；`same` 对比位置及快照。`background.js` 收到 `analysis` 时采用单次选区提示词，未携带该字段的旧路径及全文批量保留兼容。
+
+无需为扩展安装依赖；使用本机已有 Playwright 验证实际 Edge 扩展：
+
+```powershell
+node scripts/verify-selection.mjs --playwright '<已安装的 playwright 包目录>'
+```
+
+脚本先在 Node VM 检查文本语料，再在隔离 Edge 中验证真实 Range、DOM过滤、预算、模型路由、右键消息及本机HTTP SSE。只使用合成凭据和合成页面；报告及截图在 `artifacts/qa/selection/`，独立profile在 `.local/browser-profile/selection/run-<时间戳>/`，结束关闭浏览器和服务器，保留profile复查。固定输出不证明真实模型的解释准确率、耗时或token账单。修改报告、分类样本及未验证项见 [SELECTION_CONTEXT_QA.md](SELECTION_CONTEXT_QA.md)。
