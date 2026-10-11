@@ -4,6 +4,8 @@
 
 这是直接加载的 Manifest V3 浏览器扩展，没有开发服务器、打包流程或 npm 依赖。扩展运行需要支持 MV3 的 Edge / Chrome；静态检查需要 Node.js，版本管理需要 Git。当前机器已核实的版本和起始状态见 [WORK_ENVIRONMENT.md](WORK_ENVIRONMENT.md)。
 
+当前使用说明见 [README.md](../README.md)，2026-10-11 项目状态、分支分叉、功能与验收边界见 [交接.md](../交接.md)。交接文档为接手快照，实时 Git 状态仍需在任务开始核实。
+
 在 PowerShell 中进入项目：
 
 ```powershell
@@ -129,6 +131,8 @@ v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重�
 ## 精简设置与接口开放列表（v4.4）
 
 窗口移除调用名编辑/新增/删除、通用控件和常驻 API 地址；通用配置仍取读取时的保存值，首次默认启用扩展、使用上下文与自动触发。Key 保存后输入区隐藏，只留重填按钮，取消重填从已保存连接恢复，空输入不会清除旧 Key。官方地址自动匹配，自定义地址只在单独 dialog 中编辑。
+
+`usePageContext` 隐藏后仍沿用旧值，不强制开启。划词 `getPageContext` 通常取选区前后各最多 300 字符，并为部分提示词提供页面标题；无块级容器时可能取页面前 800 字符，不包含网页地址。全文脚本虽在消息中传 title/url，但没有 before/after，当前 `buildTranslatePrompt` 不将它们加入提示词，所以不采用划词前后文。这些行为以源码为准，真实账号保存偏好需在其浏览器中确认。
 
 `LIST_MODELS` 保留原 IDs，并增加过滤后的 `entries`（ID/名称）；有效空列表也是成功结果。`AIModelCatalog.interfaceModels` 排除重复、非法 ID、明确非文本模态/过期和常见嵌入/图像/音频等用途，按型号归属筛当前厂家；自定义接受该接口的文本型号。字段不完整时采用名称规则，不能据此证明 Chat Completions 的全部能力。
 
