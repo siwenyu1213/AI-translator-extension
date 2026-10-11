@@ -14,7 +14,7 @@ const editingKeys = new Set();
 
 function providerConnection(provider) {
   const entry = providerConnections[provider] || {};
-  return { ...entry, apiBaseUrl: AIConfig.PROVIDER_ENDPOINTS[provider] || entry.apiBaseUrl || AIConfig.DEFAULT_BASE_URL,
+  return { ...entry, apiBaseUrl: AIConfig.endpointFor(provider, entry),
     apiKey: entry.apiKey || '', availableModels: entry.availableModels || [], modelEntries: entry.modelEntries || [] };
 }
 function captureConnection() {
@@ -38,7 +38,8 @@ function showConnection() {
   renderCatalogStatus();
 }
 function renderCatalogStatus() {
-  const message = providerErrors.get(connectionProvider) || catalogError;
+  const missingAddress = connectionProvider === 'custom' && !providerConnection(connectionProvider).apiBaseUrl;
+  const message = missingAddress ? '请先配置自定义接口地址。' : providerErrors.get(connectionProvider) || catalogError;
   $catalogStatus.textContent = message;
   $catalogStatus.hidden = !message;
 }
@@ -58,7 +59,8 @@ function renderManufacturers() {
 function renderModelOptions(tab) {
   const selected = tab.select.value, provider = tab.manufacturer.value;
   const connection = providerConnection(provider);
-  const entries = AIModelCatalog.interfaceModels(connection.modelEntries.length ? connection.modelEntries :
+  const missingAddress = provider === 'custom' && !connection.apiBaseUrl;
+  const entries = missingAddress ? [] : AIModelCatalog.interfaceModels(connection.modelEntries.length ? connection.modelEntries :
     connection.availableModels.map(id => ({id})), provider);
   const catalog = catalogSnapshot.providers.find(p => p.id === provider)?.models || [];
   tab.select.replaceChildren();
@@ -74,7 +76,7 @@ function renderModelOptions(tab) {
   tab.select.disabled = !entries.length;
   if (!entries.length) {
     const option = document.createElement('option'); option.value = '';
-    option.textContent = connection.apiKey ? '暂无可用模型' : '填写 API Key 后加载模型';
+    option.textContent = missingAddress ? '先配置自定义接口地址' : connection.apiKey ? '暂无可用模型' : '填写 API Key 后加载模型';
     tab.select.append(option);
   }
   tab.detail.textContent = !entries.length && connection.apiKey ? '模型列表由当前接口提供。' : '';
@@ -141,6 +143,11 @@ function modelFailureMessage(result, provider) {
 }
 async function refreshProviderModels(provider = connectionProvider) {
   const connection = providerConnection(provider);
+  if (provider === 'custom' && !connection.apiBaseUrl) {
+    providerErrors.set(provider, '请先配置自定义接口地址。');
+    renderCatalogStatus();
+    return;
+  }
   if (!connection.apiKey || connection.apiKey !== savedKeys[provider]) return;
   const signature = JSON.stringify([connection.apiBaseUrl, connection.apiKey]);
   if (providerRequests.get(provider)?.signature === signature) return providerRequests.get(provider).promise;
@@ -299,7 +306,7 @@ $('custom-save').addEventListener('click',async()=>{
     const stored=await chrome.storage.local.get(['providerConnections','explainManufacturer','translateManufacturer']);
     const connections=AIConfig.normalizeConnections(stored.providerConnections);
     const saved=connections.custom || {apiKey:'',availableModels:[],modelEntries:[],modelsCheckedAt:''};
-    const changed=(saved.apiBaseUrl || AIConfig.DEFAULT_BASE_URL)!==apiBaseUrl;
+    const changed=(saved.apiBaseUrl || '')!==apiBaseUrl;
     // 地址保存只保存地址和已保存 Key，不能顺带保存切换标签时捕获的 Key 草稿。
     const profile={...saved,apiBaseUrl,
       ...(changed ? {availableModels:[],modelEntries:[],modelsCheckedAt:''} : {})};

@@ -2,13 +2,19 @@
 
 ## 环境与目录
 
-这是直接加载的 Manifest V3 浏览器扩展，没有开发服务器、打包流程或 npm 依赖。扩展运行需要支持 MV3 的 Edge / Chrome；静态检查需要 Node.js，版本管理需要 Git。当前机器已核实的版本和起始状态见 [WORK_ENVIRONMENT.md](WORK_ENVIRONMENT.md)。
+这是直接加载的 Manifest V3 浏览器扩展，没有开发服务器、打包流程或 npm 安装步骤。Markdown解析及清理由本地vendor脚本提供，不从CDN执行代码。扩展运行需要支持 MV3 的 Edge / Chrome；静态检查需要 Node.js，版本管理需要 Git。当前机器已核实的版本和起始状态见 [WORK_ENVIRONMENT.md](WORK_ENVIRONMENT.md)。
 
 当前使用说明见 [README.md](../README.md)，2026-10-11 项目状态、分支分叉、功能与验收边界见 [交接.md](../交接.md)。交接文档为接手快照，实时 Git 状态仍需在任务开始核实。
 
 2026-10-11 修复源分支 `codex/verify-adversarial-findings` 的主分支合并入口为 [PR #10](https://github.com/siwenyu1213/AI-translator-extension/pull/10)。用户确认GitHub账号改名为 `siwenyu1213` 后，本仓库origin的fetch/push地址统一更新为 `https://github.com/siwenyu1213/AI-translator-extension.git`，并执行fetch确认可访问。PR #9/#10已合并，main中的准确提交与PR状态用fetch和gh查询核实。
 
 2026-10-11 两个子 agent 的版本残留与逻辑对抗式审查见 [ADVERSARIAL_REVIEW.md](ADVERSARIAL_REVIEW.md)，包含未修复发现、源码定位、可复现证据和验证边界。其模拟/页面样本结果不替代完整扩展或真实 API 验收。
+
+v4.6 Markdown浮层的两子agent对抗性审查与安全清理见 [MARKDOWN_ADVERSARIAL_REVIEW.md](MARKDOWN_ADVERSARIAL_REVIEW.md)：5项功能问题、全文观察器重复扫描、阅读/导出功能建议，以及移除28行无用代码后的差分与实际Edge回归。通过回归不表示所列未修复问题已解决。
+
+这些问题随后已修复，见 [MARKDOWN_FIX_QA.md](MARKDOWN_FIX_QA.md)：25项实际Edge定向回归、13项旧提交负向对照、完整相关回归和剩余限制。`scripts/verify-markdown-fixes.mjs` 默认断言修复行为；加 `--ref eeb5ed6 --expect-vulnerable` 加载临时基线副本复现旧缺陷，不改当前Git工作区。生成证据在artifacts/qa/markdown-fix-2026-10-11/。
+
+自定义接口缺少地址时曾回退到 OpenAI，修复及负向对照见 [CUSTOM_ENDPOINT_QA.md](CUSTOM_ENDPOINT_QA.md)。`scripts/verify-custom-endpoint.mjs` 执行64项Node VM和12项隔离Edge检查；`--node-only` 只运行离线部分，`--ref 4c1cc3b --expect-vulnerable` 用临时基线副本复现旧行为（64项VM和8项Edge），不切换或改写当前工作区。非本机请求全部拦截，仅本机HTTP接口接收合成Key；真实供应商生成未验收。生成报告和截图在 `artifacts/qa/custom-endpoint-2026-10-11/`，运行方法见对应验收文档。
 
 随后在 `codex/verify-adversarial-findings` 的实际扩展复现见 [ADVERSARIAL_VALIDATION.md](ADVERSARIAL_VALIDATION.md)，修复和最新回归见 [ADVERSARIAL_FIX_QA.md](ADVERSARIAL_FIX_QA.md)。三个 adversarial 工具当前默认断言修复行为，退出0表示所列回归通过；历史缺陷复现脚本保存在提交 `bfb3f65`，旧证据不覆盖。browser/config 使用已有 Playwright、隔离 Edge profile 和本机合成接口；background 提供离线时序对照，也支持在旧源码上使用 `--expect-vulnerable`。profiles 每轮独立且保留，浏览器与服务器结束时关闭。
 
@@ -130,6 +136,8 @@ v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重�
 
 `AIConfig.PROVIDER_ENDPOINTS` 固定 10 家官方兼容地址；厂家字段 `explainManufacturer` / `translateManufacturer` 显式决定路由，不根据模型名覆盖用户选择。`providerConnections` 按厂家记录 Key 与 `/models` ID，自定义额外记录可编辑 Base URL。`providerConfigVersion: 1` 表示新结构，读取时只做一次迁移：原地址匹配该厂家预设才交给该厂家，其他原连接保留为 custom，不借用全局 Key。旧顶层 `apiBaseUrl/apiKey/availableModels` 保留兼容存储，新后台请求读取 `connectionFor(config, kind)`。
 
+`AIConfig.endpointFor(provider, entry)` 是后台归一化/生成与设置页查询共用的地址选择入口：官方厂家返回固定预设，自定义只接受自身非空字符串地址，不回退到默认地址。`connectionFor` 在自定义地址缺失时抛出配置错误，所有生成路径在fetch前停止；设置页禁用该连接的型号选择并停止后台/直接查询。迁移已有v4配置时不为缺地址的Key猜厂家；新安装默认OpenAI和旧v3清除未知专用Key的行为保留。无法从历史存储中的明确OpenAI地址判断它是用户填写还是旧代码回填，因此保留该值并提示用户核对。
+
 设置页地址与 Key 随当前标签和厂家显示；切换前保留连接草稿，保存设置时写入各厂家的连接。官方地址只读，所有自定义/网关地址须选择 custom；厂家地址即使被改写到 storage，也由固定预设还原。保存新自定义地址在同一次 storage.set 中清除该连接列表和使用 custom 的已保存型号，地址保存使用持久化 Key，不顺带保存 Key 草稿。查询/检测完成时检查厂家、标签、地址和 Key 是否仍一致，期间切换则不写入返回结果。后台解释和 A/C/D 分类读取解释连接，B 分类及全文 STREAM_BATCH 读取翻译连接，缺少该厂家 Key 时不发请求。
 
 验证新增 10 家地址联动、独立 Key 恢复、旧网关迁移、厂家路由、未配置拦截与异步切换处理。浏览器内官方域名请求由 Worker fetch 模拟拦截，仅核对路由/消息/SSE，不向供应商发送合成 Key。真实公开目录仍联网；本机模拟接口继续验证完整划词与全文路径。端点来源、地域和真实凭据缺口见 [PROVIDER_ENDPOINTS_QA.md](PROVIDER_ENDPOINTS_QA.md)。
@@ -170,11 +178,11 @@ v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重�
 
 上述 main 整合记录是历史基线。当前全文批量/回退共享最多 50 个实际端口请求配额，每批最多 8 个 Text 片段/3500 字符；长片段单独处理。任务 Map 以节点身份及 expected 值丢弃失效响应；restore 仅还原仍由扩展拥有的写入。MutationObserver 覆盖新增行内节点、characterData、保护属性、style/class/hidden/open；祖先过滤覆盖可编辑、代码、SVG/MathML 和 translate=no。详细回归、质量边界见 [ADVERSARIAL_FIX_QA.md](ADVERSARIAL_FIX_QA.md)。
 
-划词采用帧播放队列，单条消息最多 2048 字符，兼容返回的 reasoning_content。点击卡片内部、鼠标移出或选区折叠不误关，点击外部/Esc 可关闭；当前端口检查防止旧流更新新卡片。验证与整合取舍见 [MERGE_CONFLICT_QA.md](MERGE_CONFLICT_QA.md)。
+v4.6划词正文采用下节Markdown节流渲染，思考内容保留帧播放队列，单条消息最多2048字符，兼容返回的reasoning_content。点击卡片内部、鼠标移出或选区折叠不误关，点击外部/Esc可关闭；当前端口检查防止旧流更新新卡片。历史验证与整合取舍见 [MERGE_CONFLICT_QA.md](MERGE_CONFLICT_QA.md)。
 
 ## v4.5 选区分析与上下文回归
 
-`manifest.json` 先注入 `selection.js`，再注入 `content.js`。`AISelection.analyze` 提供可独立验证的文字构成、结构类别、可信度、依赖信号和A/B/C/D路由；`capture` 提取有边界和预算的DOM材料；`same` 对比位置及快照。`background.js` 收到 `analysis` 时采用单次选区提示词，未携带该字段的旧路径及全文批量保留兼容。
+`manifest.json` 在 `content.js` 前注入 `selection.js`；v4.6同时加载下节的Markdown依赖。`AISelection.analyze` 提供可独立验证的文字构成、结构类别、可信度、依赖信号和A/B/C/D路由；`capture` 提取有边界和预算的DOM材料；`same` 对比位置及快照。`background.js` 收到 `analysis` 时采用单次选区提示词，未携带该字段的旧路径及全文批量保留兼容。
 
 无需为扩展安装依赖；使用本机已有 Playwright 验证实际 Edge 扩展：
 
@@ -183,3 +191,19 @@ node scripts/verify-selection.mjs --playwright '<已安装的 playwright 包目�
 ```
 
 脚本先在 Node VM 检查文本语料，再在隔离 Edge 中验证真实 Range、DOM过滤、预算、模型路由、右键消息及本机HTTP SSE。只使用合成凭据和合成页面；报告及截图在 `artifacts/qa/selection/`，独立profile在 `.local/browser-profile/selection/run-<时间戳>/`，结束关闭浏览器和服务器，保留profile复查。固定输出不证明真实模型的解释准确率、耗时或token账单。修改报告、分类样本及未验证项见 [SELECTION_CONTEXT_QA.md](SELECTION_CONTEXT_QA.md)。
+
+## v4.6 Markdown浮层与回答格式
+
+自动注入顺序：selection.js → vendor/marked/marked.umd.js → vendor/dompurify/purify.min.js → markdown.js → content.js。固定版本、本地来源与许可证见 [vendor/README.md](../vendor/README.md)。不引入包管理或构建环境；不要在扩展中加载CDN脚本。markdown.js使用独立Marked实例和DOMPurify标签/属性白名单，在内容脚本隔离环境中工作。
+
+正文两处入口（划词、解释此句）使用AIMarkdown.createStreamingRenderer，每150～600ms重新解析累计原文，完成时立即刷新，取消时清定时器。思考文本继续使用createStreamingTextRenderer。保留Markdown原文用于复制/现有TXT下载，不再调用cleanMarkdown。样式只作用于结果区域；表格和代码块可横向滚动，正文保持阅读位置。
+
+当前浮层以原文snapshot Range及文档坐标回退定位，尺寸/窗口变化节流重新约束；整体高度受视口限制，关闭状态inert。Markdown重绘恢复代码/表格/链接焦点，首次整答从顶部显示。DOWNLOAD使用异步消息确认，只显示“已开始下载”而不声称文件已完成；失败可重试并隔离晚回包。全文scan提前跳过扩展UI子树。后台每次local保存继续失效配置读，仅生成字段或连接语义变化清结果缓存，展示元数据刷新保留缓存。
+
+background.js的buildSelectionPrompt及旧浮层兼容入口共用MARKDOWN_OUTPUT_GUIDANCE，优先结构化Markdown，不要求简短、编号列表或固定要点数。A/B浮层翻译给出原意及文中含义，不提供例句；buildTranslatePrompt和buildBatchTranslatePrompt保留全文纯译文/ID协议。系统提示词仍要求材料作为数据、证据不足保留歧义。语言和模型路由继续沿用已有设置。
+
+```powershell
+node scripts/verify-markdown.mjs --playwright '<已安装的playwright包目录>'
+```
+
+该工具加载实际扩展和隔离Edge profile，用本机HTTP SSE返回合成Markdown；检查流式/最终结构、复制/下载、缓存回放、提示词、再次解释、链接/HTML处理、节流、宽内容/窄屏/键盘滚动、取消与错误重试。下载TXT在context关闭前保存为artifacts/qa/markdown/markdown-download.txt；报告和截图在同目录。profile在.local/browser-profile/markdown/run-<时间戳>/，结束关闭浏览器和服务器，保留profile复查。合成回答不代表真实模型遵守了新提示词；真实生成需有效凭据单独验收。完整结果与限制见 [MARKDOWN_RENDERING_QA.md](MARKDOWN_RENDERING_QA.md)。

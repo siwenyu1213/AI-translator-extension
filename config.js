@@ -16,6 +16,9 @@
   const normalizeModel = model => typeof model === 'string' ? model.trim() : '';
   const normalizeModels = list => [...new Set((Array.isArray(list) ? list : [])
     .map(normalizeModel).filter(Boolean))];
+  // 官方厂家有固定地址；自定义连接必须提供自己的地址，不能借用默认厂家。
+  const endpointFor = (provider, entry = {}) => PROVIDER_ENDPOINTS[provider] ||
+    (typeof entry.apiBaseUrl === 'string' ? entry.apiBaseUrl.trim() : '');
 
   function normalizeBaseUrl(input) {
     let url;
@@ -51,7 +54,8 @@
       }
       config.apiConfigVersion = 1;
     }
-    config.apiBaseUrl ||= DEFAULT_BASE_URL;
+    // 已有v4全局Key缺地址时保留未配置状态，迁移不得猜测Key属于OpenAI。
+    config.apiBaseUrl = typeof config.apiBaseUrl === 'string' ? config.apiBaseUrl.trim() : '';
     config.apiKey ||= '';
     config.modelList = normalizeModels(config.modelList);
     // 只升级厂家目录，不改 v4 已保存的接口、Key 或当前模型。
@@ -96,7 +100,7 @@
     for (const id of [...Object.keys(PROVIDER_ENDPOINTS), 'custom']) {
       const entry = value?.[id];
       if (!entry || typeof entry !== 'object') continue;
-      connections[id] = { apiBaseUrl: PROVIDER_ENDPOINTS[id] || String(entry.apiBaseUrl || DEFAULT_BASE_URL),
+      connections[id] = { apiBaseUrl: endpointFor(id, entry),
         apiKey: typeof entry.apiKey === 'string' ? entry.apiKey.trim() : '',
         availableModels: normalizeModels(entry.availableModels),
         modelEntries: AIModelCatalog.interfaceModels(entry.modelEntries || normalizeModels(entry.availableModels).map(model => ({id:model})), id),
@@ -110,7 +114,9 @@
     const provider = config[kind + 'Manufacturer'];
     if (!validProvider(provider)) throw new Error('请先选择接口厂家并保存设置');
     const entry = config.providerConnections?.[provider] || {};
-    return { apiBaseUrl: PROVIDER_ENDPOINTS[provider] || entry.apiBaseUrl || DEFAULT_BASE_URL,
+    const apiBaseUrl = endpointFor(provider, entry);
+    if (provider === 'custom' && !apiBaseUrl) throw new Error('请先配置自定义接口地址');
+    return { apiBaseUrl,
       apiKey: entry.apiKey || '', availableModels: normalizeModels(entry.availableModels), modelsCheckedAt: entry.modelsCheckedAt || '' };
   }
 
@@ -135,6 +141,6 @@
   }
 
   globalThis.AIConfig = { DEFAULT_MODEL, DEFAULT_MODELS, DEFAULT_BASE_URL,
-    PROVIDER_ENDPOINTS, validProvider, normalizeConnections, connectionFor,
+    PROVIDER_ENDPOINTS, validProvider, endpointFor, normalizeConnections, connectionFor,
     normalizeModel, normalizeModels, normalizeBaseUrl, migrate, load };
 })();

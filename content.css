@@ -5,6 +5,9 @@
   z-index: 2147483647;
   width: 360px;
   max-width: calc(100vw - 24px);
+  max-height: calc(var(--ds-viewport-height, 100vh) - 20px);
+  box-sizing: border-box;
+  flex-direction: column;
   background: #ffffff;
   border: 1px solid #e8e8ed;
   border-radius: 12px;
@@ -24,7 +27,7 @@
 }
 
 #deepseek-explain-tooltip.ds-visible {
-  display: block;
+  display: flex;
   opacity: 1;
 }
 
@@ -93,10 +96,76 @@
   font-size: 13px;
   color: #334155;
   word-break: break-word;
-  min-height: 28px;
+  min-height: 0;
+  flex: 0 1 auto;
   max-height: 40vh;
   overflow-y: auto;
   white-space: pre-line;
+}
+
+/* Markdown typography is scoped to the result, including host-page heading/list resets. */
+#deepseek-explain-tooltip .ds-markdown {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: 1.75;
+}
+#deepseek-explain-tooltip .ds-markdown * { box-sizing: border-box; }
+#deepseek-explain-tooltip .ds-markdown p { margin: 0 0 10px; font: inherit; color: inherit; }
+#deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6) {
+  display: block; margin: 16px 0 8px; padding: 0; border: 0;
+  font-family: inherit; font-weight: 650; line-height: 1.45; color: #1e293b;
+  text-transform: none; letter-spacing: normal;
+}
+#deepseek-explain-tooltip .ds-markdown h1 { font-size: 19px; }
+#deepseek-explain-tooltip .ds-markdown h2 { font-size: 17px; }
+#deepseek-explain-tooltip .ds-markdown h3 { font-size: 15px; }
+#deepseek-explain-tooltip .ds-markdown :is(h4,h5,h6) { font-size: 13px; }
+#deepseek-explain-tooltip .ds-markdown :is(ul,ol) { margin: 8px 0 12px; padding: 0 0 0 22px; }
+#deepseek-explain-tooltip .ds-markdown ul { list-style: disc outside; }
+#deepseek-explain-tooltip .ds-markdown ol { list-style: decimal outside; }
+#deepseek-explain-tooltip .ds-markdown li { display: list-item; margin: 4px 0; padding: 0; }
+#deepseek-explain-tooltip .ds-markdown li > p { margin: 0; }
+#deepseek-explain-tooltip .ds-markdown strong { font-weight: 700; }
+#deepseek-explain-tooltip .ds-markdown em { font-style: italic; }
+#deepseek-explain-tooltip .ds-markdown del { text-decoration: line-through; }
+#deepseek-explain-tooltip .ds-markdown blockquote {
+  margin: 10px 0; padding: 8px 12px; border-left: 3px solid #94a3b8;
+  background: #f8fafc; color: #475569; font: inherit;
+}
+#deepseek-explain-tooltip .ds-markdown code {
+  font-family: Consolas, "SFMono-Regular", monospace; font-size: 12px;
+  padding: 2px 4px; border-radius: 4px; background: #f1f5f9; color: #0f172a;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+#deepseek-explain-tooltip .ds-markdown pre {
+  display: block; max-width: 100%; margin: 10px 0; padding: 12px;
+  overflow: auto; border: 1px solid #e2e8f0; border-radius: 6px;
+  background: #f8fafc; color: #0f172a; text-align: left;
+}
+#deepseek-explain-tooltip .ds-markdown pre code {
+  display: block; padding: 0; background: transparent;
+  white-space: pre; overflow-wrap: normal; word-break: normal; line-height: 1.6;
+}
+#deepseek-explain-tooltip .ds-markdown a { color: #1d4ed8; text-decoration: underline; }
+#deepseek-explain-tooltip .ds-markdown a:not([href]) { color: inherit; text-decoration: none; }
+#deepseek-explain-tooltip .ds-markdown :is(a,pre,.ds-md-table):focus-visible {
+  outline: 2px solid #2563eb; outline-offset: 2px;
+}
+#deepseek-explain-tooltip .ds-markdown .ds-md-table { max-width: 100%; overflow-x: auto; margin: 10px 0; }
+#deepseek-explain-tooltip .ds-markdown table { display: table; width: 100%; border-collapse: collapse; font: inherit; }
+#deepseek-explain-tooltip .ds-markdown :is(th,td) {
+  min-width: 90px; padding: 7px 9px; border: 1px solid #cbd5e1;
+  text-align: left; vertical-align: top; background: #fff; color: inherit;
+}
+#deepseek-explain-tooltip .ds-markdown th { font-weight: 650; background: #f1f5f9; }
+#deepseek-explain-tooltip .ds-markdown input[type="checkbox"] { margin-right: 6px; }
+#deepseek-explain-tooltip .ds-markdown hr { margin: 14px 0; border: 0; border-top: 1px solid #e2e8f0; }
+#deepseek-explain-tooltip .ds-markdown > :first-child { margin-top: 0; }
+#deepseek-explain-tooltip .ds-markdown > :last-child { margin-bottom: 0; }
+#deepseek-explain-tooltip .ds-markdown blockquote > :last-child { margin-bottom: 0; }
+@media (prefers-reduced-motion: reduce) {
+  #deepseek-explain-tooltip .ds-streaming::after { animation: none; }
 }
 
 /* ── 流式光标 ── */
@@ -263,3 +332,13 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* 卡片整体受视口约束，正文与思考可收缩，操作按钮保持可见。 */
+#deepseek-explain-tooltip :is(.ds-header,.ds-actions,.ds-footer,.ds-quote) { flex-shrink: 0; }
+#deepseek-explain-tooltip .ds-quote { max-height: min(72px, 12vh); overflow-y: auto; }
+#deepseek-explain-tooltip .ds-reasoning { min-height: 0; flex: 0 1 auto; overflow-y: auto; }
+#deepseek-explain-tooltip :is(.ds-close,.ds-btn):focus-visible {
+  outline: 2px solid #2563eb; outline-offset: 2px;
+}
+#deepseek-explain-tooltip .ds-btn:disabled { cursor: wait; opacity: .65; }
+#deepseek-explain-tooltip .ds-actions { flex-wrap: wrap; }

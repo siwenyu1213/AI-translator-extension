@@ -106,6 +106,9 @@
     if (visible.has(task.block)) enqueue(task);
   }
   function scan(root) {
+    const element = root.nodeType === Node.ELEMENT_NODE ? root : root.parentElement;
+    // 仅提前跳过扩展自己的UI；网页保护属性的变化仍须扫描并恢复已有任务。
+    if (element?.closest('#deepseek-explain-tooltip, #ds-translate-toolbar')) return;
     if (root.nodeType === Node.TEXT_NODE) { scanNode(root); return; }
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) scanNode(walker.currentNode);
