@@ -3,6 +3,7 @@
 
 let tooltip = null;
 let currentText = null;
+let currentSelection = null;
 let currentExplanation = null;
 let isLoading = false;
 let currentStreamPort = null;
@@ -14,6 +15,7 @@ let triggerMode = 'auto';
 let usePageContext = true;
 let selectionDebounce = null;
 let lastContextMenuPos = { x: 0, y: 0 };
+let contextMenuSelection = null;
 
 // ── 扩展上下文有效性检测（重载后旧页面的 runtime 会失效）──
 function isRuntimeAlive() {
@@ -26,25 +28,6 @@ function safeSendMessage(msg) {
 function safeConnect(name) {
   if (!isRuntimeAlive()) return null;
   try { return chrome.runtime.connect({ name }); } catch { return null; }
-}
-
-// ── 本地自动分类（微秒级，无网络开销）──
-function classifyText(text) {
-  const trimmed = text.trim();
-  // 剥离数字与常见半角标点，避免“3.5 元”“2024-2025”等中文文本被误判为外语
-  const cleaned = trimmed.replace(/[\d.,%+\-():;/'"$?!&@#=*_\[\]{}|\\^~<>]/g, '');
-  // 检测非中文字符（拉丁字母、假名、韩文、阿拉伯文等）
-  const hasForeign = /[^\u4e00-\u9fff\u3000-\u303f\uff00-\uffef\u2013\u00b7\s，。、；：！？…—""''（）【】《》]/.test(cleaned);
-  const isPurelyChinese = !hasForeign;
-
-  if (isPurelyChinese) {
-    if (trimmed.length <= 10) return 'C';  // 拓展解释
-    return 'D';                             // 语境解读
-  }
-
-  const words = trimmed.split(/\s+/).filter(w => w.length > 0);
-  if (words.length <= 10) return 'A';       // 翻译+解释
-  return 'B';                                // 纯翻译
 }
 
 function modeLabel(mode) {
@@ -151,6 +134,7 @@ function hideTooltip() {
   tooltip.classList.add('ds-hidden');
   tooltip.classList.remove('ds-visible');
   currentText = null;
+  currentSelection = null;
   currentExplanation = null;
   isLoading = false;
 }
@@ -258,13 +242,17 @@ function createStreamingTextRenderer(container) {
 // 统一流式弹窗触发（解释 & 翻译共用）
 // ═══════════════════════════════════════════
 
-async function triggerWithStream({ text, mode, popupTitle }) {
-  if (!text || text.length < 2) return;
-  if (text === currentText && tooltip?.classList.contains('ds-visible') && !tooltip.querySelector('.ds-error')) return;
+async function triggerWithStream({ text, mode, popupTitle, snapshot }) {
+  if (!text?.trim()) return;
+  snapshot ||= AISelection.capture(text);
+  mode ||= snapshot.analysis.mode;
+  popupTitle ||= `AI ${modeLabel(mode)}`;
+  if (AISelection.same(snapshot, currentSelection) && tooltip?.classList.contains('ds-visible') && !tooltip.querySelector('.ds-error')) return;
 
   // 中止上一个流
   abortStream();
   currentText = text;
+  currentSelection = snapshot;
   isLoading = true;
   currentExplanation = null;
 
@@ -352,12 +340,13 @@ async function triggerWithStream({ text, mode, popupTitle }) {
   });
 
   // 发送请求（根据开关决定是否携带上下文）
-  const context = usePageContext ? getPageContext() : null;
+  const context = usePageContext ? snapshot.context : null;
   try { port.postMessage({
     type: 'STREAM_REQUEST',
     mode,
     text,
-    context
+    context,
+    analysis: snapshot.analysis
   }); } catch { showStreamFailure(el, '⚠️ 连接中断，请重试'); }
 }
 
@@ -397,26 +386,7 @@ function isInTooltip(node) {
 // ═══════════════════════════════════════════
 
 function getPageContext() {
-  const sel = window.getSelection();
-  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
-
-  const range = sel.getRangeAt(0);
-  const blockTags = new Set(['P', 'DIV', 'LI', 'TD', 'TH', 'SECTION', 'ARTICLE', 'BLOCKQUOTE', 'PRE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'FIGCAPTION', 'DD', 'DT', 'ASIDE', 'MAIN', 'SUMMARY']);
-  let container = range.commonAncestorContainer;
-  while (container && container !== document.body) {
-    if (container.nodeType === 1 && blockTags.has(container.tagName)) break;
-    container = container.parentElement;
-  }
-  container ||= document.body;
-  try {
-    const beforeRange = document.createRange();
-    beforeRange.selectNodeContents(container);
-    beforeRange.setEnd(range.startContainer, range.startOffset);
-    const afterRange = document.createRange();
-    afterRange.selectNodeContents(container);
-    afterRange.setStart(range.endContainer, range.endOffset);
-    return { title: document.title, before: beforeRange.toString().slice(-300), after: afterRange.toString().slice(0, 300) };
-  } catch { return null; }
+  return currentSelection?.context || null;
 }
 
 // ═══════════════════════════════════════════
@@ -573,7 +543,9 @@ async function handleExplainThis(e) {
     type: 'STREAM_REQUEST',
     mode: 'D',
     text: textToExplain,
-    context: usePageContext ? getPageContext() : null
+    context: usePageContext ? getPageContext() : null,
+    analysis: currentSelection?.analysis,
+    explicitTask: 'interpret'
   }); } catch { showStreamFailure(el, '⚠️ 连接中断，请重试'); cleanup(); }
 }
 
@@ -602,6 +574,8 @@ chrome.storage.onChanged.addListener((changes) => {
 document.addEventListener('contextmenu', (e) => {
   lastContextMenuPos.x = e.clientX + window.scrollX;
   lastContextMenuPos.y = e.clientY + window.scrollY;
+  const text = window.getSelection()?.toString().trim();
+  contextMenuSelection = text ? AISelection.capture(text) : null;
 });
 
 // ── 检测是否在输入框/搜索框/编辑器内（用户正在编辑，不触发）──
@@ -633,21 +607,19 @@ document.addEventListener('mouseup', (e) => {
       // 若页面阻止默认行为导致选区不变，则保持“已关闭”状态。
       if (!text || text === closedText) return;
     }
-    if (!text || text.length < 2) {
+    if (!text) {
       return;
     }
-    if (text === currentText && tooltip?.classList.contains('ds-visible') && !tooltip.querySelector('.ds-error')) return;
-
-    const mode = classifyText(text);
-    triggerWithStream({ text, mode, popupTitle: `AI ${modeLabel(mode)}` });
+    triggerWithStream({ text });
   }, 150);
 });
 
 // ── 接收来自 background（右键菜单）的消息 ──
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'TRIGGER_EXPLAIN' && message.text) {
-    const mode = classifyText(message.text);
-    triggerWithStream({ text: message.text, mode, popupTitle: `AI ${modeLabel(mode)}` });
+    const snapshot = contextMenuSelection?.text === message.text ? contextMenuSelection : null;
+    contextMenuSelection = null;
+    triggerWithStream({ text: message.text, snapshot });
   }
   if (message.type === 'TRIGGER_FULLPAGE_TRANSLATE') {
     safeSendMessage({ type: 'INJECT_FULLPAGE_TRANSLATE' });

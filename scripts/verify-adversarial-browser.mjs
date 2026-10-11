@@ -145,7 +145,7 @@ try{
  });
  await check('R12','repeated-word selection sends actual Range context',async()=>{
   const source='The bank raised rates. Along the river, the bank was muddy.';const {page}=await sample(`<p id="p">${source}</p>`);const offset=source.lastIndexOf('bank');await select(page,'#p',offset,offset+4);await until(()=>requests.length===1);
-  const prompt=requests[0].prompt;assert.ok(prompt.includes('上文：The bank raised rates. Along the river, the '));return{observed:{selectedOffset:offset,actualBefore:source.slice(0,offset),capturedPrompt:prompt}};
+  const prompt=requests[0].prompt;assert.ok(prompt.includes('参考上文：\nThe bank raised rates. Along the river, the '));return{observed:{selectedOffset:offset,actualBefore:source.slice(0,offset),capturedPrompt:prompt}};
  });
  // Delay delivery of a real chrome.storage read. AIConfig.load and its caller are unchanged.
  async function holdNativeStorageRead(){
@@ -231,7 +231,7 @@ try{
  await check('C06','context selection across inline nodes uses exact Range boundaries',async()=>{
   const {page}=await sample('<p id="p">Earlier bank. Actual <b id="start">river bank</b> and <span id="end">shore</span> suffix.</p>');
   await page.evaluate(()=>{const r=document.createRange();r.setStart(document.querySelector('#start').firstChild,6);r.setEnd(document.querySelector('#end').firstChild,5);getSelection().removeAllRanges();getSelection().addRange(r);document.querySelector('#p').dispatchEvent(new MouseEvent('mouseup',{bubbles:true,button:0}));});
-  await until(()=>requests.length===1);assert.ok(requests[0].prompt.includes('上文：Earlier bank. Actual river \n'));assert.ok(requests[0].prompt.includes('下文： suffix.'));return{observed:{before:'Earlier bank. Actual river ',after:' suffix.'}};
+  await until(()=>requests.length===1);assert.ok(requests[0].prompt.includes('参考上文：\nEarlier bank. Actual river \n'));assert.ok(requests[0].prompt.includes('参考下文：\n suffix.'));return{observed:{before:'Earlier bank. Actual river ',after:' suffix.'}};
  });
 }catch(e){results.push({id:'setup',status:'check_failed',error:e.message});process.exitCode=1;console.error(e);}
 finally{
