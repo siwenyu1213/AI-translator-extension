@@ -13,3 +13,10 @@ node_modules/
 # 系统
 .DS_Store
 Thumbs.db
+
+# 本地任务材料、临时文件、浏览器测试配置和生成产物
+.local/
+artifacts/
+.env
+.env.*
+!.env.example

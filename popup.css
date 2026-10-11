@@ -1,6 +1,7 @@
-/* ========== DeepSeek 智能解释 & 翻译 — Popup 样式 ========== */
+/* ========== AI 智能解释 & 翻译 — Popup 样式 ========== */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 
 body {
   width: 380px;
@@ -92,8 +93,9 @@ body {
 
 .hint {
   font-size: 11px;
-  color: #94a3b8;
+  color: #64748b;
   margin-top: 2px;
+  line-height: 1.5;
 }
 
 .select, .input {
@@ -118,6 +120,17 @@ body {
   color: #cbd5e1;
 }
 
+.key-section { padding-top: 12px; border-top: 1px solid #e2e8f0; margin-top: 16px; }
+.key-actions { display: flex; gap: 8px; margin-top: 10px; }
+.key-actions .mini-btn { min-height: 36px; padding: 6px 12px; }
+.inline-error { color: #b91c1c; font-size: 12px; margin-top: 6px; }
+.inline-error:empty { display: none; }
+.connection-link { border: 0; background: transparent; color: #2563eb; cursor: pointer; padding: 8px 0; font: inherit; }
+.select:disabled { color: #64748b; background: #f8fafc; }
+dialog { width: 332px; margin: auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; color: #1e293b; }
+dialog::backdrop { background: rgba(15, 23, 42, .25); }
+dialog h2 { font-size: 15px; margin-bottom: 16px; }
+
 /* ── 开关 ── */
 .toggle-label {
   display: flex;
@@ -137,37 +150,6 @@ body {
   font-size: 12px;
   font-weight: 600;
   color: #475569;
-}
-
-/* ── 链接 ── */
-.link {
-  display: inline-block;
-  font-size: 11px;
-  color: #2563eb;
-  text-decoration: none;
-  margin-top: 4px;
-}
-
-.link:hover {
-  text-decoration: underline;
-}
-
-/* ── 分隔线 ── */
-.divider {
-  font-size: 11px;
-  font-weight: 600;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 8px 0 4px;
-  margin-top: 4px;
-  border-top: 1px solid #f1f5f9;
-}
-
-/* ── 下载提示 ── */
-.download-hint {
-  font-size: 11px;
-  color: #94a3b8;
 }
 
 /* ── 保存按钮 ── */
@@ -211,20 +193,7 @@ body {
   color: #dc2626;
 }
 
-/* ── 自定义模型 ── */
-.custom-model-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.custom-model-input {
-  min-width: 0;
-  padding: 6px 8px;
-  font-size: 12px;
-}
-
+/* ── Key 与地址操作按钮 ── */
 .mini-btn {
   padding: 0 9px;
   border: 1px solid #cbd5e1;
@@ -243,50 +212,15 @@ body {
   border-color: #94a3b8;
 }
 
-.mini-btn.danger {
-  color: #b91c1c;
-  border-color: #fecaca;
-  background: #fef2f2;
-}
-
-.mini-btn.danger:hover:not(:disabled) {
-  background: #fee2e2;
-  border-color: #fca5a5;
-}
-
 .mini-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.model-msg {
-  display: none;
-  margin-top: 6px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  font-size: 11px;
-  line-height: 1.4;
-  word-break: break-all;
+.fetch-btn {
+  width: 100%; padding: 8px; border: 1px solid #bfdbfe; border-radius: 6px;
+  background: #eff6ff; color: #1d4ed8; font: inherit; cursor: pointer;
 }
+.fetch-btn:disabled { opacity: .5; cursor: wait; }
 
-.model-msg.error {
-  display: block;
-  color: #b91c1c;
-  background: #fef2f2;
-  border-color: #fecaca;
-}
-
-.model-msg.success {
-  display: block;
-  color: #15803d;
-  background: #f0fdf4;
-  border-color: #bbf7d0;
-}
-
-.model-msg.info {
-  display: block;
-  color: #1d4ed8;
-  background: #eff6ff;
-  border-color: #bfdbfe;
-}
+.catalog-error { margin: 0 0 12px; padding: 8px 10px; border-left: 2px solid #dc2626; border-radius: 4px; background: #fef2f2; color: #b91c1c; font-size: 12px; line-height: 1.6; }

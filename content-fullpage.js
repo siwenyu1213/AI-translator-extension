@@ -1,4 +1,4 @@
-// ========== DeepSeek 全文翻译 — Content Script ==========
+// ========== AI 全文翻译 — Content Script ==========
 // 由 background.js 通过 chrome.scripting.executeScript 按需注入
 // 职责：DOM 文本扫描 → 视口优先 + 相邻块批量流式翻译 → ID 映射落盘 → 还原
 
@@ -129,18 +129,18 @@
     'FIGCAPTION', 'DD', 'DT', 'LEGEND', 'SUMMARY', 'CAPTION'
   ]);
 
+  function visitDirectTextNodes(node, visit) {
+    for (const child of node.childNodes) {
+      if (child.nodeType === 3) visit(child);
+      else if (child.nodeType === 1 && !BLOCK_TAGS.has(child.tagName) && !SKIP_TAGS.has(child.tagName)) {
+        visitDirectTextNodes(child, visit);
+      }
+    }
+  }
+
   function getDirectText(el) {
     let text = '';
-    (function walk(node) {
-      for (const child of node.childNodes) {
-        if (child.nodeType === 3) {
-          text += child.textContent;
-        } else if (child.nodeType === 1) {
-          if (BLOCK_TAGS.has(child.tagName) || SKIP_TAGS.has(child.tagName)) continue;
-          walk(child);
-        }
-      }
-    })(el);
+    visitDirectTextNodes(el, node => { text += node.textContent; });
     return text.trim();
   }
 
@@ -165,16 +165,7 @@
   // 跳过块级后代与脚本/控件等不可翻译元素内部，保持嵌套结构不被破坏。
   function collectTextNodes(el) {
     const textNodes = [];
-    (function walk(node) {
-      for (const child of node.childNodes) {
-        if (child.nodeType === 3) {
-          textNodes.push(child);
-        } else if (child.nodeType === 1) {
-          if (BLOCK_TAGS.has(child.tagName) || SKIP_TAGS.has(child.tagName)) continue;
-          walk(child);
-        }
-      }
-    })(el);
+    visitDirectTextNodes(el, node => textNodes.push(node));
     return textNodes;
   }
 

@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DeepSeek 智能解释 & 翻译</title>
+<title>AI 智能解释 & 翻译</title>
 <link rel="stylesheet" href="popup.css">
 </head>
 <body>
 <div class="container">
-  <h1 class="title">DeepSeek 智能解释 &amp; 翻译 <span class="version">v3.6.2</span></h1>
+  <h1 class="title">AI 智能解释 &amp; 翻译 <span class="version">v4.4.0</span></h1>
+  <p id="catalog-status" class="catalog-error" role="alert" hidden></p>
 
   <!-- ═══ 标签切换 ═══ -->
   <div class="tab-bar">
@@ -19,18 +20,12 @@
   <!-- ═══ 解释标签设置 ═══ -->
   <div class="tab-panel active" id="panel-explain">
     <div class="section">
-      <label class="label" for="explain-model">模型列表</label>
-      <select id="explain-model" class="select"></select>
+      <label class="label" for="explain-manufacturer">模型厂家</label>
+      <select id="explain-manufacturer" class="select" aria-controls="explain-model"></select>
+      <label class="label label-spaced" for="explain-model">该厂家模型</label>
+      <select id="explain-model" class="select" aria-describedby="explain-model-detail"></select>
+      <p id="explain-model-detail" class="hint"></p>
 
-      <label class="label label-spaced" for="explain-custom-model">模型调用名</label>
-      <div class="custom-model-row">
-        <input type="text" id="explain-custom-model" class="input custom-model-input" placeholder="输入模型调用名，如 deepseek-flash" autocomplete="off">
-        <button type="button" id="explain-custom-new" class="mini-btn">新增</button>
-        <button type="button" id="explain-custom-add" class="mini-btn">保存使用</button>
-        <button type="button" id="explain-custom-delete" class="mini-btn danger" disabled>删除</button>
-      </div>
-      <div id="explain-model-msg" class="model-msg" role="status"></div>
-      <p class="hint">选择列表模型会同步到输入框；修改后点“保存使用”即更新当前模型。点“新增”可输入新调用名添加到列表。保存前会调用 API 检测模型是否可调用；以 qwen 开头走千问，其余走 DeepSeek。</p>
     </div>
 
     <div class="section">
@@ -38,14 +33,15 @@
         <input type="checkbox" id="explain-thinking">
         <span class="toggle-text">深度思考模式</span>
       </label>
-      <p class="hint">DeepSeek Flash / V4-Pro 均支持。开启后更深入但耗时更长。</p>
+      <p class="hint">仅在接口和模型支持 reasoning_effort 时开启；关闭时不发送思考参数。</p>
     </div>
 
     <div class="section" id="explain-effort-section" style="display:none">
       <label class="label" for="explain-effort">思考强度</label>
       <select id="explain-effort" class="select">
         <option value="high">高（推荐）</option>
-        <option value="max">最高</option>
+        <option value="medium">中</option>
+        <option value="low">低</option>
       </select>
     </div>
 
@@ -62,18 +58,12 @@
   <!-- ═══ 翻译标签设置 ═══ -->
   <div class="tab-panel" id="panel-translate">
     <div class="section">
-      <label class="label" for="translate-model">模型列表</label>
-      <select id="translate-model" class="select"></select>
+      <label class="label" for="translate-manufacturer">模型厂家</label>
+      <select id="translate-manufacturer" class="select" aria-controls="translate-model"></select>
+      <label class="label label-spaced" for="translate-model">该厂家模型</label>
+      <select id="translate-model" class="select" aria-describedby="translate-model-detail"></select>
+      <p id="translate-model-detail" class="hint"></p>
 
-      <label class="label label-spaced" for="translate-custom-model">模型调用名</label>
-      <div class="custom-model-row">
-        <input type="text" id="translate-custom-model" class="input custom-model-input" placeholder="输入模型调用名，如 deepseek-flash" autocomplete="off">
-        <button type="button" id="translate-custom-new" class="mini-btn">新增</button>
-        <button type="button" id="translate-custom-add" class="mini-btn">保存使用</button>
-        <button type="button" id="translate-custom-delete" class="mini-btn danger" disabled>删除</button>
-      </div>
-      <div id="translate-model-msg" class="model-msg" role="status"></div>
-      <p class="hint">选择列表模型会同步到输入框；修改后点“保存使用”即更新当前模型。点“新增”可输入新调用名添加到列表。保存前会调用 API 检测模型是否可调用；以 qwen 开头走千问，其余走 DeepSeek。</p>
     </div>
 
     <div class="section">
@@ -81,14 +71,15 @@
         <input type="checkbox" id="translate-thinking">
         <span class="toggle-text">深度思考模式</span>
       </label>
-      <p class="hint">DeepSeek Flash / V4-Pro 均支持。开启后更精准但耗时与 token 消耗大幅增加，全文翻译建议保持关闭。</p>
+      <p class="hint">仅适用于支持 reasoning_effort 的模型，全文翻译建议关闭。关闭表示使用模型默认行为。</p>
     </div>
 
     <div class="section" id="translate-effort-section" style="display:none">
       <label class="label" for="translate-effort">思考强度</label>
       <select id="translate-effort" class="select">
         <option value="high">高（推荐）</option>
-        <option value="max">最高</option>
+        <option value="medium">中</option>
+        <option value="low">低</option>
       </select>
     </div>
 
@@ -109,51 +100,38 @@
     </div>
   </div>
 
-  <!-- ═══ 通用设置 ═══ -->
-  <div class="divider">通用设置</div>
-
-  <div class="section">
-    <label class="label" for="api-key">DeepSeek API Key</label>
-    <input type="password" id="api-key" class="input" placeholder="sk-...">
-    <a class="link" href="https://platform.deepseek.com/api_keys" target="_blank">前往 DeepSeek 开放平台获取 Key →</a>
+  <div class="section key-section">
+    <div id="key-editor">
+      <label class="label" for="api-key">API Key</label>
+      <input type="password" id="api-key" class="input" autocomplete="off" spellcheck="false">
+      <p class="hint">填写所选厂家的 Key，保存后自动收起。</p>
+      <div class="key-actions">
+        <button type="button" id="save-key" class="mini-btn">保存 API Key</button>
+        <button type="button" id="cancel-key" class="mini-btn" hidden>取消</button>
+      </div>
+      <p id="key-msg" class="inline-error" role="alert"></p>
+    </div>
+    <button type="button" id="rewrite-key" class="fetch-btn" hidden>重新填写 API Key</button>
   </div>
-
-  <div class="section">
-    <label class="label" for="qwen-api-key">千问 API Key</label>
-    <input type="password" id="qwen-api-key" class="input" placeholder="sk-...">
-    <a class="link" href="https://platform.qianwenai.com/home/api-keys" target="_blank">前往千问 AI 平台获取 Key →</a>
-  </div>
-
-  <div class="section">
-    <label class="toggle-label">
-      <input type="checkbox" id="enabled" checked>
-      <span class="toggle-text">启用扩展</span>
-    </label>
-  </div>
-
-  <div class="section">
-    <label class="toggle-label">
-      <input type="checkbox" id="use-context" checked>
-      <span class="toggle-text">结合网页上下文</span>
-    </label>
-  </div>
-
-  <div class="section">
-    <label class="label" for="trigger-mode">触发方式</label>
-    <select id="trigger-mode" class="select">
-      <option value="auto">选中自动搜索（推荐）</option>
-      <option value="contextMenu">右键菜单搜索</option>
-    </select>
-  </div>
-
-  <div class="section">
-    <p class="download-hint">📥 下载位置：浏览器默认下载目录</p>
-  </div>
+  <button type="button" id="custom-connection-button" class="connection-link" hidden>配置自定义接口</button>
+  <dialog id="custom-connection-dialog">
+    <h2>自定义接口</h2>
+    <label class="label" for="api-base-url">接口地址</label>
+    <input type="url" id="api-base-url" class="input" placeholder="https://example.com/v1" autocomplete="off">
+    <p class="hint">填写服务商提供的兼容地址。</p>
+    <p id="custom-msg" class="inline-error" role="alert"></p>
+    <div class="key-actions">
+      <button type="button" id="custom-save" class="mini-btn">保存地址</button>
+      <button type="button" id="custom-cancel" class="mini-btn">取消</button>
+    </div>
+  </dialog>
 
   <button id="save-btn" class="save-btn">💾 保存设置</button>
   <div id="status" class="status"></div>
 </div>
 
+<script src="model-catalog.js"></script>
+<script src="config.js"></script>
 <script src="popup.js"></script>
 </body>
 </html>

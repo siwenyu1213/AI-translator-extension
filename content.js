@@ -1,4 +1,4 @@
-// ========== DeepSeek 智能解释 & 翻译 — Content Script ==========
+// ========== AI 智能解释 & 翻译 — Content Script ==========
 // 职责：划词检测 → 流式弹窗（解释/翻译共用）、动态菜单联动、全文翻译入口
 
 let tooltip = null;
@@ -61,7 +61,7 @@ function getTooltip() {
     tooltip.id = 'deepseek-explain-tooltip';
     tooltip.innerHTML = `
       <div class="ds-header">
-        <span class="ds-brand">DeepSeek 解释</span>
+        <span class="ds-brand">AI 解释</span>
         <button class="ds-close" title="关闭">×</button>
       </div>
       <div class="ds-reasoning" style="display:none">
@@ -86,7 +86,7 @@ function getTooltip() {
       </div>
       <div class="ds-footer">
         <span class="ds-model-tag"></span>
-        <span class="ds-powered">Powered by DeepSeek</span>
+        <span class="ds-powered">Powered by AI</span>
       </div>
     `;
     tooltip.querySelector('.ds-close').addEventListener('click', hideTooltip);
@@ -299,6 +299,7 @@ async function triggerWithStream({ text, mode, popupTitle }) {
   currentStreamPort = port;
 
   port.onMessage.addListener((msg) => {
+    if (currentStreamPort !== port) return;
     if (msg.type === 'reasoning-token') {
       hasReasoning = true;
       reasoningEl.style.display = 'block';
@@ -549,6 +550,7 @@ async function handleExplainThis(e) {
   };
 
   port.onMessage.addListener((msg) => {
+    if (currentStreamPort !== port) return;
     if (msg.type === 'reasoning-token') {
       hasReasoning = true;
       reasoningEl.style.display = 'block';
@@ -652,7 +654,7 @@ document.addEventListener('mouseup', (e) => {
     if (text === currentText && tooltip?.classList.contains('ds-visible') && !tooltip.querySelector('.ds-error')) return;
 
     const mode = classifyText(text);
-    triggerWithStream({ text, mode, popupTitle: `DeepSeek ${modeLabel(mode)}` });
+    triggerWithStream({ text, mode, popupTitle: `AI ${modeLabel(mode)}` });
   }, 150);
 });
 
@@ -660,7 +662,7 @@ document.addEventListener('mouseup', (e) => {
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'TRIGGER_EXPLAIN' && message.text) {
     const mode = classifyText(message.text);
-    triggerWithStream({ text: message.text, mode, popupTitle: `DeepSeek ${modeLabel(mode)}` });
+    triggerWithStream({ text: message.text, mode, popupTitle: `AI ${modeLabel(mode)}` });
   }
   if (message.type === 'TRIGGER_FULLPAGE_TRANSLATE') {
     safeSendMessage({ type: 'INJECT_FULLPAGE_TRANSLATE' });

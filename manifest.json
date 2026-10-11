@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "DeepSeek 智能解释 & 翻译",
-  "version": "3.6.3",
-  "description": "选中文本真流式解释/翻译，全文翻译支持 50 并发、相邻块批量与视口懒加载。模型列表可在线检测、修改、删除。",
+  "name": "AI 智能解释 & 翻译",
+  "version": "4.4.0",
+  "description": "划词智能解释与全文流式翻译。支持 10 家厂家地址自动匹配、独立 API Key、接口开放模型自动更新及自定义兼容接口，Key 保存后收起。",
   "permissions": ["storage", "downloads", "contextMenus", "scripting"],
   "host_permissions": ["<all_urls>"],
   "background": {
@@ -16,7 +16,7 @@
     }
   ],
   "action": {
-    "default_title": "DeepSeek 智能解释 & 翻译",
+    "default_title": "AI 智能解释 & 翻译",
     "default_popup": "popup.html"
   }
 }
