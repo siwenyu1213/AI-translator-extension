@@ -21,6 +21,7 @@ const oldPopupCss=compareRef ? execFileSync('git',['show',`${compareRef}:popup.c
 const profileCleanup={path:relative(root,profile),removed:false};
 const checks = [], requests = [], providerRequests = [], errors = [];
 let browserVersion, context, liveCatalog, liveDeepSeekProbe;
+let batchFixtureMode='normal',batchFixtureDelay=0;
 const server = createServer(async (req, res) => {
   if (req.url === '/sample') {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -29,7 +30,10 @@ const server = createServer(async (req, res) => {
   }
   let payload = ''; for await (const chunk of req) payload += chunk;
   const authenticated = req.headers.authorization === 'Bearer local-qa-only';
-  requests.push({ path: req.url, method: req.method, authenticated,
+  const body=payload ? JSON.parse(payload) : null;
+  const batchItems=[...(body?.messages?.[1]?.content || '').split('\n输出要求：')[0].matchAll(/<<<DS_ITEM_([A-Za-z0-9_]+)>>>([\s\S]*?)<<<DS_END_\1>>>/g)]
+    .map(match=>({id:match[1],text:match[2].trim()}));
+  requests.push({ path: req.url, method: req.method, authenticated,batchIds:batchItems.map(item=>item.id),
     model: payload ? JSON.parse(payload).model : undefined,
     parameters: payload ? Object.keys(JSON.parse(payload)) : [] });
   if (!authenticated) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":{"message":"invalid test key"}}'); return; }
@@ -39,8 +43,12 @@ const server = createServer(async (req, res) => {
     return;
   }
   if (req.url.endsWith('/chat/completions')) {
+    const mode=batchFixtureMode,delay=batchFixtureDelay;
+    if(batchItems.length && delay) await new Promise(resolve=>setTimeout(resolve,delay));
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8' });
-    for (const token of ['这是', '本机模拟接口的', '流式翻译结果。']) {
+    const output=batchItems.length && mode!=='invalid' ? [...batchItems].reverse().map(item=>
+      `<<<DS_ITEM_${item.id}>>>这是本机模拟接口的流式翻译结果。${item.text}<<<DS_END_${item.id}>>>`).join('\n') : null;
+    for (const token of output ? [output.slice(0,20),output.slice(20)] : ['这是', '本机模拟接口的', '流式翻译结果。']) {
       res.write(`data:${JSON.stringify({ choices: [{ delta: { content: token } }] })}\r\n\r\n`);
       await new Promise(resolve => setTimeout(resolve, 80));
     }
@@ -358,6 +366,10 @@ try {
   });
   const page=await context.newPage();page.on('pageerror',err=>errors.push(err.message));await page.goto(base+'/sample');
   const tabId=await worker.evaluate(async url=>(await chrome.tabs.query({})).find(tab=>tab.url===url).id,base+'/sample');
+  const waitFullPageDone=()=>page.waitForFunction(()=>{
+    const counts=document.querySelector('#ds-tb-progress')?.textContent.split('/').map(Number);
+    return counts?.[1]>0 && counts[0]===counts[1];
+  });
   await check('实际划词 → Worker → 本机 HTTP SSE → 结果卡片完整输出',async()=>{
     await page.evaluate(()=>{
       const p=document.querySelector('#word'),range=document.createRange();range.selectNodeContents(p);
@@ -373,11 +385,31 @@ try {
     assert.equal((await stream({type:'STREAM_REQUEST',mode:'B',text:'Long English translation request for QA'})).at(-1).type,'done');
     assert.ok(requests.some(r=>r.model==='gateway/model-large'&&r.authenticated));
   });
+  await check('划词点击内部保持、选区折叠不误关、点击外部/Esc 可关闭（实际 Edge）',async()=>{
+    const open=()=>page.evaluate(()=>{
+      const word=document.querySelector('#word'),range=document.createRange();
+      word.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));range.selectNodeContents(word);
+      const selection=getSelection();selection.removeAllRanges();selection.addRange(range);
+      word.dispatchEvent(new MouseEvent('mouseup',{bubbles:true,button:0}));
+    });
+    await open();await page.locator('#deepseek-explain-tooltip.ds-visible .ds-body').filter({hasText:'流式翻译结果。'}).waitFor();
+    await page.locator('.ds-quote').click();
+    await page.evaluate(()=>getSelection().removeAllRanges());await page.waitForTimeout(300);
+    assert.equal(await page.locator('#deepseek-explain-tooltip').evaluate(el=>el.classList.contains('ds-visible')),true);
+    await page.locator('#paragraph').click();
+    await page.locator('#deepseek-explain-tooltip.ds-hidden').waitFor({state:'attached'});
+    await open();await page.locator('#deepseek-explain-tooltip.ds-visible').waitFor({state:'attached'});
+    await page.keyboard.press('Escape');await page.locator('#deepseek-explain-tooltip.ds-hidden').waitFor({state:'attached'});
+  });
   await check('实际按需注入全文脚本，翻译与原文切换/取消恢复',async()=>{
     const inlineOriginal=await page.locator('#inline-fixture').innerHTML();
+    const before=requests.length;
+    await page.evaluate(()=>{window.qaLink=document.querySelector('#inline-fixture a');window.qaText=document.querySelector('#paragraph').firstChild;});
     await worker.evaluate(async id=>chrome.tabs.sendMessage(id,{type:'TRIGGER_FULLPAGE_TRANSLATE'}),tabId);
     await page.locator('#paragraph').filter({hasText:'流式翻译结果。'}).waitFor();
     await page.locator('#inline-fixture').filter({hasText:'流式翻译结果。'}).waitFor();
+    assert.ok(requests.slice(before).some(request=>request.batchIds.length>1));
+    assert.match(await page.locator('#paragraph').innerText(),/This is a longer English paragraph/);
     assert.equal(await page.locator('#inline-fixture img').count(),1);
     assert.equal(await page.locator('#inline-fixture a').getAttribute('href'),'#fixture');
     assert.equal(await page.locator('#inline-fixture script').textContent(),'{"fixture":"preserve"}');
@@ -388,6 +420,45 @@ try {
     await page.locator('#ds-tb-cancel').click();
     await page.locator('#paragraph').filter({hasText:'This is a longer English paragraph'}).waitFor();
     assert.equal(await page.locator('#inline-fixture').innerHTML(),inlineOriginal);
+    assert.equal(await page.evaluate(()=>qaLink===document.querySelector('#inline-fixture a') && qaText===document.querySelector('#paragraph').firstChild),true);
+  });
+  await check('批量格式错误实际回退逐块翻译，进度完成且取消恢复（本机模拟 API）',async()=>{
+    await worker.evaluate(()=>CACHE.clear());
+    batchFixtureMode='invalid';const before=requests.length;
+    try {
+      await worker.evaluate(async id=>chrome.tabs.sendMessage(id,{type:'TRIGGER_FULLPAGE_TRANSLATE'}),tabId);
+      await page.locator('#paragraph').filter({hasText:'流式翻译结果。'}).waitFor();
+      await waitFullPageDone();
+      const run=requests.slice(before);
+      assert.ok(run.some(r=>r.batchIds.length>1));assert.ok(run.some(r=>r.path.endsWith('/chat/completions')&&r.batchIds.length===0));
+      await page.locator('#ds-tb-cancel').click();
+      await page.locator('#paragraph').filter({hasText:'This is a longer English paragraph'}).waitFor();
+    } finally {batchFixtureMode='normal';}
+  });
+  await check('请求途中显示原文保持原文，切回译文正常；取消重启隔离旧会话（实际 Edge）',async()=>{
+    await worker.evaluate(()=>CACHE.clear());
+    batchFixtureDelay=350;
+    await worker.evaluate(async id=>chrome.tabs.sendMessage(id,{type:'TRIGGER_FULLPAGE_TRANSLATE'}),tabId);
+    await page.locator('#ds-tb-show-original').click();
+    await waitFullPageDone();
+    assert.equal(await page.locator('#paragraph').innerText(),'This is a longer English paragraph used to verify full page translation and preserve original text.');
+    await page.locator('#ds-tb-show-original').click();await page.locator('#paragraph').filter({hasText:'流式翻译结果。'}).waitFor();
+    await page.locator('#ds-tb-cancel').click();
+    await worker.evaluate(()=>CACHE.clear());
+    batchFixtureDelay=600;const before=requests.length;
+    await worker.evaluate(async id=>chrome.tabs.sendMessage(id,{type:'TRIGGER_FULLPAGE_TRANSLATE'}),tabId);
+    await page.waitForFunction(()=>document.querySelector('.ds-translating-indicator'));
+    await page.locator('#ds-tb-cancel').click();
+    batchFixtureDelay=0;
+    await worker.evaluate(async id=>chrome.tabs.sendMessage(id,{type:'TRIGGER_FULLPAGE_TRANSLATE'}),tabId);
+    await waitFullPageDone();
+    await page.waitForTimeout(750);
+    const progress=await worker.evaluate(async id=>(await chrome.scripting.executeScript({target:{tabId:id},
+      func:()=>window.__dsFullPageTranslator.progress}))[0].result,tabId);
+    assert.equal(progress.total,progress.completed);assert.ok(requests.length>before);
+    await page.locator('#ds-tb-cancel').click();
+    assert.equal(await page.locator('#paragraph').innerText(),'This is a longer English paragraph used to verify full page translation and preserve original text.');
+    assert.equal(await page.locator('.ds-translating-indicator').count(),0);
   });
   await check('无效 Key 的接口错误可见，重填后列表恢复；无相关页面异常',async()=>{
     await saveKey('invalid-test-only');

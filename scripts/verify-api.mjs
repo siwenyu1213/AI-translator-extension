@@ -293,6 +293,66 @@ await check('禁用、缺 Key 与无选定模型不发网络请求', async () =>
     await config(values); const messages = await stream(sse); assert.equal(messages.at(-1).type, 'error'); assert.equal(calls.length, 0);
   }
 });
+async function batchStream(data, items = [{id:'b0',text:'First paragraph'}, {id:'b1',text:'Second paragraph'}]) {
+  responder = () => new Response(data, {headers:{'Content-Type':'text/event-stream'}});
+  const messages=[];
+  context.testPort={onDisconnect:event(),postMessage:message=>messages.push(message),disconnect(){}};
+  context.testBatch={items,context:{title:'Batch QA'},batchId:'batch-qa'};
+  await run('handleTranslateBatchRequest(testPort,testBatch)');
+  return messages;
+}
+const batchOutput='<<<DS_ITEM_b1>>>第二段译文<<<DS_END_b1>>>\n<<<DS_ITEM_b0>>>第一段译文<<<DS_END_b0>>>';
+const batchSse=`data: ${JSON.stringify({choices:[{delta:{content:batchOutput}}]})}\n\ndata: [DONE]\n`;
+await check('批量翻译使用所选 Gemini 连接与最小参数，乱序标记按 ID 返回（模拟）',async()=>{
+  await config();await chrome.storage.local.set({translateManufacturer:'google',translateModel:'gemini-qa',modelList:['gpt-4.1-mini','gemini-qa'],
+    providerConnections:{google:{apiKey:'google-test-only'}}});
+  const messages=await batchStream(batchSse);
+  assert.equal(calls[0].url,run('AIConfig.PROVIDER_ENDPOINTS.google')+'/chat/completions');
+  assert.equal(calls[0].options.headers.Authorization,'Bearer google-test-only');
+  const body=JSON.parse(calls[0].options.body);
+  assert.deepEqual(Object.keys(body).sort(),['messages','model','stream']);assert.equal(body.model,'gemini-qa');
+  assert.match(body.messages[1].content,/网页标题：Batch QA/);
+  assert.deepEqual(JSON.parse(JSON.stringify(messages.at(-1).items)),[{id:'b0',text:'第一段译文'},{id:'b1',text:'第二段译文'}]);
+  assert.equal(messages.some(message=>message.type==='token'),false);
+});
+await check('批量缓存复用同一连接，目标语言改变后失效（模拟）',async()=>{
+  await config();await batchStream(batchSse);assert.equal(calls.length,1);
+  await batchStream(batchSse);assert.equal(calls.length,1);
+  await chrome.storage.local.set({targetLanguage:'ja'});await batchStream(batchSse);assert.equal(calls.length,2);
+});
+await check('批量缺项/重复/未知 ID 或截断只报错，不缓存无效译文（模拟）',async()=>{
+  for(const output of ['<<<DS_ITEM_b0>>>只有第一段<<<DS_END_b0>>>',batchOutput+batchOutput,
+    batchOutput+'<<<DS_ITEM_other>>>其他<<<DS_END_other>>>']){
+    await config();const data=`data: ${JSON.stringify({choices:[{delta:{content:output}}]})}\n\ndata: [DONE]\n`;
+    const messages=await batchStream(data);assert.equal(messages.at(-1).type,'error');assert.equal(run('CACHE.size'),0);
+  }
+  await config();assert.equal((await batchStream('data: {"error":{"message":"batch failed"}}\n')).at(-1).type,'error');
+});
+await check('批量重复或不安全输入 ID、未配置厂家不发网络请求（模拟）',async()=>{
+  for(const items of [[{id:'bad-id',text:'Text'}],[{id:'b0',text:'Text'},{id:'b0',text:'Other'}],[]]){
+    await config();assert.equal((await batchStream(batchSse,items)).at(-1).type,'error');assert.equal(calls.length,0);
+  }
+  await config();await chrome.storage.local.set({translateManufacturer:'xai'});
+  assert.equal((await batchStream(batchSse)).at(-1).type,'error');assert.equal(calls.length,0);
+});
+await check('长内容与思考输出分成最多 2048 字符消息，完整文本不丢失（模拟）',async()=>{
+  await config();const long='流'.repeat(7000),reasoning='思'.repeat(5000);
+  const messages=await stream(`data: ${JSON.stringify({choices:[{delta:{content:long,reasoning_content:reasoning}}]})}\n\ndata: [DONE]\n`);
+  assert.equal(messages.filter(m=>m.type==='token').map(m=>m.token).join(''),long);
+  assert.equal(messages.filter(m=>m.type==='reasoning-token').map(m=>m.token).join(''),reasoning);
+  assert.ok(messages.filter(m=>m.token).every(m=>m.token.length<=2048));assert.equal(messages.at(-1).type,'done');
+});
+await check('生成短暂 503 退避后恢复；退避期间取消立即停止，不继续请求（模拟）',async()=>{
+  await config();let attempts=0;
+  responder=()=>++attempts===1 ? new Response('{}',{status:503}) : new Response(sse);
+  context.testPort={onDisconnect:event(),postMessage(){},disconnect(){}};
+  await run("handleStreamRequest(testPort,{mode:'C',text:'生成重试'})");assert.equal(attempts,2);
+  attempts=0;responder=()=>{attempts++;return new Response('{}',{status:503});};
+  context.retryController=new AbortController();
+  const pending=run("fetchWithRetry('https://qa.example',{signal:retryController.signal})");
+  const rejected=assert.rejects(pending);await new Promise(resolve=>setTimeout(resolve,20));
+  context.retryController.abort();await rejected;assert.equal(attempts,1);
+});
 const report = { date: new Date().toISOString(), tool: process.version, kind: 'offline simulation of actual worker code',
   passed: checks.filter(x => x.status === 'passed').length, failed: checks.filter(x => x.status === 'failed').length, checks,
   unverified: ['真实供应商 API、账号权限、真实模型质量、浏览器交互'] };

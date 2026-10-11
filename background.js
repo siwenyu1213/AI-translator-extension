@@ -3,6 +3,7 @@
 
 const CACHE = new Map();
 const CACHE_MAX = 100;
+const MAX_STREAM_CHARS = 2048;
 let cacheRevision = 0;
 
 importScripts('model-catalog.js');
@@ -131,6 +132,9 @@ chrome.runtime.onConnect.addListener((port) => {
         batchId: msg.batchId
       });
     }
+    if (msg.type === 'STREAM_TRANSLATE_BATCH') {
+      handleTranslateBatchRequest(port, msg);
+    }
   });
 });
 
@@ -138,7 +142,7 @@ chrome.runtime.onConnect.addListener((port) => {
 // 统一流式处理器
 // ═══════════════════════════════════════════
 
-async function handleStreamRequest(port, { promptType, text, context, batchId, mode }) {
+async function handleStreamRequest(port, { promptType, text, context, batchId, mode, batchItems }) {
   const config = await getConfig();
   if (config.enabled === false) {
     port.postMessage({ type: 'error', error: '扩展已禁用', batchId });
@@ -187,6 +191,11 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
     prompt = buildTranslatePrompt(text, config.targetLanguage || 'zh', context);
   }
 
+  if (batchItems) {
+    prompt = buildBatchTranslatePrompt(batchItems, config.targetLanguage || 'zh', context);
+    systemPrompt = '你是一个专业的翻译引擎。只输出规定格式的译文，不要任何解释、说明。';
+  }
+
   if (!model) {
     port.postMessage({ type: 'error', error: '请先选择模型并保存设置', batchId });
     port.disconnect();
@@ -219,21 +228,33 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
   // 缓存检查（键包含思考开关，避免开关切换后命中旧缓存）
   const cacheKey = JSON.stringify([cacheRevision, baseUrl, model, systemPrompt, prompt,
     thinkingEnabled, reasoningEffort]);
+  const doneMessage = output => {
+    if (!batchItems) return { type: 'done', model, batchId };
+    const items = parseBatchTranslation(output, batchItems.map(item => item.id));
+    if (!items) throw new Error('批量译文解析失败，将回退为逐块翻译');
+    return { type: 'done', model, batchId, items };
+  };
+  const postChunk = (type, token) => {
+    if (batchItems) return;
+    for (let i = 0; i < token.length; i += MAX_STREAM_CHARS) {
+      port.postMessage({ type, token: token.slice(i, i + MAX_STREAM_CHARS), batchId });
+    }
+  };
   if (CACHE.has(cacheKey)) {
     // 模拟流式：分 chunk 发送缓存结果
     const cached = CACHE.get(cacheKey);
-    const chunks = splitIntoChunks(cached, 3);
+    const chunks = batchItems ? [] : splitIntoChunks(cached, Math.ceil(cached.length / MAX_STREAM_CHARS));
     for (const chunk of chunks) {
       // 端口可能已被页面断开（用户关闭弹窗），发送失败即中止
       try {
         port.postMessage({ type: 'token', token: chunk, batchId });
-        await sleep(30);
+        await sleep(16);
       } catch {
         port.disconnect();
         return;
       }
     }
-    port.postMessage({ type: 'done', model: model, batchId });
+    port.postMessage(doneMessage(cached));
     port.disconnect();
     return;
   }
@@ -261,7 +282,7 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
     if (thinkingEnabled) body.reasoning_effort = reasoningEffort;
     const endpoint = `${baseUrl}/chat/completions`;
 
-    const res = await fetch(endpoint, {
+    const res = await fetchWithRetry(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -291,10 +312,12 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
       catch { throw new Error('接口返回了无效的流式 JSON'); }
       if (parsed.error) throw new Error(parsed.error.message || '接口流式响应报错');
       const choice = parsed?.choices?.[0];
+      const reasoning = choice?.delta?.reasoning_content;
+      if (typeof reasoning === 'string' && reasoning) postChunk('reasoning-token', reasoning);
       const token = choice?.delta?.content;
       if (typeof token === 'string' && token) {
         fullText += token;
-        port.postMessage({ type: 'token', token, batchId });
+        postChunk('token', token);
       }
       if (choice?.finish_reason === 'length') throw new Error('模型输出达到长度上限，请缩短待翻译文本');
       if (choice?.finish_reason === 'content_filter') throw new Error('接口过滤了模型输出');
@@ -317,11 +340,12 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
     } finally { await reader.cancel().catch(() => {}); }
     if (!fullText) throw new Error('模型没有返回文本，请确认该模型支持流式 Chat Completions');
     if (!finished && !sawFinish) throw new Error('响应流意外中断，请重试');
+    const result = doneMessage(fullText);
     if (fullText.length > 10) {
       CACHE.set(cacheKey, fullText);
       if (CACHE.size > CACHE_MAX) CACHE.delete(CACHE.keys().next().value);
     }
-    port.postMessage({ type: 'done', model, batchId });
+    port.postMessage(result);
   } catch (err) {
     if (timedOut || err.name !== 'AbortError') {
       port.postMessage({ type: 'error', error: timedOut ? '接口响应超时，请检查网络或接口地址' : err.message, batchId });
@@ -475,6 +499,69 @@ async function getConfig() {
 // ═══════════════════════════════════════════
 // API 错误解析
 // ═══════════════════════════════════════════
+
+// 批量协议复用通用生成路径，厂家路由、Key、超时、SSE 校验与缓存保持一致。
+function buildBatchTranslatePrompt(items, targetLanguage, context) {
+  const langNames = { zh: '中文', en: 'English', ja: '日本語', ko: '한국어', fr: 'Français', de: 'Deutsch', es: 'Español', pt: 'Português', ru: 'Русский', ar: 'العربية' };
+  const blocks = items.map(item => `<<<DS_ITEM_${item.id}>>>\n${item.text}\n<<<DS_END_${item.id}>>>`).join('\n\n');
+  return `你是一个专业的翻译引擎，请将下面每个标记块中的文本翻译为${langNames[targetLanguage] || targetLanguage}。
+${context?.title ? `网页标题：${context.title}\n\n` : ''}${blocks}
+
+输出要求：
+- 只输出翻译后的标记块，保持 <<<DS_ITEM_xxx>>> 和 <<<DS_END_xxx>>> 标记原样
+- 标记中的 xxx 是 id，必须与输入完全一致
+- 不要合并、遗漏、新增任何标记块
+- 不要输出解释、说明、Markdown 代码块
+- 保留原文段落结构和换行`;
+}
+
+function parseBatchTranslation(raw, expectedIds) {
+  const map = new Map();
+  const re = /<<<DS_ITEM_([A-Za-z0-9_]+)>>>([\s\S]*?)<<<DS_END_\1>>>/g;
+  for (const match of String(raw || '').matchAll(re)) {
+    if (map.has(match[1]) || !expectedIds.includes(match[1])) return null;
+    map.set(match[1], match[2].trim());
+  }
+  if (expectedIds.some(id => !map.get(id))) return null;
+  return expectedIds.map(id => ({ id, text: map.get(id) }));
+}
+
+async function handleTranslateBatchRequest(port, { items, context, batchId }) {
+  if (!Array.isArray(items) || !items.length || items.length > 8 ||
+      items.some(item => !item || typeof item.id !== 'string' || !/^[A-Za-z0-9_]+$/.test(item.id) ||
+        typeof item.text !== 'string' || !item.text.trim()) ||
+      new Set(items.map(item => item.id)).size !== items.length) {
+    port.postMessage({ type: 'error', error: '批量翻译内容或标记无效', batchId });
+    port.disconnect();
+    return;
+  }
+  await handleStreamRequest(port, { promptType: 'translate', text: '', context, batchId, batchItems: items });
+}
+
+// 保留 main 的生成退避重试，取消/超时信号在等待期间也立即生效。
+async function fetchWithRetry(url, options, maxRetries = 3) {
+  for (let attempt = 0; ; attempt++) {
+    options.signal?.throwIfAborted();
+    let response;
+    try {
+      response = await fetch(url, options);
+      if ((response.status !== 429 && response.status < 500) || attempt >= maxRetries) return response;
+    } catch (error) {
+      if (options.signal?.aborted || error.name === 'AbortError' || attempt >= maxRetries) throw error;
+    }
+    const retryAfter = Number(response?.headers.get('Retry-After') || 0);
+    await response?.body?.cancel().catch(() => {});
+    const delay = retryAfter > 0 ? Math.min(8000, retryAfter * 1000) : Math.min(8000, 500 * 2 ** attempt);
+    await new Promise((resolve, reject) => {
+      const signal = options.signal;
+      const finish = () => { signal?.removeEventListener('abort', abort); resolve(); };
+      const timer = setTimeout(finish, delay);
+      const abort = () => { clearTimeout(timer); signal.removeEventListener('abort', abort); reject(signal.reason); };
+      signal?.addEventListener('abort', abort, { once: true });
+      if (signal?.aborted) abort();
+    });
+  }
+}
 
 async function parseApiError(res) {
   try {
