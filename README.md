@@ -67,6 +67,8 @@
 
 以上是当前代码的地址预设；千问采用百炼北京接口，MiniMax 采用国际接口。其他地域、第三方网关、聚合或本机服务使用“自定义接口”。官方地址自动匹配，不在主窗口显示；自定义地址通过“配置自定义接口”弹窗填写。
 
+自定义接口必须明确保存自己的地址。缺少、空白或非字符串地址时，设置页提示“请先配置自定义接口地址”，模型查询和解释/翻译均在请求前停止；保存 Key 不会补入 OpenAI 地址。旧 v4 配置仅有 Key、没有地址时也保留未配置状态。已保存的明确地址继续保留；如果旧版本曾自动写入 OpenAI 地址，请在“配置自定义接口”中核对是否属于你的服务。复现与回归见 [自定义接口地址验收](docs/CUSTOM_ENDPOINT_QA.md)。
+
 模型选项来自所选连接的 `/models`，按厂家及文本用途过滤，排除明确非文本、过期和常见嵌入/图像/音频型号。过滤基于接口元数据与名称规则，不等于逐款生成能力验证。列表不加入其他厂家的型号、历史预设或公开目录猜测的调用名；自定义接口使用它返回的文本型号。完整 ID 由扩展保存并用于调用，无需手填。
 
 每次打开窗口会自动刷新公开目录及当前已配置厂家的模型列表；切换到已配置厂家、保存 Key 或设置时，也会查询对应接口。公开目录只辅助厂家信息与展示名称，不增加模型选项，也不接收用户 Key。
@@ -127,6 +129,7 @@ git clone https://github.com/siwenyu1213/AI-translator-extension.git
 - [docs/MARKDOWN_RENDERING_QA.md](docs/MARKDOWN_RENDERING_QA.md)：v4.6 Markdown浮层、回答格式、实际Edge渲染与失败恢复验收。
 - [docs/MARKDOWN_ADVERSARIAL_REVIEW.md](docs/MARKDOWN_ADVERSARIAL_REVIEW.md)：两个子agent对抗审查、待修复交互、功能建议和已验证的冗余代码清理。
 - [docs/MARKDOWN_FIX_QA.md](docs/MARKDOWN_FIX_QA.md)：审查问题修复、25项定向回归、13项旧版对照及相关完整回归。
+- [docs/CUSTOM_ENDPOINT_QA.md](docs/CUSTOM_ENDPOINT_QA.md)：自定义接口缺少地址时的错误路由修复、实际Edge负向对照和回归证据。
 
 最低静态检查：
 

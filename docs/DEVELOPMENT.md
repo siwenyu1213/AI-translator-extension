@@ -14,6 +14,8 @@ v4.6 Markdown浮层的两子agent对抗性审查与安全清理见 [MARKDOWN_ADV
 
 这些问题随后已修复，见 [MARKDOWN_FIX_QA.md](MARKDOWN_FIX_QA.md)：25项实际Edge定向回归、13项旧提交负向对照、完整相关回归和剩余限制。`scripts/verify-markdown-fixes.mjs` 默认断言修复行为；加 `--ref eeb5ed6 --expect-vulnerable` 加载临时基线副本复现旧缺陷，不改当前Git工作区。生成证据在artifacts/qa/markdown-fix-2026-10-11/。
 
+自定义接口缺少地址时曾回退到 OpenAI，修复及负向对照见 [CUSTOM_ENDPOINT_QA.md](CUSTOM_ENDPOINT_QA.md)。`scripts/verify-custom-endpoint.mjs` 执行64项Node VM和12项隔离Edge检查；`--node-only` 只运行离线部分，`--ref 4c1cc3b --expect-vulnerable` 用临时基线副本复现旧行为（64项VM和8项Edge），不切换或改写当前工作区。非本机请求全部拦截，仅本机HTTP接口接收合成Key；真实供应商生成未验收。生成报告和截图在 `artifacts/qa/custom-endpoint-2026-10-11/`，运行方法见对应验收文档。
+
 随后在 `codex/verify-adversarial-findings` 的实际扩展复现见 [ADVERSARIAL_VALIDATION.md](ADVERSARIAL_VALIDATION.md)，修复和最新回归见 [ADVERSARIAL_FIX_QA.md](ADVERSARIAL_FIX_QA.md)。三个 adversarial 工具当前默认断言修复行为，退出0表示所列回归通过；历史缺陷复现脚本保存在提交 `bfb3f65`，旧证据不覆盖。browser/config 使用已有 Playwright、隔离 Edge profile 和本机合成接口；background 提供离线时序对照，也支持在旧源码上使用 `--expect-vulnerable`。profiles 每轮独立且保留，浏览器与服务器结束时关闭。
 
 在 PowerShell 中进入项目：
@@ -133,6 +135,8 @@ v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重�
 ## 厂家连接配置（v4.3）
 
 `AIConfig.PROVIDER_ENDPOINTS` 固定 10 家官方兼容地址；厂家字段 `explainManufacturer` / `translateManufacturer` 显式决定路由，不根据模型名覆盖用户选择。`providerConnections` 按厂家记录 Key 与 `/models` ID，自定义额外记录可编辑 Base URL。`providerConfigVersion: 1` 表示新结构，读取时只做一次迁移：原地址匹配该厂家预设才交给该厂家，其他原连接保留为 custom，不借用全局 Key。旧顶层 `apiBaseUrl/apiKey/availableModels` 保留兼容存储，新后台请求读取 `connectionFor(config, kind)`。
+
+`AIConfig.endpointFor(provider, entry)` 是后台归一化/生成与设置页查询共用的地址选择入口：官方厂家返回固定预设，自定义只接受自身非空字符串地址，不回退到默认地址。`connectionFor` 在自定义地址缺失时抛出配置错误，所有生成路径在fetch前停止；设置页禁用该连接的型号选择并停止后台/直接查询。迁移已有v4配置时不为缺地址的Key猜厂家；新安装默认OpenAI和旧v3清除未知专用Key的行为保留。无法从历史存储中的明确OpenAI地址判断它是用户填写还是旧代码回填，因此保留该值并提示用户核对。
 
 设置页地址与 Key 随当前标签和厂家显示；切换前保留连接草稿，保存设置时写入各厂家的连接。官方地址只读，所有自定义/网关地址须选择 custom；厂家地址即使被改写到 storage，也由固定预设还原。保存新自定义地址在同一次 storage.set 中清除该连接列表和使用 custom 的已保存型号，地址保存使用持久化 Key，不顺带保存 Key 草稿。查询/检测完成时检查厂家、标签、地址和 Key 是否仍一致，期间切换则不写入返回结果。后台解释和 A/C/D 分类读取解释连接，B 分类及全文 STREAM_BATCH 读取翻译连接，缺少该厂家 Key 时不发请求。
 
