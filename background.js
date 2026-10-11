@@ -142,8 +142,34 @@ chrome.runtime.onConnect.addListener((port) => {
 // 统一流式处理器
 // ═══════════════════════════════════════════
 
-async function handleStreamRequest(port, { promptType, text, context, batchId, mode, batchItems }) {
+async function handleStreamRequest(rawPort, request) {
+  const controller = new AbortController();
+  let closed = false;
+  // Listen before configuration/storage awaits, including migration and cache reads.
+  rawPort.onDisconnect.addListener(() => { closed = true; controller.abort(); });
+  const port = {
+    postMessage(message) {
+      if (closed) return false;
+      try { rawPort.postMessage(message); return true; }
+      catch { closed = true; controller.abort(); return false; }
+    },
+    disconnect() {
+      if (closed) return;
+      closed = true;
+      controller.abort();
+      try { rawPort.disconnect(); } catch {}
+    }
+  };
+  try {
+    await performStreamRequest(port, request, controller);
+  } catch (error) {
+    if (!controller.signal.aborted) port.postMessage({ type: 'error', error: error.message || '请求失败', batchId: request.batchId });
+  } finally { port.disconnect(); }
+}
+
+async function performStreamRequest(port, { promptType, text, context, batchId, mode, batchItems }, controller) {
   const config = await getConfig();
+  controller.signal.throwIfAborted();
   if (config.enabled === false) {
     port.postMessage({ type: 'error', error: '扩展已禁用', batchId });
     port.disconnect();
@@ -245,9 +271,10 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
     const cached = CACHE.get(cacheKey);
     const chunks = batchItems ? [] : splitIntoChunks(cached, Math.ceil(cached.length / MAX_STREAM_CHARS));
     for (const chunk of chunks) {
+      controller.signal.throwIfAborted();
       // 端口可能已被页面断开（用户关闭弹窗），发送失败即中止
       try {
-        port.postMessage({ type: 'token', token: chunk, batchId });
+        if (!port.postMessage({ type: 'token', token: chunk, batchId })) return;
         await sleep(16);
       } catch {
         port.disconnect();
@@ -259,8 +286,6 @@ async function handleStreamRequest(port, { promptType, text, context, batchId, m
     return;
   }
 
-  const controller = new AbortController();
-  port.onDisconnect.addListener(() => controller.abort());
   let timedOut = false;
   let timeout;
   const resetTimeout = () => {
@@ -488,11 +513,29 @@ ${text}
 
 // 会话级配置缓存：避免全文翻译高并发时每个请求都读 storage
 let configCache = null;
+let configLoad = null;
+let configRevision = 0;
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local') { configCache = null; cacheRevision++; CACHE.clear(); }
+  if (area === 'local') { configCache = null; configLoad = null; configRevision++; cacheRevision++; CACHE.clear(); }
 });
 async function getConfig() {
-  if (!configCache) configCache = await AIConfig.load();
+  while (!configCache) {
+    const revision = configRevision;
+    if (!configLoad) configLoad = AIConfig.load({ isCurrent: () => revision === configRevision });
+    const pending = configLoad;
+    let config;
+    try { config = await pending; }
+    catch (error) {
+      if (revision !== configRevision) continue;
+      if (configLoad === pending) configLoad = null;
+      throw error;
+    }
+    // An old storage read must never repopulate a cache invalidated while awaiting it.
+    if (revision !== configRevision) continue;
+    if (!config) { if (configLoad === pending) configLoad = null; continue; }
+    configCache = config;
+    if (configLoad === pending) configLoad = null;
+  }
   return configCache;
 }
 
@@ -531,8 +574,8 @@ async function handleTranslateBatchRequest(port, { items, context, batchId }) {
       items.some(item => !item || typeof item.id !== 'string' || !/^[A-Za-z0-9_]+$/.test(item.id) ||
         typeof item.text !== 'string' || !item.text.trim()) ||
       new Set(items.map(item => item.id)).size !== items.length) {
-    port.postMessage({ type: 'error', error: '批量翻译内容或标记无效', batchId });
-    port.disconnect();
+    try { port.postMessage({ type: 'error', error: '批量翻译内容或标记无效', batchId }); } catch {}
+    try { port.disconnect(); } catch {}
     return;
   }
   await handleStreamRequest(port, { promptType: 'translate', text: '', context, batchId, batchItems: items });

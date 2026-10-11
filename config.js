@@ -114,16 +114,24 @@
       apiKey: entry.apiKey || '', availableModels: normalizeModels(entry.availableModels), modelsCheckedAt: entry.modelsCheckedAt || '' };
   }
 
-  async function load() {
+  async function load({ isCurrent = () => true } = {}) {
     const raw = await chrome.storage.local.get(null);
+    // 后台读配置期间发生外部保存时，不让旧快照的迁移覆盖新值。
+    if (!isCurrent()) return null;
     const config = migrate(raw);
     // storage 返回的键顺序可能不同；逐字段比较，只写真正需要迁移/归一化的值。
     const updates = Object.fromEntries(Object.entries(config)
       .filter(([key,value])=>JSON.stringify(raw[key]) !== JSON.stringify(value)));
-    if (Object.keys(updates).length) await chrome.storage.local.set(updates);
+    if (Object.keys(updates).length) {
+      if (!isCurrent()) return null;
+      await chrome.storage.local.set(updates);
+    }
     const oldKeys = ['qwenApiKey', 'customModels', 'model', 'thinkingEnabled', 'reasoningEffort'];
-    if (oldKeys.some(key => Object.hasOwn(raw, key))) await chrome.storage.local.remove(oldKeys);
-    return config;
+    if (oldKeys.some(key => Object.hasOwn(raw, key))) {
+      if (!isCurrent()) return null;
+      await chrome.storage.local.remove(oldKeys);
+    }
+    return isCurrent() ? config : null;
   }
 
   globalThis.AIConfig = { DEFAULT_MODEL, DEFAULT_MODELS, DEFAULT_BASE_URL,

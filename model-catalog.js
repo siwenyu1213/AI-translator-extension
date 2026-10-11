@@ -344,7 +344,7 @@
     const rules = [ ['openai', /^(gpt-|o[134](?:-|$))/], ['deepseek', /deepseek/],
       ['anthropic', /claude/], ['google', /gemini|gemma/], ['qwen', /qwen/],
       ['moonshot', /kimi|moonshot/], ['zai', /\bglm/], ['minimax', /minimax/],
-      ['xai', /grok/], ['mistral', /mistral|ministral|codestral|devstral|magistral/] ];
+      ['xai', /grok/], ['mistral', /mistral|ministral|mixtral|codestral|devstral|magistral|voxtral/] ];
     return rules.find(([, regex]) => regex.test(lower))?.[0] || 'custom';
   }
   function normalizeSnapshot(value) {
@@ -381,12 +381,17 @@
       const output = item.output_modalities || item.architecture?.output_modalities;
       if ((Array.isArray(input) && !input.includes('text')) ||
           (Array.isArray(output) && (output.length !== 1 || output[0] !== 'text'))) return false;
+      // Voxtral 还包含语音型号；仅在接口明确确认文本输入/输出时开放。
+      if (/voxtral/i.test(id) && (!Array.isArray(input) || !input.includes('text') ||
+          !Array.isArray(output) || !output.includes('text'))) return false;
       if (item.expiration_date && Date.parse(item.expiration_date) <= Date.now()) return false;
       if (/(?:embed|rerank|whisper|tts|dall-e|image|moderation|sora|realtime|transcri|audio)/i.test(id)) return false;
       const family = id.replace(/^ft:/, '').replace(/^models\//, '');
       if (provider !== 'custom' && providerFor(family) !== provider) return false;
       seen.add(id); return true;
-    }).map(item => ({ id: item.id, name: typeof item.name === 'string' && item.name.length <= 200 ? item.name : item.id }));
+    }).map(item => ({ id: item.id, name: typeof item.name === 'string' && item.name.length <= 200 ? item.name : item.id,
+      // 重复过滤/缓存归一化仍需保留 Voxtral 的已确认文本能力。
+      ...(/voxtral/i.test(item.id) ? {input_modalities:['text'],output_modalities:['text']} : {}) }));
   }
   // 后台与设置页共用账号模型查询；只返回固定错误信息，不回显服务端正文或凭据。
   async function fetchInterface(connection) {

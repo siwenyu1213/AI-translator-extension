@@ -238,34 +238,6 @@
   background: #7f1d1d;
 }
 
-/* ═══════════════════════════════════════════
-   🆕 段首翻译指示器（低调、商务风格）
-   ═══════════════════════════════════════════ */
-
-.ds-translating-indicator {
-  display: inline;
-  font-size: 12px;
-  color: #94a3b8;
-  margin-right: 6px;
-  white-space: nowrap;
-}
-
-.ds-translating-indicator .ds-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border: 1.5px solid #94a3b8;
-  border-top-color: #2563eb;
-  border-radius: 50%;
-  animation: ds-dot-spin 0.8s linear infinite;
-  margin-right: 4px;
-  vertical-align: middle;
-}
-
-@keyframes ds-dot-spin {
-  to { transform: rotate(360deg); }
-}
-
 /* ── 思考过程（真流式） ── */
 .ds-reasoning {
   margin: 8px 16px 0;

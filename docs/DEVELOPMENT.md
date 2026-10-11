@@ -6,6 +6,12 @@
 
 当前使用说明见 [README.md](../README.md)，2026-10-11 项目状态、分支分叉、功能与验收边界见 [交接.md](../交接.md)。交接文档为接手快照，实时 Git 状态仍需在任务开始核实。
 
+2026-10-11 修复源分支 `codex/verify-adversarial-findings` 的主分支合并入口为 [PR #10](https://github.com/siwenyu1213/AI-translator-extension/pull/10)。仓库已迁移至siwenyu1213名下，原origin地址仍可重定向；不修改用户远程配置。PR #9已合并，main中的准确提交与PR状态用fetch和gh查询核实。
+
+2026-10-11 两个子 agent 的版本残留与逻辑对抗式审查见 [ADVERSARIAL_REVIEW.md](ADVERSARIAL_REVIEW.md)，包含未修复发现、源码定位、可复现证据和验证边界。其模拟/页面样本结果不替代完整扩展或真实 API 验收。
+
+随后在 `codex/verify-adversarial-findings` 的实际扩展复现见 [ADVERSARIAL_VALIDATION.md](ADVERSARIAL_VALIDATION.md)，修复和最新回归见 [ADVERSARIAL_FIX_QA.md](ADVERSARIAL_FIX_QA.md)。三个 adversarial 工具当前默认断言修复行为，退出0表示所列回归通过；历史缺陷复现脚本保存在提交 `bfb3f65`，旧证据不覆盖。browser/config 使用已有 Playwright、隔离 Edge profile 和本机合成接口；background 提供离线时序对照，也支持在旧源码上使用 `--expect-vulnerable`。profiles 每轮独立且保留，浏览器与服务器结束时关闭。
+
 在 PowerShell 中进入项目：
 
 ```powershell
@@ -124,7 +130,7 @@ v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重�
 
 `AIConfig.PROVIDER_ENDPOINTS` 固定 10 家官方兼容地址；厂家字段 `explainManufacturer` / `translateManufacturer` 显式决定路由，不根据模型名覆盖用户选择。`providerConnections` 按厂家记录 Key 与 `/models` ID，自定义额外记录可编辑 Base URL。`providerConfigVersion: 1` 表示新结构，读取时只做一次迁移：原地址匹配该厂家预设才交给该厂家，其他原连接保留为 custom，不借用全局 Key。旧顶层 `apiBaseUrl/apiKey/availableModels` 保留兼容存储，新后台请求读取 `connectionFor(config, kind)`。
 
-设置页地址与 Key 随当前标签和厂家显示；切换前保留连接草稿，保存设置时写入各厂家的连接。官方地址只读，所有自定义/网关地址须选择 custom；厂家地址即使被改写到 storage，也由固定预设还原。改变地址或 Key 仅使该连接的接口列表失效。查询/检测完成时检查厂家、标签、地址和 Key 是否仍一致，期间切换则不写入返回结果。后台解释和 A/C/D 分类读取解释连接，B 分类及全文 STREAM_BATCH 读取翻译连接，缺少该厂家 Key 时不发请求。
+设置页地址与 Key 随当前标签和厂家显示；切换前保留连接草稿，保存设置时写入各厂家的连接。官方地址只读，所有自定义/网关地址须选择 custom；厂家地址即使被改写到 storage，也由固定预设还原。保存新自定义地址在同一次 storage.set 中清除该连接列表和使用 custom 的已保存型号，地址保存使用持久化 Key，不顺带保存 Key 草稿。查询/检测完成时检查厂家、标签、地址和 Key 是否仍一致，期间切换则不写入返回结果。后台解释和 A/C/D 分类读取解释连接，B 分类及全文 STREAM_BATCH 读取翻译连接，缺少该厂家 Key 时不发请求。
 
 验证新增 10 家地址联动、独立 Key 恢复、旧网关迁移、厂家路由、未配置拦截与异步切换处理。浏览器内官方域名请求由 Worker fetch 模拟拦截，仅核对路由/消息/SSE，不向供应商发送合成 Key。真实公开目录仍联网；本机模拟接口继续验证完整划词与全文路径。端点来源、地域和真实凭据缺口见 [PROVIDER_ENDPOINTS_QA.md](PROVIDER_ENDPOINTS_QA.md)。
 
@@ -132,7 +138,7 @@ v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重�
 
 窗口移除调用名编辑/新增/删除、通用控件和常驻 API 地址；通用配置仍取读取时的保存值，首次默认启用扩展、使用上下文与自动触发。Key 保存后输入区隐藏，只留重填按钮，取消重填从已保存连接恢复，空输入不会清除旧 Key。官方地址自动匹配，自定义地址只在单独 dialog 中编辑。
 
-`usePageContext` 隐藏后仍沿用旧值，不强制开启。划词 `getPageContext` 通常取选区前后各最多 300 字符，并为部分提示词提供页面标题；无块级容器时可能取页面前 800 字符，不包含网页地址。全文脚本不采用划词前后文：逐块 `buildTranslatePrompt` 没有 before/after 时不加入上下文，批量 `buildBatchTranslatePrompt` 使用标题，但不读取 url。这些行为以源码为准，真实账号保存偏好需在其浏览器中确认。
+`usePageContext` 隐藏后仍沿用旧值，不强制开启。划词 `getPageContext` 以真实 Range 起止边界取前后各最多 300 字符，无块级容器时使用 body 内真实选区；部分提示词使用标题，不包含网页地址。全文脚本不采用划词前后文：单条 `buildTranslatePrompt` 没有 before/after 时不加入上下文，批量 `buildBatchTranslatePrompt` 使用标题，但不读取 url。旧停用值继续保留，但设置页提供仅停用时可见的启用按钮。
 
 `LIST_MODELS` 保留原 IDs，并增加过滤后的 `entries`（ID/名称）；有效空列表也是成功结果。`AIModelCatalog.interfaceModels` 排除重复、非法 ID、明确非文本模态/过期和常见嵌入/图像/音频等用途，按型号归属筛当前厂家；自定义接受该接口的文本型号。字段不完整时采用名称规则，不能据此证明 Chat Completions 的全部能力。
 
@@ -152,7 +158,7 @@ v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重�
 
 ## 保持行为的维护与清理
 
-`AIConfig.load` 按字段比较归一化前后的值，仅写变化字段，避免顶层键顺序变化导致全量重写；旧配置字段仍按原规则移除。`popup.js` 的两种模型查询共用 `queryWithFallback`，保留无回复/通信故障才恢复、明确接口错误不绕过的规则。全文翻译用 `visitDirectTextNodes` 保持读取/落盘范围一致，取消和重新开始共用 `restoreOriginalBlocks`，不改变标签过滤与恢复顺序。
+`AIConfig.load` 按字段比较归一化前后的值，仅写变化字段，避免顶层键顺序变化导致全量重写；旧配置字段仍按原规则移除。后台传入可选 `isCurrent`，失效读在迁移写入前返回 null 后重读；共享 pending 避免重复读。该机制不是跨上下文原子事务。`popup.js` 的两种模型查询共用 `queryWithFallback`，保留无回复/通信故障才恢复、明确接口错误不绕过的规则。2026-10-11 全文代码已重写为 Text 节点任务，旧块级遍历/首次节点覆盖/段首指示器不再使用。
 
 内置目录采用每款模型一行的格式，保留完整对象、顺序及所有元数据；修改这类静态数据格式时先与旧版本深度比较，不能用格式压缩删减型号。未引用函数和已移除控件样式可清除，当前 DOM 状态需做实际浏览器对比。
 
@@ -162,6 +168,6 @@ v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重�
 
 2026-10-11 整合 `origin/main` 的 PR #8 修复，保留 v4.4 设置和最小通用 API 参数。`STREAM_TRANSLATE_BATCH` 通过共享 `handleStreamRequest` 使用翻译标签的厂家连接，按块 ID 解析；缺项、重复/未知 ID 或流错误触发前端逐块回退，无效结果不缓存。生成网络/429/5xx 最多退避重试三次，等待期间取消立即生效；账号模型列表仍使用原有最多重试一次、20 秒规则。
 
-全文采用最多 50 个并发批量请求，每批最多 8 个相邻块、合计最多 3500 字符；单个长块单独处理。原文保存文本节点引用和值，原文/译文切换与取消不重建 innerHTML；会话 ID 隔离取消/重新开始后的旧端口及队列结算。浏览器工具验证真正批量成功、乱序 ID、格式错误回退、节点引用保留、请求途中显示原文及取消重启；这些结果使用本机模拟 API。
+上述 main 整合记录是历史基线。当前全文批量/回退共享最多 50 个实际端口请求配额，每批最多 8 个 Text 片段/3500 字符；长片段单独处理。任务 Map 以节点身份及 expected 值丢弃失效响应；restore 仅还原仍由扩展拥有的写入。MutationObserver 覆盖新增行内节点、characterData、保护属性、style/class/hidden/open；祖先过滤覆盖可编辑、代码、SVG/MathML 和 translate=no。详细回归、质量边界见 [ADVERSARIAL_FIX_QA.md](ADVERSARIAL_FIX_QA.md)。
 
 划词采用帧播放队列，单条消息最多 2048 字符，兼容返回的 reasoning_content。点击卡片内部、鼠标移出或选区折叠不误关，点击外部/Esc 可关闭；当前端口检查防止旧流更新新卡片。验证与整合取舍见 [MERGE_CONFLICT_QA.md](MERGE_CONFLICT_QA.md)。
