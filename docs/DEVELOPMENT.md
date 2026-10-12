@@ -200,6 +200,14 @@ node scripts/verify-selection.mjs --playwright '<已安装的 playwright 包目�
 
 当前浮层以原文snapshot Range及文档坐标回退定位，尺寸/窗口变化节流重新约束；整体高度受视口限制，关闭状态inert。Markdown重绘恢复代码/表格/链接焦点，首次整答从顶部显示。DOWNLOAD使用异步消息确认，只显示“已开始下载”而不声称文件已完成；失败可重试并隔离晚回包。全文scan提前跳过扩展UI子树。后台每次local保存继续失效配置读，仅生成字段或连接语义变化清结果缓存，展示元数据刷新保留缓存。
 
+2026-10-12 浮层新增标题区 Pointer Events 拖动、捕获/取消清理、点击方向按钮和方向键/Home 定位。自动定位依次检查选区下/上/右/左，四周无法容纳自然高度时缩小到上下较大空间。手动位置用视口坐标保存，流式增长和页面滚动保留位置，窗口缩小时边界约束；新选区清除手动位置。原文 Range 继续用于自动定位，点击移动按钮造成网页选区折叠不会改锚点。空间铺满时无法保证无重叠。验证工具与证据边界见 [TOOLTIP_POSITION_QA.md](TOOLTIP_POSITION_QA.md)：
+
+```powershell
+node scripts/verify-tooltip-position.mjs --playwright '<已安装的playwright包目录>'
+```
+
+工具使用隔离的实际 Edge 扩展、合成网页/Key/本机 SSE 和真实鼠标/键盘事件；外部网络被拦截，不读取日常浏览器配置。生成报告与截图在 `artifacts/qa/tooltip-position-2026-10-12/`，独立 profile 在 `.local/browser-profile/tooltip-position/run-<时间戳>/`。结束关闭浏览器和本机服务器，保留 profile 复查。
+
 background.js的buildSelectionPrompt及旧浮层兼容入口共用MARKDOWN_OUTPUT_GUIDANCE，优先结构化Markdown，不要求简短、编号列表或固定要点数。A/B浮层翻译给出原意及文中含义，不提供例句；buildTranslatePrompt和buildBatchTranslatePrompt保留全文纯译文/ID协议。系统提示词仍要求材料作为数据、证据不足保留歧义。语言和模型路由继续沿用已有设置。
 
 ```powershell

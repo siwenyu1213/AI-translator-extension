@@ -11,6 +11,9 @@ let currentRenderers = [];
 let scrollRaf = null;
 let tooltipAnchor = null;
 let tooltipFocusReturn = null;
+let tooltipManualPosition = null;
+let tooltipDrag = null;
+let tooltipDragEndedAt = 0;
 let downloadRequest = null;
 
 // ── 触发模式 ──
@@ -49,8 +52,18 @@ function getTooltip() {
     tooltip.setAttribute('aria-hidden', 'true');
     tooltip.innerHTML = `
       <div class="ds-header">
-        <span class="ds-brand">AI 解释</span>
+        <button class="ds-drag-handle" type="button" title="拖动移动；点击展开移动按钮；方向键微调" aria-label="移动结果浮层，方向键微调，点击展开移动按钮" aria-expanded="false">
+          <svg aria-hidden="true" width="12" height="16" viewBox="0 0 12 16" fill="currentColor"><circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/><circle cx="3" cy="8" r="1.2"/><circle cx="9" cy="8" r="1.2"/><circle cx="3" cy="13" r="1.2"/><circle cx="9" cy="13" r="1.2"/></svg>
+          <span class="ds-brand">AI 解释</span><span class="ds-drag-hint">拖动</span>
+        </button>
         <button class="ds-close" title="关闭" aria-label="关闭结果">×</button>
+      </div>
+      <div class="ds-move-controls" hidden>
+        <button type="button" data-ds-move="left" aria-label="向左移动">←</button>
+        <button type="button" data-ds-move="up" aria-label="向上移动">↑</button>
+        <button type="button" data-ds-move="down" aria-label="向下移动">↓</button>
+        <button type="button" data-ds-move="right" aria-label="向右移动">→</button>
+        <button type="button" data-ds-move="reset">自动定位</button>
       </div>
       <div class="ds-reasoning" style="display:none">
         <div class="ds-reasoning-title">思考中…</div>
@@ -80,6 +93,30 @@ function getTooltip() {
     tooltip.querySelector('.ds-close').addEventListener('click', hideTooltip);
     tooltip.querySelector('.ds-btn-copy').addEventListener('click', handleCopy);
     tooltip.querySelector('.ds-btn-download').addEventListener('click', handleDownload);
+    const header = tooltip.querySelector('.ds-header');
+    header.addEventListener('pointerdown', startTooltipDrag);
+    header.addEventListener('pointermove', moveTooltipDrag);
+    header.addEventListener('pointerup', endTooltipDrag);
+    header.addEventListener('pointercancel', endTooltipDrag);
+    header.addEventListener('lostpointercapture', endTooltipDrag);
+    const handle = tooltip.querySelector('.ds-drag-handle');
+    handle.addEventListener('click', (e) => {
+      if (Date.now() - tooltipDragEndedAt < 300) { e.preventDefault(); return; }
+      const controls = tooltip.querySelector('.ds-move-controls');
+      controls.hidden = !controls.hidden;
+      handle.setAttribute('aria-expanded', String(!controls.hidden));
+      scheduleTooltipPosition();
+    });
+    handle.addEventListener('keydown', (e) => {
+      const direction = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', Home: 'reset' }[e.key];
+      if (!direction) return;
+      e.preventDefault();
+      nudgeTooltip(direction, e.shiftKey ? 40 : 10);
+    });
+    tooltip.querySelector('.ds-move-controls').addEventListener('click', (e) => {
+      const direction = e.target.closest('[data-ds-move]')?.dataset.dsMove;
+      if (direction) nudgeTooltip(direction, 40);
+    });
     document.body.appendChild(tooltip);
     new ResizeObserver(scheduleTooltipPosition).observe(tooltip);
   }
@@ -112,27 +149,89 @@ function positionTooltip(docCoords) {
   el.style.display = 'flex';
   el.style.setProperty('--ds-viewport-height', `${window.innerHeight}px`);
 
-  const rect = el.getBoundingClientRect();
   const gap = 10;
-
-  let left = docCoords.left;
-  let top = docCoords.bottom + gap;
-
-  if (left + rect.width > window.scrollX + window.innerWidth - 10) {
-    left = docCoords.right - rect.width;
+  const width = window.innerWidth, height = window.innerHeight;
+  el.style.removeProperty('--ds-placement-height');
+  let rect = el.getBoundingClientRect();
+  const clampX = x => Math.max(gap, Math.min(x, width - gap - rect.width));
+  const clampY = y => Math.max(gap, Math.min(y, height - gap - rect.height));
+  let left, top;
+  if (tooltipManualPosition) {
+    left = clampX(tooltipManualPosition.left);
+    top = clampY(tooltipManualPosition.top);
+    tooltipManualPosition = { left, top };
+  } else {
+    const source = { left: docCoords.left - scrollX, right: docCoords.right - scrollX,
+      top: docCoords.top - scrollY, bottom: docCoords.bottom - scrollY };
+    const alignedX = clampX(source.left);
+    const alignedY = clampY(source.top);
+    const candidates = [
+      { left: alignedX, top: source.bottom + gap },
+      { left: alignedX, top: source.top - gap - rect.height },
+      { left: source.right + gap, top: alignedY },
+      { left: source.left - gap - rect.width, top: alignedY }
+    ];
+    const fits = p => p.left >= gap && p.top >= gap &&
+      p.left + rect.width <= width - gap && p.top + rect.height <= height - gap;
+    let placement = candidates.find(fits);
+    if (!placement) {
+      // Neither vertical side fits the natural height: scroll inside the larger free side.
+      const below = Math.max(0, height - gap - Math.max(gap, source.bottom + gap));
+      const above = Math.max(0, Math.min(height - gap, source.top - gap) - gap);
+      const available = Math.max(below, above);
+      if (available > 0) {
+        el.style.setProperty('--ds-placement-height', `${available}px`);
+        rect = el.getBoundingClientRect();
+        placement = { left: clampX(source.left), top: below >= above ? Math.max(gap, source.bottom + gap) : Math.min(height - gap, source.top - gap) - rect.height };
+      } else {
+        // A selection filling the viewport leaves no disjoint area; keep the handle reachable.
+        placement = { left: alignedX, top: gap };
+      }
+    }
+    left = clampX(placement.left);
+    top = clampY(placement.top);
   }
-  left = Math.max(window.scrollX + gap,
-    Math.min(left, window.scrollX + window.innerWidth - gap - rect.width));
+  el.style.left = `${left + scrollX}px`;
+  el.style.top = `${top + scrollY}px`;
+}
 
-  const viewportBottom = docCoords.bottom - window.scrollY + gap + rect.height;
-  if (viewportBottom > window.innerHeight - 10) {
-    top = docCoords.top - rect.height - gap;
+function nudgeTooltip(direction, step) {
+  if (direction === 'reset') tooltipManualPosition = null;
+  else {
+    const rect = tooltip.getBoundingClientRect();
+    tooltipManualPosition = { left: rect.left + (direction === 'left' ? -step : direction === 'right' ? step : 0),
+      top: rect.top + (direction === 'up' ? -step : direction === 'down' ? step : 0) };
   }
-  top = Math.max(window.scrollY + gap,
-    Math.min(top, window.scrollY + window.innerHeight - gap - rect.height));
+  positionTooltip(tooltipAnchor);
+}
 
-  el.style.left = left + 'px';
-  el.style.top = top + 'px';
+function startTooltipDrag(e) {
+  if (e.button !== 0 || !e.isPrimary || e.target.closest('.ds-close')) return;
+  const rect = tooltip.getBoundingClientRect();
+  const captureTarget = e.target.closest('.ds-drag-handle') || e.currentTarget;
+  tooltipDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: rect.left, top: rect.top, moved: false, captureTarget };
+  captureTarget.setPointerCapture(e.pointerId);
+  // Preserve the original selection instead of starting a new text selection in the header.
+  e.preventDefault();
+}
+
+function moveTooltipDrag(e) {
+  if (!tooltipDrag || tooltipDrag.id !== e.pointerId) return;
+  const dx = e.clientX - tooltipDrag.x, dy = e.clientY - tooltipDrag.y;
+  if (!tooltipDrag.moved && Math.hypot(dx, dy) < 3) return;
+  tooltipDrag.moved = true;
+  tooltip.classList.add('ds-dragging');
+  tooltipManualPosition = { left: tooltipDrag.left + dx, top: tooltipDrag.top + dy };
+  positionTooltip(tooltipAnchor);
+}
+
+function endTooltipDrag() {
+  if (!tooltipDrag) return;
+  const drag = tooltipDrag;
+  tooltipDrag = null;
+  tooltip.classList.remove('ds-dragging');
+  if (drag.moved) tooltipDragEndedAt = Date.now();
+  if (drag.captureTarget.hasPointerCapture(drag.id)) drag.captureTarget.releasePointerCapture(drag.id);
 }
 
 // 原文 Range 是定位锚点；用户在结果内选字不会改变锚点。
@@ -151,6 +250,7 @@ function hideTooltip() {
   abortStream();
   if (scrollRaf) cancelAnimationFrame(scrollRaf);
   scrollRaf = null;
+  endTooltipDrag();
   if (tooltip.contains(document.activeElement)) {
     document.activeElement.blur();
     if (tooltipFocusReturn?.isConnected) tooltipFocusReturn.focus({ preventScroll: true });
@@ -161,6 +261,7 @@ function hideTooltip() {
   tooltip.classList.remove('ds-visible');
   resetDownloadAction();
   tooltipAnchor = null;
+  tooltipManualPosition = null;
   tooltipFocusReturn = null;
   currentText = null;
   currentSelection = null;
@@ -269,6 +370,10 @@ async function triggerWithStream({ text, mode, popupTitle, snapshot }) {
   const el = getTooltip();
   if (!el.contains(document.activeElement)) tooltipFocusReturn = document.activeElement;
   tooltipAnchor = coords;
+  endTooltipDrag();
+  tooltipManualPosition = null;
+  el.querySelector('.ds-move-controls').hidden = true;
+  el.querySelector('.ds-drag-handle').setAttribute('aria-expanded', 'false');
   resetDownloadAction();
   const bodyEl = el.querySelector('.ds-body');
   const reasoningEl = el.querySelector('.ds-reasoning');
@@ -604,6 +709,7 @@ function isEditingElement() {
 
 // ── mouseup 自动触发（auto 模式：分类 → 智能解释）──
 document.addEventListener('mouseup', (e) => {
+  if (tooltipDrag || Date.now() - tooltipDragEndedAt < 300) return;
   if (isInTooltip(e.target)) return;
   if (triggerMode !== 'auto') return;
   if (e.button !== 0) return; // 仅左键拖动选区触发，避免右键点击误触发
@@ -686,3 +792,4 @@ document.addEventListener('keydown', handleDocumentKeyDown, true);
 
 window.addEventListener('scroll', scheduleTooltipPosition, { passive: true });
 window.addEventListener('resize', scheduleTooltipPosition, { passive: true });
+window.addEventListener('blur', endTooltipDrag);
