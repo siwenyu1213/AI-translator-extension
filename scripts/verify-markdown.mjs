@@ -200,6 +200,65 @@ try {
     }
     return { requests: results.length, paths: results.map(result => result.mode), provider: 'localhost synthetic SSE; output quality and reasoning latency unverified' };
   });
+  await check('DeepSeek trial sends explicit thinking off through real selection, translation and batch ports', async () => {
+    const saved = await worker.evaluate(() => chrome.storage.local.get(null));
+    const count = requests.length;
+    try {
+      await worker.evaluate(async base => {
+        globalThis.qaThinkingFetch = fetch;
+        globalThis.fetch = (url, options = {}) => {
+          const address = new URL(String(url));
+          if (address.hostname === 'api.deepseek.com') {
+            if (address.pathname.endsWith('/models')) return Promise.resolve(Response.json({ data: [{ id: 'deepseek-flash' }] }));
+            return qaThinkingFetch(base + '/v1/chat/completions', options);
+          }
+          if (address.hostname === '127.0.0.1') return qaThinkingFetch(url, options);
+          return Promise.resolve(new Response('{}', { status: 503 }));
+        };
+        await chrome.storage.local.set({ explainManufacturer: 'deepseek', translateManufacturer: 'deepseek',
+          explainModel: 'deepseek-flash', translateModel: 'deepseek-flash', modelList: ['deepseek-flash'],
+          explainThinkingEnabled: true, translateThinkingEnabled: true, explainReasoningEffort: 'high', translateReasoningEffort: 'high',
+          providerConnections: { deepseek: { apiKey: 'markdown-test-only', availableModels: ['deepseek-flash'] } } });
+      }, base);
+      await sample({ chunks: ['**祖先节点**是当前节点上层的节点。'], delay: 10 });
+      await select('#chinese', '好的'); await done();
+      await sample({ chunks: ['**我爱你。**'], delay: 10 });
+      await select('#sentence', 'I love you'); await done();
+      fixture = { chunks: ['<<<DS_ITEM_off1>>>\n批量译文\n<<<DS_END_off1>>>'], delay: 1 };
+      const batch = await worker.evaluate(async id => {
+        const [result] = await chrome.scripting.executeScript({ target: { tabId: id }, func: () => new Promise((resolve, reject) => {
+          const port = chrome.runtime.connect({ name: 'stream-thinking-off-batch' });
+          const timer = setTimeout(() => { port.disconnect(); reject(Error('Batch timeout')); }, 5000);
+          port.onMessage.addListener(message => {
+            if (message.type === 'done' || message.type === 'error') { clearTimeout(timer); port.disconnect(); resolve(message); }
+          });
+          port.postMessage({ type: 'STREAM_TRANSLATE_BATCH', items: [{ id: 'off1', text: 'batch text' }] });
+        }) });
+        return result.result;
+      }, await tabId());
+      assert.equal(batch.type, 'done');
+      assert.equal(requests.length - count, 3);
+      for (const request of requests.slice(count)) {
+        assert.equal(request.model, 'deepseek-flash');
+        assert.deepEqual(request.thinking, { type: 'disabled' });
+        assert.equal(request.reasoning_effort, undefined);
+      }
+      const popup = await context.newPage();
+      try {
+        await popup.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`);
+        await popup.waitForFunction(() => document.querySelector('#explain-thinking').checked);
+        assert.ok((await popup.locator('.hint').allTextContents()).filter(text => text.includes('固定关闭思考')).length >= 2);
+      } finally { await popup.close(); }
+      const state = await worker.evaluate(() => chrome.storage.local.get(['explainThinkingEnabled', 'translateThinkingEnabled']));
+      assert.equal(state.explainThinkingEnabled, true); assert.equal(state.translateThinkingEnabled, true);
+      return { requests: 3, originalPreferencePreserved: true, boundary: 'official URL intercepted and forwarded to localhost; real DeepSeek compliance and latency unverified' };
+    } finally {
+      await worker.evaluate(async saved => {
+        globalThis.fetch = qaThinkingFetch; delete globalThis.qaThinkingFetch;
+        await chrome.storage.local.clear(); await chrome.storage.local.set(saved);
+      }, saved);
+    }
+  });
   await check('Floating translation requests original meaning with optional context and no translation examples', async () => {
     await sample({ chunks: ['**我爱你。**\n\n这句话表达对对方的爱意。'], delay: 50 });
     await select('#sentence', 'I love you'); await done();

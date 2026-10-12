@@ -257,6 +257,10 @@ async function performStreamRequest(port, { promptType, text, context, batchId, 
     return;
   }
 
+  // 试用分支：仅对 DeepSeek 官方端点强制关闭，保留已保存设置便于切回对照。
+  const deepSeekThinkingOff = new URL(baseUrl).hostname === 'api.deepseek.com';
+  if (deepSeekThinkingOff) thinkingEnabled = false;
+
   // 缓存检查（键包含思考开关，避免开关切换后命中旧缓存）
   const cacheKey = JSON.stringify([cacheRevision, baseUrl, model, systemPrompt, prompt,
     thinkingEnabled, reasoningEffort]);
@@ -310,7 +314,8 @@ async function performStreamRequest(port, { promptType, text, context, batchId, 
       stream: true
     };
     // 默认使用最小公共参数，避免不同模型对 temperature / token 上限的差异。
-    if (thinkingEnabled) body.reasoning_effort = reasoningEffort;
+    if (deepSeekThinkingOff) body.thinking = { type: 'disabled' };
+    else if (thinkingEnabled) body.reasoning_effort = reasoningEffort;
     const endpoint = `${baseUrl}/chat/completions`;
 
     const res = await fetchWithRetry(endpoint, {

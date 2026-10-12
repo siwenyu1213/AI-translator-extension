@@ -110,6 +110,8 @@ node scripts/verify-api.mjs
 
 该脚本在 Node VM 中执行实际 `config.js` / `background.js`，模拟 chrome.storage 与网络响应。结果为 `artifacts/qa/api-simulation.json`，不代表浏览器或真实 API 已验收。
 
+2026-10-12 `codex/deepseek-thinking-off` 试用分支：规范化端点的hostname精确等于`api.deepseek.com`时，后台在缓存键计算前把有效thinkingEnabled设为false，请求显式发送`thinking: { type: 'disabled' }`且省略reasoning_effort。不写入/重置已有思考设置，设置页提示该分支覆盖开关；模型名不用于判定厂家，其他域名和第三方网关保持原参数行为。包括划词、旧解释、解释此句及全文单条/批量共用路径。离线工具新增32组官方地址/开关/路由组合及4组非官方端点对照；实际Edge工具新增真实扩展端口检查和设置提示检查。试用方法、保留证据及真实API边界见 [DEEPSEEK_THINKING_OFF_QA.md](DEEPSEEK_THINKING_OFF_QA.md)。
+
 如果本机已经有 Playwright，可运行可选的实际 Edge 验收（不执行 npm install，不改变扩展运行依赖）：
 
 ```powershell
@@ -208,7 +210,7 @@ node scripts/verify-tooltip-position.mjs --playwright '<已安装的playwright�
 
 工具使用隔离的实际 Edge 扩展、合成网页/Key/本机 SSE 和真实鼠标/键盘事件；外部网络被拦截，不读取日常浏览器配置。生成报告与截图在 `artifacts/qa/tooltip-position-2026-10-12/`，独立 profile 在 `.local/browser-profile/tooltip-position/run-<时间戳>/`。结束关闭浏览器和本机服务器，保留 profile 复查。
 
-background.js的正常选区与旧浮层兼容入口共用SELECTION_SYSTEM_PROMPT、MEANING_EXPLANATION_GUIDANCE和MARKDOWN_OUTPUT_GUIDANCE。系统提示词保留材料作为数据及歧义边界，要求只做最少必要思考、明确时直接作答，不在正文输出思考/分类过程；这不限制接口的实际reasoning token或耗时。解释整体含义，按原义与文中用法差异分配篇幅，避免机械拆词和固定栏目；A/B先给原意译文，重复文中含义合并或省略，不提供翻译例句，概念解释可用必要小例子。正文仅Markdown，提示词禁止表格及非正文输出；渲染器仍兼容合成或不遵守提示词的返回内容，不代表格式已被强制过滤。buildTranslatePrompt和buildBatchTranslatePrompt保留全文纯译文/ID协议。语言、模型路由和reasoning_effort设置继续沿用已有配置。2026-10-12变更与验证边界见 [PROMPT_STYLE_QA.md](PROMPT_STYLE_QA.md)。
+background.js的正常选区与旧浮层兼容入口共用SELECTION_SYSTEM_PROMPT、MEANING_EXPLANATION_GUIDANCE和MARKDOWN_OUTPUT_GUIDANCE。系统提示词保留材料作为数据及歧义边界，要求只做最少必要思考、明确时直接作答，不在正文输出思考/分类过程；这不限制接口的实际reasoning token或耗时。解释整体含义，按原义与文中用法差异分配篇幅，避免机械拆词和固定栏目；A/B先给原意译文，重复文中含义合并或省略，不提供翻译例句，概念解释可用必要小例子。正文仅Markdown，提示词禁止表格及非正文输出；渲染器仍兼容合成或不遵守提示词的返回内容，不代表格式已被强制过滤。buildTranslatePrompt和buildBatchTranslatePrompt保留全文纯译文/ID协议。语言和模型路由继续沿用已有配置；当前DeepSeek试用分支的有效思考覆盖见前文。提示词变更与验证边界见 [PROMPT_STYLE_QA.md](PROMPT_STYLE_QA.md)。
 
 ```powershell
 node scripts/verify-markdown.mjs --playwright '<已安装的playwright包目录>'
