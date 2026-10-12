@@ -208,10 +208,10 @@ node scripts/verify-tooltip-position.mjs --playwright '<已安装的playwright�
 
 工具使用隔离的实际 Edge 扩展、合成网页/Key/本机 SSE 和真实鼠标/键盘事件；外部网络被拦截，不读取日常浏览器配置。生成报告与截图在 `artifacts/qa/tooltip-position-2026-10-12/`，独立 profile 在 `.local/browser-profile/tooltip-position/run-<时间戳>/`。结束关闭浏览器和本机服务器，保留 profile 复查。
 
-background.js的buildSelectionPrompt及旧浮层兼容入口共用MARKDOWN_OUTPUT_GUIDANCE，优先结构化Markdown，不要求简短、编号列表或固定要点数。A/B浮层翻译给出原意及文中含义，不提供例句；buildTranslatePrompt和buildBatchTranslatePrompt保留全文纯译文/ID协议。系统提示词仍要求材料作为数据、证据不足保留歧义。语言和模型路由继续沿用已有设置。
+background.js的正常选区与旧浮层兼容入口共用SELECTION_SYSTEM_PROMPT、MEANING_EXPLANATION_GUIDANCE和MARKDOWN_OUTPUT_GUIDANCE。系统提示词保留材料作为数据及歧义边界，要求只做最少必要思考、明确时直接作答，不在正文输出思考/分类过程；这不限制接口的实际reasoning token或耗时。解释整体含义，按原义与文中用法差异分配篇幅，避免机械拆词和固定栏目；A/B先给原意译文，重复文中含义合并或省略，不提供翻译例句，概念解释可用必要小例子。正文仅Markdown，提示词禁止表格及非正文输出；渲染器仍兼容合成或不遵守提示词的返回内容，不代表格式已被强制过滤。buildTranslatePrompt和buildBatchTranslatePrompt保留全文纯译文/ID协议。语言、模型路由和reasoning_effort设置继续沿用已有配置。2026-10-12变更与验证边界见 [PROMPT_STYLE_QA.md](PROMPT_STYLE_QA.md)。
 
 ```powershell
 node scripts/verify-markdown.mjs --playwright '<已安装的playwright包目录>'
 ```
 
-该工具加载实际扩展和隔离Edge profile，用本机HTTP SSE返回合成Markdown；检查流式/最终结构、复制/下载、缓存回放、提示词、再次解释、链接/HTML处理、节流、宽内容/窄屏/键盘滚动、取消与错误重试。下载TXT在context关闭前保存为artifacts/qa/markdown/markdown-download.txt；报告和截图在同目录。profile在.local/browser-profile/markdown/run-<时间戳>/，结束关闭浏览器和服务器，保留profile复查。合成回答不代表真实模型遵守了新提示词；真实生成需有效凭据单独验收。完整结果与限制见 [MARKDOWN_RENDERING_QA.md](MARKDOWN_RENDERING_QA.md)。
+该工具加载实际扩展和隔离Edge profile，用本机HTTP SSE返回合成Markdown；检查流式/最终结构、复制/下载、缓存回放、提示词、再次解释、链接/HTML处理、节流、宽内容/窄屏/键盘滚动、取消与错误重试。提示词检查实际发出10个请求，覆盖正常A/B/C/D、旧兼容A/B/C/D、旧解释与解释此句，确认指导一致、一次生成及模型路由；包含表格的合成回答用于保留渲染兼容回归，不表示模型遵守了表格禁令。下载TXT在context关闭前保存为artifacts/qa/markdown/markdown-download.txt；报告和截图在同目录。profile在.local/browser-profile/markdown/run-<时间戳>/，结束关闭浏览器和服务器，保留profile复查。合成回答不代表真实模型遵守了新提示词；真实生成需有效凭据单独验收。完整结果与限制见 [MARKDOWN_RENDERING_QA.md](MARKDOWN_RENDERING_QA.md) 与 [PROMPT_STYLE_QA.md](PROMPT_STYLE_QA.md)。
