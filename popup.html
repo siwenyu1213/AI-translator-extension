@@ -37,7 +37,7 @@
         <input type="checkbox" id="explain-thinking">
         <span class="toggle-text">深度思考模式</span>
       </label>
-      <p class="hint">仅在接口和模型支持 reasoning_effort 时开启；关闭时不发送思考参数。</p>
+      <p class="hint">当前版本对 DeepSeek 官方接口固定关闭思考，忽略此开关；其他接口仅在支持 reasoning_effort 时开启。</p>
     </div>
 
     <div class="section" id="explain-effort-section" style="display:none">
@@ -75,7 +75,7 @@
         <input type="checkbox" id="translate-thinking">
         <span class="toggle-text">深度思考模式</span>
       </label>
-      <p class="hint">仅适用于支持 reasoning_effort 的模型，全文翻译建议关闭。关闭表示使用模型默认行为。</p>
+      <p class="hint">当前版本对 DeepSeek 官方接口固定关闭思考，忽略此开关；其他接口关闭时使用模型默认行为。</p>
     </div>
 
     <div class="section" id="translate-effort-section" style="display:none">

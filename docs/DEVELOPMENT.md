@@ -110,6 +110,12 @@ node scripts/verify-api.mjs
 
 该脚本在 Node VM 中执行实际 `config.js` / `background.js`，模拟 chrome.storage 与网络响应。结果为 `artifacts/qa/api-simulation.json`，不代表浏览器或真实 API 已验收。
 
+2026-10-12 `codex/deepseek-thinking-off` 试用分支：规范化端点的hostname精确等于`api.deepseek.com`时，后台在缓存键计算前把有效thinkingEnabled设为false，请求显式发送`thinking: { type: 'disabled' }`且省略reasoning_effort。不写入/重置已有思考设置，设置页提示该分支覆盖开关；模型名不用于判定厂家，其他域名和第三方网关保持原参数行为。包括划词、旧解释、解释此句及全文单条/批量共用路径。离线工具新增32组官方地址/开关/路由组合及4组非官方端点对照；实际Edge工具新增真实扩展端口检查和设置提示检查。试用方法、保留证据及真实API边界见 [DEEPSEEK_THINKING_OFF_QA.md](DEEPSEEK_THINKING_OFF_QA.md)。
+
+2026-10-13 从该分支的 `655bb12` 新建 `codex/local-classified-prompts`，保留官方 DeepSeek 显式关闭思考，重写划词提示词及本地材料选择。此前试用分支保留；当前任务没有恢复接口默认思考、改动原有保存值或增加分类请求。新设计与验证边界见 [LOCAL_CLASSIFIED_PROMPTS_QA.md](LOCAL_CLASSIFIED_PROMPTS_QA.md)。
+
+同日按用户授权，将 `codex/local-classified-prompts` 的 `c0db5ee` 合入已更新到 `9eec6f4` 的 `main`，无冲突。整合包含浮层拖动、提示词风格、DeepSeek关闭思考和本地分类四个提交；设置提示改为当前版本行为。主分支保护与有效rulesets经GitHub API核验后，使用普通推送保留历史，不强推。合并复核和证据见上述验收文档末节。
+
 如果本机已经有 Playwright，可运行可选的实际 Edge 验收（不执行 npm install，不改变扩展运行依赖）：
 
 ```powershell
@@ -146,7 +152,7 @@ v4.0 已保存的配置通过 `modelCatalogVersion` 一次追加目录，不重�
 
 窗口移除调用名编辑/新增/删除、通用控件和常驻 API 地址；通用配置仍取读取时的保存值，首次默认启用扩展、使用上下文与自动触发。Key 保存后输入区隐藏，只留重填按钮，取消重填从已保存连接恢复，空输入不会清除旧 Key。官方地址自动匹配，自定义地址只在单独 dialog 中编辑。
 
-`usePageContext` 隐藏后仍沿用旧值，不强制开启。v4.5 划词由 `selection.js` 保存真实 Range，分别分析文字构成/结构/可信度，再按 1500/2500 字符预算补段落、邻近块及结构信息，长选区额外预算800；后台再限制额外材料最多3000字符。相同文本按位置和上下文区分；右键与解释按钮复用快照。无法确认选区时只处理文字，不搜索猜位置；不发送网页地址。全文脚本不采用划词前后文：单条 `buildTranslatePrompt` 没有 before/after 时不加入上下文，批量 `buildBatchTranslatePrompt` 使用标题，但不读取 url。旧停用值继续保留，但设置页提供仅停用时可见的启用按钮。
+`usePageContext` 隐藏后仍沿用旧值，不强制开启。划词由 `selection.js` 保存真实 Range，按 1500/2500 字符预算选取所在句及必要材料，长选区额外预算800；后台再限制补充材料最多3000字符。当前本地分类与上下文取舍见下文2026-10-13章节。相同文本按位置和上下文区分；右键与解释按钮复用快照。无法确认选区时只处理文字，不搜索猜位置；不发送网页地址。全文脚本不采用划词前后文：单条 `buildTranslatePrompt` 没有 before/after 时不加入上下文，批量 `buildBatchTranslatePrompt` 使用标题，但不读取 url。旧停用值继续保留，但设置页提供仅停用时可见的启用按钮。
 
 `LIST_MODELS` 保留原 IDs，并增加过滤后的 `entries`（ID/名称）；有效空列表也是成功结果。`AIModelCatalog.interfaceModels` 排除重复、非法 ID、明确非文本模态/过期和常见嵌入/图像/音频等用途，按型号归属筛当前厂家；自定义接受该接口的文本型号。字段不完整时采用名称规则，不能据此证明 Chat Completions 的全部能力。
 
@@ -182,15 +188,36 @@ v4.6划词正文采用下节Markdown节流渲染，思考内容保留帧播放�
 
 ## v4.5 选区分析与上下文回归
 
-`manifest.json` 在 `content.js` 前注入 `selection.js`；v4.6同时加载下节的Markdown依赖。`AISelection.analyze` 提供可独立验证的文字构成、结构类别、可信度、依赖信号和A/B/C/D路由；`capture` 提取有边界和预算的DOM材料；`same` 对比位置及快照。`background.js` 收到 `analysis` 时采用单次选区提示词，未携带该字段的旧路径及全文批量保留兼容。
+`manifest.json` 在 `content.js` 前注入 `selection.js`；v4.6同时加载下节的Markdown依赖。`AISelection.analyze` 提供可独立验证的语言、内容类别、可信度、依赖信号和A/B/C/D路由，现行实现另将选取位置与完整性分别保存；`capture` 提取有边界和预算的DOM材料；`same` 对比位置及快照。`background.js` 正常选区和旧兼容路径都使用下文的统一请求构建器；全文批量保留独立协议。
 
 无需为扩展安装依赖；使用本机已有 Playwright 验证实际 Edge 扩展：
 
 ```powershell
+node scripts/verify-selection.mjs --node-only
 node scripts/verify-selection.mjs --playwright '<已安装的 playwright 包目录>'
 ```
 
-脚本先在 Node VM 检查文本语料，再在隔离 Edge 中验证真实 Range、DOM过滤、预算、模型路由、右键消息及本机HTTP SSE。只使用合成凭据和合成页面；报告及截图在 `artifacts/qa/selection/`，独立profile在 `.local/browser-profile/selection/run-<时间戳>/`，结束关闭浏览器和服务器，保留profile复查。固定输出不证明真实模型的解释准确率、耗时或token账单。修改报告、分类样本及未验证项见 [SELECTION_CONTEXT_QA.md](SELECTION_CONTEXT_QA.md)。
+脚本先在 Node VM 检查文本语料，再在隔离 Edge 中验证真实 Range、DOM过滤、预算、模型路由、右键消息及本机HTTP SSE。`--node-only` 不加载 Playwright、不运行浏览器，只保存 `artifacts/qa/selection/node-report.json`。完整模式只使用合成凭据和合成页面；报告及截图在 `artifacts/qa/selection/`，独立profile在 `.local/browser-profile/selection/run-<时间戳>/`，结束关闭浏览器和服务器，保留profile复查。固定输出不证明真实模型的解释准确率、耗时或token账单。早期修改报告见 [SELECTION_CONTEXT_QA.md](SELECTION_CONTEXT_QA.md)，现行回归见 [LOCAL_CLASSIFIED_PROMPTS_QA.md](LOCAL_CLASSIFIED_PROMPTS_QA.md)。
+
+## 2026-10-13 本地分类与按需请求
+
+`background.js` 通过 `importScripts` 加载 `selection.js` 和 `selection-prompts.js`。前者的 `analyze` 不依赖 DOM，可供没有分析快照的旧消息本地分类；DOM 访问只发生在网页调用 `capture` 时。后者仅在后台加载，暴露 `AISelectionPrompts.SYSTEM`、`taskFor` 和 `build`，统一正常划词、旧兼容入口及“解释此句”的请求构建；不新增网页注入脚本或模型分类调用。
+
+请求分为统一 system 要求、当前类型的一段任务要求和 JSON 编码的材料。`taskFor` 根据内容类别、语言路由及明确任务，在词语、句段、翻译、短回应、片段、代码、公式、数据、表格、引用、标题等要求中选择一项。分类标签、可信度、判断理由和分类示例留在本地，不直接写入任务指令。短回应规则区分独立应答与句中作用，领域明确的术语优先采用该领域定义。材料使用 `选中文字`、`所在句子`或`所在句片段`、相关标题/语言声明及必要前后文等字段；JSON 用于区分数据与指令，模型回答仍仅允许 Markdown 正文。
+
+内容类别与位置分别保存：句中完整词语保持词语类别；真正截断的拉丁单词、明确指代或不完整关系使用片段类别。所在句由真实 Range 的两侧构成，发送时用 `【】` 标出短选区；`complete:false` 或后台裁剪的句子标为句片段。普通完整词语不为用满预算扩展到相邻块；明确的指代定义可保留前文，回应、片段和代码/表格等内容按需补充材料。实际 `lang="ja"` 辅助识别的纯汉字可发送语言元信息，不发送介绍语言规则的网页段落作为通用指令。隐藏内容、导航和扩展浮层继续过滤，章节/消息/列表边界、上下文关闭、无可靠 Range 的回退及右键/再次解释快照继续保留。
+
+捕获时的1500/2500/800字符预算包含所在句两侧、标题、结构信息和语言声明；后台补充材料上限3000字符，包含组装后的短选区所在句。所选正文是任务输入，短所在句中的选区重复用于明确位置；超长选区不重复组装所在句。这些是字符上限，不是精确token限制，也不代表本地规则能判定所有语言或复杂DOM。
+
+共同输出要求主动加粗核心定义、结论或译文，有不同层次时用简短小标题，并列信息用列表；与通常含义一致时省略重复语境，含义转移时重点说明文中含义。未知细节简短说明，不穷举猜测或重复改写；禁止表格和非Markdown正文形式。格式要求属于模型提示，渲染器仍保留原有Markdown兼容能力。全文 `buildTranslatePrompt` 的纯译文和 `buildBatchTranslatePrompt` 的ID协议不接入这套划词要求。
+
+无需依赖的分类和请求构建检查：
+
+```powershell
+node scripts/verify-selection-prompts.mjs
+```
+
+该工具在Node VM执行实际 `selection.js` / `selection-prompts.js`，核对类别对应任务、共用system、材料选择、转义、预算和兼容输入，报告在 `artifacts/qa/selection-prompts-2026-10-13/offline-report.json`。它不运行DOM、浏览器或供应商请求。实际选区/消息/SSE证据使用上述Edge工具；真实厂家准确率、首个正文耗时、思考量及输出格式遵守情况需用有效凭据另行比较。修改范围、操作与验证结果见 [LOCAL_CLASSIFIED_PROMPTS_QA.md](LOCAL_CLASSIFIED_PROMPTS_QA.md)。
 
 ## v4.6 Markdown浮层与回答格式
 
@@ -200,10 +227,18 @@ node scripts/verify-selection.mjs --playwright '<已安装的 playwright 包目�
 
 当前浮层以原文snapshot Range及文档坐标回退定位，尺寸/窗口变化节流重新约束；整体高度受视口限制，关闭状态inert。Markdown重绘恢复代码/表格/链接焦点，首次整答从顶部显示。DOWNLOAD使用异步消息确认，只显示“已开始下载”而不声称文件已完成；失败可重试并隔离晚回包。全文scan提前跳过扩展UI子树。后台每次local保存继续失效配置读，仅生成字段或连接语义变化清结果缓存，展示元数据刷新保留缓存。
 
-background.js的buildSelectionPrompt及旧浮层兼容入口共用MARKDOWN_OUTPUT_GUIDANCE，优先结构化Markdown，不要求简短、编号列表或固定要点数。A/B浮层翻译给出原意及文中含义，不提供例句；buildTranslatePrompt和buildBatchTranslatePrompt保留全文纯译文/ID协议。系统提示词仍要求材料作为数据、证据不足保留歧义。语言和模型路由继续沿用已有设置。
+2026-10-12 浮层新增标题区 Pointer Events 拖动、捕获/取消清理、点击方向按钮和方向键/Home 定位。自动定位依次检查选区下/上/右/左，四周无法容纳自然高度时缩小到上下较大空间。手动位置用视口坐标保存，流式增长和页面滚动保留位置，窗口缩小时边界约束；新选区清除手动位置。原文 Range 继续用于自动定位，点击移动按钮造成网页选区折叠不会改锚点。空间铺满时无法保证无重叠。验证工具与证据边界见 [TOOLTIP_POSITION_QA.md](TOOLTIP_POSITION_QA.md)：
+
+```powershell
+node scripts/verify-tooltip-position.mjs --playwright '<已安装的playwright包目录>'
+```
+
+工具使用隔离的实际 Edge 扩展、合成网页/Key/本机 SSE 和真实鼠标/键盘事件；外部网络被拦截，不读取日常浏览器配置。生成报告与截图在 `artifacts/qa/tooltip-position-2026-10-12/`，独立 profile 在 `.local/browser-profile/tooltip-position/run-<时间戳>/`。结束关闭浏览器和本机服务器，保留 profile 复查。
+
+2026-10-12的回答风格调整曾在background.js共用SELECTION_SYSTEM_PROMPT、MEANING_EXPLANATION_GUIDANCE和MARKDOWN_OUTPUT_GUIDANCE，历史验证见 [PROMPT_STYLE_QA.md](PROMPT_STYLE_QA.md)。2026-10-13改为前文 `selection-prompts.js` 的统一system与单项任务要求；语言和模型路由、DeepSeek官方思考覆盖以及全文纯译文/ID协议继续保留。提示词对思考和格式的要求不构成接口token、耗时或强制过滤保证，合成渲染与真实模型生成须分别验收。
 
 ```powershell
 node scripts/verify-markdown.mjs --playwright '<已安装的playwright包目录>'
 ```
 
-该工具加载实际扩展和隔离Edge profile，用本机HTTP SSE返回合成Markdown；检查流式/最终结构、复制/下载、缓存回放、提示词、再次解释、链接/HTML处理、节流、宽内容/窄屏/键盘滚动、取消与错误重试。下载TXT在context关闭前保存为artifacts/qa/markdown/markdown-download.txt；报告和截图在同目录。profile在.local/browser-profile/markdown/run-<时间戳>/，结束关闭浏览器和服务器，保留profile复查。合成回答不代表真实模型遵守了新提示词；真实生成需有效凭据单独验收。完整结果与限制见 [MARKDOWN_RENDERING_QA.md](MARKDOWN_RENDERING_QA.md)。
+该工具加载实际扩展和隔离Edge profile，用本机HTTP SSE返回合成Markdown；检查流式/最终结构、复制/下载、缓存回放、提示词、再次解释、链接/HTML处理、节流、宽内容/窄屏/键盘滚动、取消与错误重试。提示词检查实际发出10个请求，覆盖正常A/B/C/D、旧兼容A/B/C/D、旧解释与解释此句，确认指导一致、一次生成及模型路由；包含表格的合成回答用于保留渲染兼容回归，不表示模型遵守了表格禁令。下载TXT在context关闭前保存为artifacts/qa/markdown/markdown-download.txt；报告和截图在同目录。profile在.local/browser-profile/markdown/run-<时间戳>/，结束关闭浏览器和服务器，保留profile复查。合成回答不代表真实模型遵守了新提示词；真实生成需有效凭据单独验收。完整结果与限制见 [MARKDOWN_RENDERING_QA.md](MARKDOWN_RENDERING_QA.md) 与 [PROMPT_STYLE_QA.md](PROMPT_STYLE_QA.md)。

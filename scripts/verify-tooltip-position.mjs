@@ -1,0 +1,146 @@
+import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { createRequire } from 'node:module';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve, relative } from 'node:path';
+import { execFileSync } from 'node:child_process';
+
+const root = process.cwd();
+const arg = name => process.argv[process.argv.indexOf(name) + 1];
+const { chromium } = createRequire(import.meta.url)(process.argv.includes('--playwright') ? arg('--playwright') : 'playwright');
+const output = resolve(root, 'artifacts/qa/tooltip-position-2026-10-12');
+const profile = resolve(root, '.local/browser-profile/tooltip-position', `run-${Date.now()}`);
+mkdirSync(output, { recursive: true }); mkdirSync(profile, { recursive: true });
+const checks = [], errors = [];
+let context, worker, page, version, sequence = 0, slow = false;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const long = '## Answer\n\n' + Array.from({ length: 30 }, (_, i) => `Paragraph ${i} explains the synthetic selection in detail.\n\n`).join('');
+const server = createServer(async (req, res) => {
+  if (req.url.startsWith('/sample/')) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.end('<!doctype html><title>Floating result QA</title><style>body{margin:0;height:2400px;font:16px Arial}#word{position:absolute;top:300px;left:40px;width:600px}#outside{position:absolute;top:0}</style><button id="outside">Outside</button><p id="word">The bank offers loans. Another sentence spans several lines for a multiline selection.</p>'); return;
+  }
+  if (!req.url.endsWith('/chat/completions')) { res.writeHead(404); res.end('{}'); return; }
+  for await (const chunk of req) { /* Drain synthetic request without saving credentials. */ }
+  res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8' });
+  const send = content => res.write('data: ' + JSON.stringify({ choices: [{ delta: { content } }] }) + '\n\n');
+  const streaming = slow;
+  send(streaming ? 'First response.\n\n' : long);
+  if (streaming) { await sleep(900); if (!res.destroyed) send(long); await sleep(600); }
+  if (!res.destroyed) res.end('data: [DONE]\n\n');
+});
+await new Promise(r => server.listen(0, '127.0.0.1', r));
+const base = `http://127.0.0.1:${server.address().port}`;
+async function fresh({ width = 1000, height = 600, top = 300, left = 40, textWidth = 600, multiline = false, stream = false } = {}) {
+  slow = stream;
+  await worker.evaluate(() => CACHE.clear());
+  if (page) await page.close();
+  page = await context.newPage(); page.on('pageerror', e => errors.push(e.message));
+  await page.setViewportSize({ width, height }); await page.goto(`${base}/sample/${sequence++}`);
+  await page.waitForFunction(() => typeof chrome !== 'undefined' && !!document.querySelector('#word'));
+  await page.evaluate(({ top, left, textWidth, multiline }) => {
+    const el = document.querySelector('#word'); Object.assign(el.style, { top: `${top}px`, left: `${left}px`, width: `${textWidth}px` });
+    const range = document.createRange(); range.setStart(el.firstChild, multiline ? 0 : 4); range.setEnd(el.firstChild, multiline ? el.textContent.length : 8);
+    window.qaSourceRange = range.cloneRange();
+    getSelection().removeAllRanges(); getSelection().addRange(range);
+    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+  }, { top, left, textWidth, multiline });
+  await page.locator('#deepseek-explain-tooltip.ds-visible').waitFor();
+  if (!stream) await done();
+  await sleep(120);
+}
+const done = () => page.waitForFunction(() => document.querySelector('.ds-actions')?.style.display === 'flex');
+async function geometry() {
+  return page.evaluate(() => {
+    const r = document.querySelector('#deepseek-explain-tooltip').getBoundingClientRect();
+    const s = document.querySelector('#word').getBoundingClientRect();
+    const selection = window.qaSourceRange?.getBoundingClientRect() || s;
+    const pack = r => ({ left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height });
+    return { tip: pack(r), source: pack(selection), width: innerWidth, height: innerHeight };
+  });
+}
+function fits(g) { assert.ok(g.tip.left >= 9 && g.tip.top >= 9 && g.tip.right <= g.width - 9 && g.tip.bottom <= g.height - 9, JSON.stringify(g)); }
+function avoids(g) { fits(g); assert.ok(g.tip.right <= g.source.left || g.tip.left >= g.source.right || g.tip.bottom <= g.source.top || g.tip.top >= g.source.bottom, JSON.stringify(g)); }
+async function check(name, fn) {
+  try { const evidence = await fn(); checks.push({ name, status: 'passed', evidence }); console.log('PASSED: ' + name); }
+  catch (e) { checks.push({ name, status: 'failed', error: e.message }); throw e; }
+}
+async function drag(dx, dy) {
+  const box = await page.locator('.ds-drag-handle').boundingBox();
+  await page.mouse.move(box.x + 14, box.y + 12); await page.mouse.down();
+  await page.mouse.move(box.x + 14 + dx, box.y + 12 + dy, { steps: 8 }); await page.mouse.up(); await sleep(130);
+}
+try {
+  context = await chromium.launchPersistentContext(profile, { channel: 'msedge', headless: true,
+    args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`, '--no-first-run'], ignoreDefaultArgs: ['--disable-extensions'] });
+  version = context.browser().version();
+  await context.route('**/*', route => route.request().url().startsWith(base) || !route.request().url().startsWith('http') ? route.continue() : route.abort());
+  worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
+  await worker.evaluate(base => {
+    const nativeFetch = globalThis.fetch;
+    globalThis.fetch = (url, init) => String(url).startsWith(base) ? nativeFetch(url, init) : Promise.reject(new Error('QA blocks external requests'));
+  }, base);
+  await worker.evaluate(async base => {
+    await chrome.storage.local.clear(); await chrome.storage.local.set(AIConfig.migrate({ apiConfigVersion: 1, modelCatalogVersion: 1, providerConfigVersion: 1,
+      enabled: true, triggerMode: 'auto', usePageContext: true, language: 'zh', targetLanguage: 'zh', explainManufacturer: 'custom', translateManufacturer: 'custom',
+      explainModel: 'qa-explain', translateModel: 'qa-explain', modelList: ['qa-explain'], providerConnections: { custom: {
+        apiBaseUrl: base + '/v1', apiKey: 'position-synthetic-only', availableModels: ['qa-explain'], modelEntries: [], modelsCheckedAt: '2026-10-12' } } }));
+  }, base);
+  for (const [name, options] of [
+    ['Middle selection avoids growing answer', {}], ['Top selection uses bottom', { top: 30 }], ['Bottom selection uses top', { top: 550 }],
+    ['Right edge stays visible', { left: 910, textWidth: 80 }], ['Multiline selection uses a side', { top: 170, textWidth: 260, multiline: true }],
+    ['375px narrow viewport avoids selection with reduced height', { width: 375, height: 600, left: 15, textWidth: 340 }],
+    ['Short landscape viewport', { width: 850, height: 375, top: 155, textWidth: 600 }]
+  ]) await check(name, async () => { await fresh(options); const g = await geometry(); avoids(g); await page.screenshot({ path: resolve(output, `${checks.length}.png`) }); return g; });
+  await check('Drag preserves selected text and moves result', async () => {
+    await fresh({ top: 80 }); const before = await geometry(), selected = await page.evaluate(() => getSelection().toString());
+    await drag(180, 35); const after = await geometry(); fits(after);
+    assert.ok(Math.abs(after.tip.left - before.tip.left - 180) < 2); assert.ok(Math.abs(after.tip.top - before.tip.top - 35) < 2);
+    assert.equal(await page.evaluate(() => getSelection().toString()), selected); return { before, after, selected };
+  });
+  await check('Drag clamps to viewport and releases outside header', async () => {
+    await drag(2000, 2000); fits(await geometry()); await drag(-2000, -2000); const g = await geometry(); fits(g);
+    assert.equal(await page.locator('#deepseek-explain-tooltip').evaluate(el => el.classList.contains('ds-dragging')), false); return g;
+  });
+  await check('Manual position survives scrolling and window resizing', async () => {
+    await fresh({ top: 80 }); await drag(200, 20); const before = await geometry();
+    await page.evaluate(() => scrollTo(0, 120)); await sleep(150); const scrolled = await geometry();
+    assert.ok(Math.abs(scrolled.tip.top - before.tip.top) < 2); assert.ok(Math.abs(scrolled.tip.left - before.tip.left) < 2);
+    await page.setViewportSize({ width: 500, height: 400 }); await sleep(150); const resized = await geometry(); fits(resized); return { before, scrolled, resized };
+  });
+  await check('Drag during stream persists through growth and completion', async () => {
+    await fresh({ top: 30, stream: true }); avoids(await geometry()); await drag(200, 10); const before = await geometry(); await done(); await sleep(150);
+    const after = await geometry(); fits(after); assert.ok(Math.abs(after.tip.left - before.tip.left) < 2); assert.ok(Math.abs(after.tip.top - before.tip.top) < 2); return { before, after };
+  });
+  await check('Pointer buttons and keyboard provide alternatives and reset', async () => {
+    await fresh({ top: 30 }); const initial = await geometry();
+    await page.locator('.ds-drag-handle').click(); await page.locator('[data-ds-move="right"]').click();
+    const clicked = await geometry(); assert.ok(Math.abs(clicked.tip.left - initial.tip.left - 40) < 2);
+    await page.locator('.ds-drag-handle').focus(); await page.keyboard.press('ArrowRight');
+    const keyed = await geometry(); assert.ok(Math.abs(keyed.tip.left - clicked.tip.left - 10) < 2);
+    await page.keyboard.press('Home'); await sleep(100); const reset = await geometry(); avoids(reset); assert.ok(Math.abs(reset.tip.left - initial.tip.left) < 2);
+    await page.screenshot({ path: resolve(output, 'move-controls.png') }); return { initial, clicked, keyed, reset };
+  });
+  await check('Escape during drag releases capture and prevents reopening', async () => {
+    await fresh({ top: 30 }); const box = await page.locator('.ds-drag-handle').boundingBox();
+    await page.mouse.move(box.x + 14, box.y + 12); await page.mouse.down(); await page.mouse.move(box.x + 100, box.y + 60);
+    await page.keyboard.press('Escape'); await page.mouse.up(); await sleep(350);
+    assert.equal(await page.locator('#deepseek-explain-tooltip').evaluate(el => el.classList.contains('ds-hidden') && !el.classList.contains('ds-dragging')), true);
+    return { hiddenAfterRelease: true };
+  });
+  await check('New selection discards previous manual position', async () => {
+    await fresh({ top: 30 }); await drag(200, 20); await page.keyboard.press('Escape'); await sleep(320);
+    await page.evaluate(() => { const el = document.querySelector('#word'), r = document.createRange(); r.setStart(el.firstChild, 9); r.setEnd(el.firstChild, 15); window.qaSourceRange = r.cloneRange(); getSelection().removeAllRanges(); getSelection().addRange(r); el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 })); });
+    await done(); await sleep(150); const g = await geometry(); avoids(g); assert.ok(g.tip.left < 200); return g;
+  });
+  await check('Close button and outside click still dismiss', async () => {
+    await page.locator('.ds-close').click(); await page.locator('#deepseek-explain-tooltip.ds-hidden').waitFor();
+    await fresh(); await page.locator('#outside').click(); await page.locator('#deepseek-explain-tooltip.ds-hidden').waitFor();
+    assert.deepEqual(errors, []); return { errors };
+  });
+} finally {
+  if (context) await context.close(); server.closeAllConnections(); await new Promise(r => server.close(r));
+  writeFileSync(resolve(output, 'report.json'), JSON.stringify({ date: new Date().toISOString(), timezone: 'Asia/Shanghai', node: process.version,
+    browser: version, head: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), workingTree: execFileSync('git', ['status', '--short'], { encoding: 'utf8' }).trim(),
+    profile: relative(root, profile), closed: true, checks, boundary: 'Actual isolated Edge extension and pointer events; synthetic page/Key/local SSE. No real supplier tested.' }, null, 2) + '\n');
+}

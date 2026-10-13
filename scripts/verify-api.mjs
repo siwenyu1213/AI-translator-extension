@@ -225,6 +225,44 @@ await check('全文翻译与 B 分类使用独立翻译模型，思考开启只�
   await stream(sse, { mode: undefined, promptType: 'translate', text: 'full page' });
   assert.equal(JSON.parse(calls[1].options.body).model, 'gpt-4o-mini');
 });
+await check('试用分支对 DeepSeek 官方端点的划词/解释/全文/批量显式关闭思考，保留保存值（模拟）', async () => {
+  const routes = [{ mode: 'A' }, { mode: 'B' }, { mode: 'C' }, { mode: 'D' },
+    { mode: undefined, promptType: 'explain' }, { mode: undefined, promptType: 'translate' },
+    { mode: 'C', analysis: { category: 'sentence' }, explicitTask: 'interpret' },
+    { mode: undefined, promptType: 'translate', batchItems: [{ id: 'off1', text: 'batch text' }] }];
+  for (const apiBaseUrl of ['https://api.deepseek.com', 'https://api.deepseek.com/v1']) {
+    for (const enabled of [false, true]) {
+      await config({ apiBaseUrl, explainModel: 'deepseek-flash', translateModel: 'deepseek-flash',
+        modelList: ['deepseek-flash'], explainThinkingEnabled: enabled, translateThinkingEnabled: enabled });
+      await run('CACHE.clear()');
+      for (const [index, route] of routes.entries()) {
+        const output = route.batchItems ? '<<<DS_ITEM_off1>>>\n批量译文\n<<<DS_END_off1>>>' : content;
+        const response = `data: ${JSON.stringify({ choices: [{ delta: { content: output } }] })}\n\ndata: [DONE]\n`;
+        const messages = await stream(response, { text: '关闭思考路由-' + index, ...route });
+        const body = JSON.parse(calls.at(-1).options.body);
+        assert.equal(messages.at(-1).type, 'done');
+        assert.deepEqual(body.thinking, { type: 'disabled' });
+        assert.equal(body.reasoning_effort, undefined);
+        assert.equal(storage.explainThinkingEnabled, enabled);
+        assert.equal(storage.translateThinkingEnabled, enabled);
+      }
+      assert.equal(calls.length, routes.length);
+    }
+  }
+});
+await check('其他端点即使模型名含 DeepSeek 也不接收厂家专用关闭参数，原思考设置保持（模拟）', async () => {
+  for (const apiBaseUrl of ['https://gateway.example/v1', 'https://api.deepseek.com.example/v1']) {
+    for (const enabled of [false, true]) {
+      await config({ apiBaseUrl, explainModel: 'deepseek-flash', modelList: ['deepseek-flash'],
+        explainThinkingEnabled: enabled, explainReasoningEffort: 'low' });
+      await run('CACHE.clear()');
+      await stream(sse);
+      const body = JSON.parse(calls[0].options.body);
+      assert.equal(body.thinking, undefined);
+      assert.equal(body.reasoning_effort, enabled ? 'low' : undefined);
+    }
+  }
+});
 await check('配置和目标语言更改清缓存，缓存不混用不同端点', async () => {
   await config(); await stream(sse); await stream(sse); assert.equal(calls.length, 1);
   await chrome.storage.local.set({ providerConnections: { custom: { ...storage.providerConnections.custom, apiBaseUrl: 'https://other.example/v1' } }, targetLanguage: 'ja' });
