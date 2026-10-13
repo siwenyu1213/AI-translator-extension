@@ -1,4 +1,5 @@
-// Local Markdown parser + HTML allowlist. Loaded in the isolated content-script world.
+// 文件职责：本地 Markdown 解析、HTML 白名单清理、流式节流渲染与阅读位置保持。
+// Loaded in the isolated content-script world.
 (() => {
   const parser = new marked.Marked({ gfm: true, breaks: true });
   const escape = value => String(value).replace(/[&<>"']/g, char =>
