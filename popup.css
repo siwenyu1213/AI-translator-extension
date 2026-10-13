@@ -1,3 +1,4 @@
+/* 文件职责：设置弹窗布局、390×510px内部滚动、缩放/窄屏适应和控件禁用状态。 */
 /* 蜜桃涂鸦布局；三主题的色彩与字体由 theme.css 提供。 */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
