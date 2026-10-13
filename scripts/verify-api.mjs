@@ -8,10 +8,12 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const checks = [];
 const event = () => ({ listeners: [], addListener(fn) { this.listeners.push(fn); } });
 let storage = {}, calls = [], storageWrites = [], responder;
+const menus = [], tabMessages = [];
 const changed = event();
 const chrome = {
   runtime: { onInstalled: event(), onMessage: event(), onConnect: event() },
-  contextMenus: { onClicked: event() },
+  contextMenus: { onClicked: event(), removeAll(fn) { menus.length=0;fn(); }, create(menu) { menus.push(menu); } },
+  tabs: { sendMessage(id,message) { tabMessages.push({id,message});return Promise.resolve(); } },
   storage: { onChanged: changed, local: {
     async get() { return structuredClone(storage); },
     async set(values) { storageWrites.push(Object.keys(values)); Object.assign(storage, values); changed.listeners.forEach(fn => fn({}, 'local')); },
@@ -51,6 +53,15 @@ async function stream(data, request = {}) {
 }
 const content = '这是流式文本，长度足以验证完整结果与缓存。';
 const sse = `data:${JSON.stringify({ choices: [{ delta: { content } }] })}\r\n\r\ndata: [DONE]`;
+await check('安装创建原生选区菜单，菜单点击将选区发送至正确网页（模拟 chrome API）', () => {
+  chrome.runtime.onInstalled.listeners[0]();
+  const menu=menus.find(menu=>menu.id==='deepseek-explain');
+  assert.equal(menu.title,'📖 说文：解释选中文字');
+  assert.deepEqual(Array.from(menu.contexts),['selection']);
+  chrome.contextMenus.onClicked.listeners[0]({menuItemId:menu.id,selectionText:'  原生菜单选区  '},{id:42});
+  assert.equal(tabMessages[0].id,42);assert.equal(tabMessages[0].message.type,'TRIGGER_EXPLAIN');
+  assert.equal(tabMessages[0].message.text,'原生菜单选区');
+});
 await check('配置字段顺序变化与重复读取不写 storage；已有配置值保持一致',async()=>{
   const normalized=JSON.parse(JSON.stringify(run('AIConfig.migrate({})')));
   storage=Object.fromEntries(Object.entries(normalized).reverse());storageWrites=[];
@@ -225,7 +236,7 @@ await check('全文翻译与 B 分类使用独立翻译模型，思考开启只�
   await stream(sse, { mode: undefined, promptType: 'translate', text: 'full page' });
   assert.equal(JSON.parse(calls[1].options.body).model, 'gpt-4o-mini');
 });
-await check('试用分支对 DeepSeek 官方端点的划词/解释/全文/批量显式关闭思考，保留保存值（模拟）', async () => {
+await check('DeepSeek 关闭总开关时八条路由禁止思考，旧深度思考值归一化为关闭（模拟）', async () => {
   const routes = [{ mode: 'A' }, { mode: 'B' }, { mode: 'C' }, { mode: 'D' },
     { mode: undefined, promptType: 'explain' }, { mode: undefined, promptType: 'translate' },
     { mode: 'C', analysis: { category: 'sentence' }, explicitTask: 'interpret' },
@@ -243,12 +254,46 @@ await check('试用分支对 DeepSeek 官方端点的划词/解释/全文/批量
         assert.equal(messages.at(-1).type, 'done');
         assert.deepEqual(body.thinking, { type: 'disabled' });
         assert.equal(body.reasoning_effort, undefined);
-        assert.equal(storage.explainThinkingEnabled, enabled);
-        assert.equal(storage.translateThinkingEnabled, enabled);
+        assert.equal(storage.explainThinkingEnabled, false);
+        assert.equal(storage.translateThinkingEnabled, false);
       }
       assert.equal(calls.length, routes.length);
     }
   }
+});
+await check('DeepSeek 两用途总开关与深度思考独立控制，所有生成路由遵循配置（模拟）', async () => {
+  const routes = [{mode:'A',kind:'explain'}, {mode:'C',kind:'explain'}, {mode:'D',kind:'explain'},
+    {mode:undefined,promptType:'explain',kind:'explain'},
+    {mode:'C',analysis:{category:'sentence'},explicitTask:'interpret',kind:'explain'},
+    {mode:'B',kind:'translate'}, {mode:undefined,promptType:'translate',kind:'translate'},
+    {mode:undefined,promptType:'translate',batchItems:[{id:'on1',text:'batch'}],kind:'translate'}];
+  for (const allowExplain of [false,true]) for (const allowTranslate of [false,true]) for (const deep of [false,true]) {
+    await config({apiBaseUrl:'https://api.deepseek.com/v1',modelList:['deepseek-flash'],
+      explainModel:'deepseek-flash',translateModel:'deepseek-flash',
+      explainDeepSeekThinkingEnabled:allowExplain,translateDeepSeekThinkingEnabled:allowTranslate,
+      explainThinkingEnabled:deep,translateThinkingEnabled:deep,
+      explainReasoningEffort:'low',translateReasoningEffort:'medium'});
+    for (const [index,route] of routes.entries()) {
+      const output = route.batchItems ? '<<<DS_ITEM_on1>>>译文<<<DS_END_on1>>>' : content;
+      const messages = await stream(`data: ${JSON.stringify({choices:[{delta:{content:output,reasoning_content:'模拟思考'}}]})}\n\ndata: [DONE]\n`,{text:'开关组合-'+index,...route});
+      const body = JSON.parse(calls.at(-1).options.body);
+      const allow = route.kind==='explain' ? allowExplain : allowTranslate;
+      assert.deepEqual(body.thinking,{type:allow?'enabled':'disabled'});
+      assert.equal(body.reasoning_effort,allow&&deep?(route.kind==='explain'?'low':'medium'):undefined);
+      assert.equal(messages.at(-1).type,'done');
+    }
+    assert.equal(calls.length,routes.length);
+  }
+});
+await check('切换 DeepSeek 总开关使已缓存的相同选区重新请求（模拟）', async () => {
+  await config({apiBaseUrl:'https://api.deepseek.com',modelList:['deepseek-flash'],explainModel:'deepseek-flash'});
+  await stream(sse); await stream(sse); assert.equal(calls.length,1);
+  await chrome.storage.local.set({explainDeepSeekThinkingEnabled:true});
+  await stream(sse); assert.equal(calls.length,2);
+  assert.deepEqual(JSON.parse(calls[1].options.body).thinking,{type:'enabled'});
+  await chrome.storage.local.set({explainDeepSeekThinkingEnabled:false});
+  await stream(sse); assert.equal(calls.length,3);
+  assert.deepEqual(JSON.parse(calls[2].options.body).thinking,{type:'disabled'});
 });
 await check('其他端点即使模型名含 DeepSeek 也不接收厂家专用关闭参数，原思考设置保持（模拟）', async () => {
   for (const apiBaseUrl of ['https://gateway.example/v1', 'https://api.deepseek.com.example/v1']) {

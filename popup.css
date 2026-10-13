@@ -34,6 +34,8 @@ button { cursor: pointer; }
 .toggle-label { display: flex; align-items: center; gap: 9px; cursor: pointer; min-height: 24px; }
 .toggle-label input { width: 17px; height: 17px; accent-color: var(--lc-accent); }
 .toggle-text { font-size: 13px; }
+.toggle-label:has(input:disabled) { opacity: .6; cursor: not-allowed; }
+.toggle-label input:disabled { cursor: not-allowed; }
 .key-section { padding: 8px 10px; margin-top: 12px; border: 1.5px solid var(--lc-border); border-radius: 5px 11px 6px 10px; background: var(--lc-soft); }
 .key-saved { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; font-size: 12px; }
 .key-saved > span, .key-saved .mini-btn { flex-shrink: 0; white-space: nowrap; }

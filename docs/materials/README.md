@@ -9,4 +9,4 @@
 | `screenshots/settings.png` | 实际扩展设置页，展示说文/LingoClarify标题、解释/翻译标签和配置界面 |
 | `screenshots/result.png` | 合成英语网页中的实际划词浮层，展示品牌、原文与模拟Markdown回答 |
 
-截图不证明真实供应商生成能力、回答质量或速度。原品牌验收见 [品牌验收](../BRANDING_QA.md)；当前截图来源为 [三主题验收](../THEMES_QA.md)，对应 `artifacts/qa/themes-2026-10-13/cobalt-settings.png`、`cobalt-result.png`。
+截图不证明真实供应商生成能力、回答质量或速度。原品牌验收见 [品牌验收](../BRANDING_QA.md)；设置截图于2026-10-13更新为 [触发与思考控件验收](../SETTINGS_CONTROLS_QA.md) 的 `artifacts/qa/settings-controls-2026-10-13/deepseek-off.png`，展示默认关闭思考与恢复的划词触发方式。结果截图仍来自 [三主题验收](../THEMES_QA.md) 的 `cobalt-result.png`。

@@ -48,7 +48,9 @@ GitHub入口为 `https://github.com/siwenyu1213/LingoClarify`。本地目录与�
 
 设置在 `chrome.storage.local`。Key与账号模型缓存位于 `providerConnections`；`AIConfig.connectionFor`选择实际连接。custom缺地址在请求前停止，改地址清除关联型号与缓存。迁移字段属于兼容实现。
 
-DeepSeek官方hostname精确匹配后关闭有效思考，发送 `thinking.disabled` 且不发送 `reasoning_effort`；第三方网关不凭模型名套用。其他服务按已有设置处理。
+DeepSeek官方hostname精确匹配后，分别读取 `explainDeepSeekThinkingEnabled` / `translateDeepSeekThinkingEnabled`，显式发送 `thinking.enabled/disabled`。默认关闭；关闭时归一化该用途的深度思考为false、不发送 `reasoning_effort`。打开总开关后，原 `*ThinkingEnabled` 控制是否发送强度。两层开关均纳入请求缓存与配置失效判断；第三方网关不凭模型名套用。
+
+设置页共用“划词触发方式”位于两面板的思考强度区域下方，保存 `triggerMode: auto/contextMenu`；已有网页通过storage变化即时更新。原生选区菜单始终注册，两种模式均可点击。
 
 ## 最低检查
 
@@ -66,6 +68,7 @@ git diff --check
 | 范围 | 工具 |
 | --- | --- |
 | 主题持久化、草稿隔离、页面同步、图标/字体与键盘/窄屏 | `scripts/verify-themes.mjs` |
+| 划词触发方式、DeepSeek两层开关/保存/端口参数与失败反馈 | `scripts/verify-settings-controls.mjs` |
 | 配置、后台、路由、SSE和失败的离线模拟 | `node scripts/verify-api.mjs` |
 | 本地分类与提示词/材料构建 | `node scripts/verify-selection-prompts.mjs` |
 | 选区分类离线语料 | `node scripts/verify-selection.mjs --node-only` |
@@ -109,6 +112,8 @@ node scripts/verify-tooltip-position.mjs --playwright '<已安装的 playwright 
 在docs记录日期/时区、基线/待提交范围、工具版本、步骤/预期/实际、报告截图路径、未验证项、提交和GitHub状态。本次证据见 [BRANDING_QA](BRANDING_QA.md)。
 
 当前三主题与引号图标改动见 [THEMES_QA](THEMES_QA.md)。主题回归同样传入 `--playwright`；清单的 web_accessible_resources 仅公开注入界面需要的本地图标和字体，静态工具逐一检查这些资源存在。
+
+2026-10-13 触发方式与DeepSeek思考控制验收见 [SETTINGS_CONTROLS_QA](SETTINGS_CONTROLS_QA.md)。新工具同样传入 `--playwright`，只使用隔离profile、合成Key和本机SSE；原生系统右键菜单的鼠标点击需人工补验。
 
 生成报告默认仅本机保留。对外截图去除Key、授权头和私有网页，附来源说明；不提交凭据或storage导出。
 

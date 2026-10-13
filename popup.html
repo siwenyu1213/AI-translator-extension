@@ -42,6 +42,14 @@
 
     </div>
 
+    <div class="section" id="explain-deepseek-thinking-section" hidden>
+      <label class="toggle-label">
+        <input type="checkbox" id="explain-deepseek-thinking" aria-describedby="explain-deepseek-thinking-hint" aria-controls="explain-thinking">
+        <span class="toggle-text">DeepSeek 思考模式</span>
+      </label>
+      <p class="hint" id="explain-deepseek-thinking-hint">开启后允许模型思考；关闭后禁止思考，深度思考也不可开启。</p>
+    </div>
+
     <div class="section">
       <label class="toggle-label">
         <input type="checkbox" id="explain-thinking">
@@ -78,6 +86,14 @@
 
     </div>
 
+    <div class="section" id="translate-deepseek-thinking-section" hidden>
+      <label class="toggle-label">
+        <input type="checkbox" id="translate-deepseek-thinking" aria-describedby="translate-deepseek-thinking-hint" aria-controls="translate-thinking">
+        <span class="toggle-text">DeepSeek 思考模式</span>
+      </label>
+      <p class="hint" id="translate-deepseek-thinking-hint">开启后允许模型思考；关闭后禁止思考，深度思考也不可开启。</p>
+    </div>
+
     <div class="section">
       <label class="toggle-label">
         <input type="checkbox" id="translate-thinking">
@@ -94,6 +110,15 @@
       </select>
     </div>
 
+  </div>
+
+  <div class="section" id="trigger-mode-section">
+    <label class="label" for="trigger-mode">划词触发方式</label>
+    <select id="trigger-mode" class="select" aria-describedby="trigger-mode-hint">
+      <option value="auto">选中文字后自动弹出（默认）</option>
+      <option value="contextMenu">仅右键菜单触发</option>
+    </select>
+    <p class="hint" id="trigger-mode-hint">选中文字后，右键选择“📖 说文：解释选中文字”。此设置同时适用于两个标签的划词回答。</p>
   </div>
 
   <div class="section key-section">

@@ -30,7 +30,7 @@ function git(args) {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
   return result.status === 0 ? result.stdout.trim() : null;
 }
-const sourceFiles = ['model-catalog.js', 'config.js', 'background.js'];
+const sourceFiles = ['model-catalog.js', 'config.js', 'selection.js', 'selection-prompts.js', 'background.js'];
 const sources = Object.fromEntries(sourceFiles.map(name => [name, readFileSync(resolve(root, name), 'utf8')]));
 
 function harness() {

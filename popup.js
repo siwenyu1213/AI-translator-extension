@@ -97,6 +97,16 @@ function renderModelOptions(tab) {
   }
   tab.detail.textContent = !entries.length && connection.apiKey ? '模型列表由当前接口提供。' : '';
   tab.detail.hidden = !tab.detail.textContent;
+  renderThinkingControls(tab);
+}
+function renderThinkingControls(tab) {
+  const kind = tab.kind;
+  const deepSeek = AIConfig.isDeepSeekEndpoint(providerConnection(tab.manufacturer.value).apiBaseUrl);
+  $(kind+'-deepseek-thinking-section').hidden = !deepSeek;
+  const blocked = deepSeek && !$(kind+'-deepseek-thinking').checked;
+  $(kind+'-thinking').disabled = blocked;
+  if (blocked) $(kind+'-thinking').checked = false;
+  $(kind+'-effort-section').style.display = $(kind+'-thinking').checked ? '' : 'none';
 }
 function renderAllModelOptions() { tabs.forEach(renderModelOptions); }
 function setTabSelection(tab, id) {
@@ -275,9 +285,9 @@ tabs.forEach(tab => tab.manufacturer.addEventListener('change', () => {
   refreshProviderModels(tab.manufacturer.value);
 }));
 for (const kind of ['explain','translate']) {
-  $(kind+'-thinking').addEventListener('change',()=> {
-    $(kind+'-effort-section').style.display=$(kind+'-thinking').checked ? '' : 'none';
-  });
+  const tab = tabs.find(tab=>tab.kind===kind);
+  $(kind+'-thinking').addEventListener('change',()=>renderThinkingControls(tab));
+  $(kind+'-deepseek-thinking').addEventListener('change',()=>renderThinkingControls(tab));
 }
 $('rewrite-key').addEventListener('click',()=>{
   editingKeys.add(connectionProvider);
@@ -354,9 +364,11 @@ $('save-btn').addEventListener('click',async()=>{
     const config={...manufacturerSettings(),...modelSettings(),
       explainThinkingEnabled:$('explain-thinking').checked,explainReasoningEffort:$('explain-effort').value,
       translateThinkingEnabled:$('translate-thinking').checked,translateReasoningEffort:$('translate-effort').value,
+      explainDeepSeekThinkingEnabled:$('explain-deepseek-thinking').checked,
+      translateDeepSeekThinkingEnabled:$('translate-deepseek-thinking').checked,
       language:$('explain-language').value,targetLanguage:$('target-language').value,
       enabled:savedConfig.enabled!==false,usePageContext:savedConfig.usePageContext!==false,
-      triggerMode:savedConfig.triggerMode||'auto',requiresApiSetup:false};
+      triggerMode:$('trigger-mode').value,requiresApiSetup:false};
     await chrome.storage.local.set(config);
     for (const [provider,connection] of Object.entries(providerConnections)) savedKeys[provider]=connection.apiKey;
     editingKeys.clear();showConnection();
@@ -377,10 +389,12 @@ $('save-btn').addEventListener('click',async()=>{
   for (const tab of tabs) {
     tab.manufacturer.value=config[tab.kind+'Manufacturer'];
     $(tab.kind+'-thinking').checked=config[tab.kind+'ThinkingEnabled']===true;
+    $(tab.kind+'-deepseek-thinking').checked=config[tab.kind+'DeepSeekThinkingEnabled']===true;
     $(tab.kind+'-effort').value=config[tab.kind+'ReasoningEffort']||'high';
     $(tab.kind+'-effort-section').style.display=$(tab.kind+'-thinking').checked ? '' : 'none';
   }
   $('explain-language').value=config.language||'auto';$('target-language').value=config.targetLanguage||'zh';
+  $('trigger-mode').value=config.triggerMode;
   showConnection();renderAllModelOptions();
   tabs.forEach(tab=>setTabSelection(tab,config[tab.key]));
   refreshCatalog();

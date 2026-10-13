@@ -209,7 +209,7 @@ try {
     }
     return { requests: results.length, paths: results.map(result => result.mode), provider: 'localhost synthetic SSE; output quality and reasoning latency unverified' };
   });
-  await check('DeepSeek trial sends explicit thinking off through real selection, translation and batch ports', async () => {
+  await check('DeepSeek master switch off sends disabled through real selection, translation and batch ports', async () => {
     const saved = await worker.evaluate(() => chrome.storage.local.get(null));
     const count = requests.length;
     try {
@@ -227,6 +227,7 @@ try {
         await chrome.storage.local.set({ explainManufacturer: 'deepseek', translateManufacturer: 'deepseek',
           explainModel: 'deepseek-flash', translateModel: 'deepseek-flash', modelList: ['deepseek-flash'],
           explainThinkingEnabled: true, translateThinkingEnabled: true, explainReasoningEffort: 'high', translateReasoningEffort: 'high',
+          explainDeepSeekThinkingEnabled: false, translateDeepSeekThinkingEnabled: false,
           providerConnections: { deepseek: { apiKey: 'markdown-test-only', availableModels: ['deepseek-flash'] } } });
       }, base);
       await sample({ chunks: ['**祖先节点**是当前节点上层的节点。'], delay: 10 });
@@ -255,12 +256,13 @@ try {
       const popup = await context.newPage();
       try {
         await popup.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`);
-        await popup.waitForFunction(() => document.querySelector('#explain-thinking').checked);
+        await popup.waitForFunction(() => document.querySelector('#explain-thinking').disabled);
+        assert.equal(await popup.locator('#explain-thinking').isChecked(), false);
         assert.equal((await popup.locator('body').textContent()).includes('固定关闭思考'), false);
       } finally { await popup.close(); }
       const state = await worker.evaluate(() => chrome.storage.local.get(['explainThinkingEnabled', 'translateThinkingEnabled']));
-      assert.equal(state.explainThinkingEnabled, true); assert.equal(state.translateThinkingEnabled, true);
-      return { requests: 3, originalPreferencePreserved: true, boundary: 'official URL intercepted and forwarded to localhost; real DeepSeek compliance and latency unverified' };
+      assert.equal(state.explainThinkingEnabled, false); assert.equal(state.translateThinkingEnabled, false);
+      return { requests: 3, deepThinkingDisabled: true, boundary: 'official URL intercepted and forwarded to localhost; real DeepSeek compliance and latency unverified' };
     } finally {
       await worker.evaluate(async saved => {
         globalThis.fetch = qaThinkingFetch; delete globalThis.qaThinkingFetch;

@@ -233,10 +233,10 @@ async function performStreamRequest(port, { promptType, text, context, batchId, 
     port.disconnect();
     return;
   }
+  const kind = mode ? (mode === 'B' ? 'translate' : 'explain') : (promptType === 'explain' ? 'explain' : 'translate');
   let baseUrl;
   let connection;
   try {
-    const kind = mode ? (mode === 'B' ? 'translate' : 'explain') : (promptType === 'explain' ? 'explain' : 'translate');
     connection = AIConfig.connectionFor(config, kind);
     baseUrl = AIConfig.normalizeBaseUrl(connection.apiBaseUrl);
   }
@@ -257,13 +257,14 @@ async function performStreamRequest(port, { promptType, text, context, batchId, 
     return;
   }
 
-  // 试用分支：仅对 DeepSeek 官方端点强制关闭，保留已保存设置便于切回对照。
-  const deepSeekThinkingOff = new URL(baseUrl).hostname === 'api.deepseek.com';
-  if (deepSeekThinkingOff) thinkingEnabled = false;
+  // 官方端点显式控制思考；第三方网关不凭模型名发送厂家专用参数。
+  const deepSeek = AIConfig.isDeepSeekEndpoint(baseUrl);
+  const deepSeekThinkingEnabled = deepSeek && config[kind + 'DeepSeekThinkingEnabled'] === true;
+  if (deepSeek && !deepSeekThinkingEnabled) thinkingEnabled = false;
 
   // 缓存检查（键包含思考开关，避免开关切换后命中旧缓存）
   const cacheKey = JSON.stringify([cacheRevision, baseUrl, model, systemPrompt, prompt,
-    thinkingEnabled, reasoningEffort]);
+    deepSeekThinkingEnabled, thinkingEnabled, reasoningEffort]);
   const doneMessage = output => {
     if (!batchItems) return { type: 'done', model, batchId };
     const items = parseBatchTranslation(output, batchItems.map(item => item.id));
@@ -314,8 +315,8 @@ async function performStreamRequest(port, { promptType, text, context, batchId, 
       stream: true
     };
     // 默认使用最小公共参数，避免不同模型对 temperature / token 上限的差异。
-    if (deepSeekThinkingOff) body.thinking = { type: 'disabled' };
-    else if (thinkingEnabled) body.reasoning_effort = reasoningEffort;
+    if (deepSeek) body.thinking = { type: deepSeekThinkingEnabled ? 'enabled' : 'disabled' };
+    if (thinkingEnabled) body.reasoning_effort = reasoningEffort;
     const endpoint = `${baseUrl}/chat/completions`;
 
     const res = await fetchWithRetry(endpoint, {
@@ -458,6 +459,7 @@ const GENERATION_FIELDS = new Set(['enabled', 'usePageContext', 'triggerMode',
   'language', 'targetLanguage', 'explainModel', 'translateModel',
   'explainManufacturer', 'translateManufacturer', 'explainThinkingEnabled',
   'translateThinkingEnabled', 'explainReasoningEffort', 'translateReasoningEffort',
+  'explainDeepSeekThinkingEnabled', 'translateDeepSeekThinkingEnabled',
   'apiBaseUrl', 'apiKey', 'availableModels', 'modelList', 'modelManufacturers',
   'apiConfigVersion', 'providerConfigVersion', 'modelCatalogVersion',
   'qwenApiKey', 'customModels', 'model', 'thinkingEnabled', 'reasoningEffort']);

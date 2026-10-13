@@ -19,6 +19,10 @@
   // 官方厂家有固定地址；自定义连接必须提供自己的地址，不能借用默认厂家。
   const endpointFor = (provider, entry = {}) => PROVIDER_ENDPOINTS[provider] ||
     (typeof entry.apiBaseUrl === 'string' ? entry.apiBaseUrl.trim() : '');
+  function isDeepSeekEndpoint(input) {
+    try { return new URL(input).hostname === 'api.deepseek.com'; }
+    catch { return false; }
+  }
 
   function normalizeBaseUrl(input) {
     let url;
@@ -35,6 +39,7 @@
     const config = { enabled: true, usePageContext: true, triggerMode: 'auto',
       language: 'auto', targetLanguage: 'zh', explainThinkingEnabled: false,
       translateThinkingEnabled: false, explainReasoningEffort: 'high',
+      explainDeepSeekThinkingEnabled: false, translateDeepSeekThinkingEnabled: false,
       translateReasoningEffort: 'high', verifyModel: true, ...raw };
     if (raw.apiConfigVersion !== 1) {
       // 旧版的 apiKey 属于专用供应商，不能发到新默认地址。
@@ -88,6 +93,13 @@
       config.providerConfigVersion = 1;
     }
     config.providerConnections = normalizeConnections(config.providerConnections);
+    config.triggerMode = config.triggerMode === 'contextMenu' ? 'contextMenu' : 'auto';
+    for (const kind of ['explain', 'translate']) {
+      config[kind + 'DeepSeekThinkingEnabled'] = config[kind + 'DeepSeekThinkingEnabled'] === true;
+      const provider = config[kind + 'Manufacturer'];
+      if (isDeepSeekEndpoint(endpointFor(provider, config.providerConnections[provider])) &&
+          !config[kind + 'DeepSeekThinkingEnabled']) config[kind + 'ThinkingEnabled'] = false;
+    }
     for (const key of ['explainReasoningEffort', 'translateReasoningEffort']) {
       if (!['low', 'medium', 'high'].includes(config[key])) config[key] = 'high';
     }
@@ -141,6 +153,6 @@
   }
 
   globalThis.AIConfig = { DEFAULT_MODEL, DEFAULT_MODELS, DEFAULT_BASE_URL,
-    PROVIDER_ENDPOINTS, validProvider, endpointFor, normalizeConnections, connectionFor,
+    PROVIDER_ENDPOINTS, validProvider, endpointFor, isDeepSeekEndpoint, normalizeConnections, connectionFor,
     normalizeModel, normalizeModels, normalizeBaseUrl, migrate, load };
 })();
