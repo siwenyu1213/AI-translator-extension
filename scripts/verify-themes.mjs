@@ -38,6 +38,7 @@ async function selectWord(){
 }
 const snapshot=()=>worker.evaluate(()=>chrome.storage.local.get(['providerConnections','explainModel','translateModel','explainManufacturer','translateManufacturer','language','targetLanguage']));
 async function setTheme(theme){await popup.locator('#ui-theme').selectOption(theme);await popup.waitForFunction(theme=>document.body.dataset.lcTheme===theme,theme);await popup.waitForFunction(()=>!document.querySelector('#ui-theme').disabled);}
+async function settingsShot(name){await popup.evaluate(()=>{document.body.scrollTop=0;window.scrollTo(0,0);});await popup.locator('body').screenshot({path:resolve(output,name)});}
 const luminance=color=>{const values=color.match(/\d+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return values[0]*.2126+values[1]*.7152+values[2]*.0722;};
 const ratio=(a,b)=>{const x=luminance(a),y=luminance(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
 try{
@@ -49,7 +50,7 @@ try{
   await worker.evaluate(()=>{AIModelCatalog.refresh=async()=>({...AIModelCatalog.BUILTIN,source:AIModelCatalog.SOURCE,providers:AIModelCatalog.BUILTIN.providers.map(provider=>({...provider,stale:false}))});});
   await worker.evaluate(()=>chrome.storage.local.clear());
   const url=`chrome-extension://${new URL(worker.url()).host}/popup.html`;
-  popup=await context.newPage();popup.on('pageerror',e=>errors.push(e.message));await popup.setViewportSize({width:520,height:900});await popup.goto(url);
+  popup=await context.newPage();popup.on('pageerror',e=>errors.push(e.message));await popup.setViewportSize({width:390,height:600});await popup.goto(url);
   await popup.waitForFunction(()=>document.querySelector('#explain-manufacturer').options.length===11);
   await check('旧配置和首次使用默认钴蓝纸页，三主题可选，删除 DeepSeek 提示',async()=>{
     await popup.evaluate(()=>LingoTheme.ready);
@@ -57,11 +58,11 @@ try{
     assert.deepEqual(await popup.locator('#ui-theme option').evaluateAll(options=>options.map(o=>o.value)),['cobalt','playful','vellum']);
     assert.equal((await popup.locator('body').textContent()).includes('固定关闭思考'),false);
     assert.equal(await popup.locator('#api-key').isVisible(),true);
-    await popup.locator('.container').screenshot({path:resolve(output,'first-run.png')});
+    await settingsShot('first-run.png');
   });
   await check('首次无 Key 也可独立保存主题，关闭并重开保留',async()=>{
     await setTheme('playful');assert.equal((await worker.evaluate(()=>chrome.storage.local.get('uiTheme'))).uiTheme,'playful');
-    await popup.close();popup=await context.newPage();popup.on('pageerror',e=>errors.push(e.message));await popup.setViewportSize({width:520,height:900});await popup.goto(url);
+    await popup.close();popup=await context.newPage();popup.on('pageerror',e=>errors.push(e.message));await popup.setViewportSize({width:390,height:600});await popup.goto(url);
     await popup.waitForFunction(()=>document.querySelector('#ui-theme').value==='playful');
   });
   await worker.evaluate(async base=>{await chrome.storage.local.set(AIConfig.migrate({apiConfigVersion:1,modelCatalogVersion:1,providerConfigVersion:1,enabled:true,triggerMode:'auto',language:'zh',targetLanguage:'zh',explainManufacturer:'custom',translateManufacturer:'custom',explainModel:'qa-model',translateModel:'qa-model',modelList:['qa-model'],providerConnections:{custom:{apiBaseUrl:base+'/v1',apiKey:'theme-synthetic-only',availableModels:['qa-model'],modelEntries:[{id:'qa-model'}],modelsCheckedAt:'2026-10-13'}}}));},base);
@@ -82,7 +83,7 @@ try{
       assert.equal(await popup.evaluate(()=>getComputedStyle(document.body).backgroundColor),color);
       assert.equal(await page.locator('#deepseek-explain-tooltip').evaluate(el=>getComputedStyle(el).backgroundColor),color);
       await popup.evaluate(()=>document.fonts.ready);await page.evaluate(()=>document.fonts.ready);
-      await popup.locator('.container').screenshot({path:resolve(output,`${theme}-settings.png`)});
+      await settingsShot(`${theme}-settings.png`);
       await page.locator('#deepseek-explain-tooltip').screenshot({path:resolve(output,`${theme}-result.png`)});
       await page.screenshot({path:resolve(output,`${theme}-result-toolbar.png`)});
       return{color};
@@ -98,7 +99,7 @@ try{
       return colors;
     });
   }
-  await check('520px宽弹窗与150%/200%浏览器缩放，操作不拆字、长厂家/型号可读',async()=>{
+  await check('390px弹窗与150%/200%浏览器缩放，操作不拆字、长厂家/型号可读',async()=>{
     const labels=await popup.evaluate(()=>{
       const provider=document.querySelector('#explain-manufacturer').selectedOptions[0],model=document.querySelector('#explain-model').selectedOptions[0];
       const original={provider:provider.textContent,model:model.textContent};provider.textContent='DeepSeek';model.textContent='DeepSeek-V4.1-Flash';return original;
@@ -115,7 +116,7 @@ try{
         });
         assert.ok(layout.body<=layout.width);assert.ok(layout.provider.width>=layout.provider.required,JSON.stringify(layout));assert.ok(layout.model.width>=layout.model.required,JSON.stringify(layout));
         assert.equal(layout.tabWrap,'nowrap');assert.equal(layout.keyWrap,'nowrap');assert.equal(layout.buttonWrap,'nowrap');
-        if(zoom===1)assert.equal(layout.body,520);
+        if(zoom===1)assert.equal(layout.body,390);
         // 浏览器缩放后的元素截图clip仍按未缩放CSS坐标计算；捕获整个视口避免误裁。
         await popup.screenshot({path:resolve(output,`popup-width-zoom-${zoom}.png`)});layouts.push({zoom,...layout});
       }
@@ -123,6 +124,27 @@ try{
       await popup.evaluate(async labels=>{const tab=await chrome.tabs.getCurrent();await chrome.tabs.setZoom(tab.id,1);document.querySelector('#explain-manufacturer').selectedOptions[0].textContent=labels.provider;document.querySelector('#explain-model').selectedOptions[0].textContent=labels.model;},labels);
     }
     return{layouts,boundary:'Actual Edge tab zoom and synthetic display labels; native toolbar popup sizing not captured'};
+  });
+  await check('高度上限510px，思考强度/Key编辑/保存/主题可滚动访问',async()=>{
+    const thinking=await popup.locator('#explain-thinking').isChecked(),states=[];
+    const geometry=()=>popup.evaluate(()=>{const body=document.body,r=body.getBoundingClientRect();return{width:r.width,height:r.height,rootHeight:document.documentElement.getBoundingClientRect().height,scrollHeight:body.scrollHeight,overflow:getComputedStyle(body).overflowY};});
+    try{
+      await popup.locator('#explain-thinking').check();await popup.locator('#explain-effort-section').waitFor({state:'visible'});
+      await popup.locator('#rewrite-key').click();
+      const expanded=await geometry();assert.equal(expanded.width,390);assert.ok(expanded.height<=510&&expanded.rootHeight<=510,JSON.stringify(expanded));assert.equal(expanded.overflow,'auto');assert.ok(expanded.scrollHeight>expanded.height,JSON.stringify(expanded));states.push({state:'expanded',...expanded});
+      for(const selector of['#explain-effort','#api-key','#cancel-key','#save-btn','#ui-theme']){
+        await popup.locator(selector).scrollIntoViewIfNeeded();
+        const accessible=await popup.locator(selector).evaluate(el=>{const r=el.getBoundingClientRect(),body=document.body.getBoundingClientRect();return{top:r.top,bottom:r.bottom,frameTop:body.top,frameBottom:body.bottom};});
+        assert.ok(accessible.top>=accessible.frameTop-1&&accessible.bottom<=accessible.frameBottom+1,JSON.stringify({selector,...accessible}));
+      }
+      await popup.locator('#cancel-key').click();await popup.locator('#explain-thinking').setChecked(thinking);
+      await popup.evaluate(()=>document.body.scrollTop=0);states.push({state:'restored',...await geometry()});
+      await settingsShot('popup-height-510.png');
+    }finally{
+      if(await popup.locator('#cancel-key').isVisible())await popup.locator('#cancel-key').click();
+      await popup.locator('#explain-thinking').setChecked(thinking);
+    }
+    return{states,boundary:'Actual Edge extension DOM scroll frame; native toolbar popup requires manual reload acceptance'};
   });
   await check('切主题不保存模型/语言/Key 草稿，保存设置不回退主题',async()=>{
     await popup.locator('#explain-language').selectOption('en');await popup.locator('#rewrite-key').click();await popup.locator('#api-key').fill('unsaved-synthetic-draft');
@@ -152,7 +174,7 @@ try{
     await page.setViewportSize({width:375,height:650});
     const geometry=await page.locator('#ds-translate-toolbar').evaluate(el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,width:innerWidth};});assert.ok(geometry.left>=0&&geometry.right<=geometry.width);
     const pageColors=await page.evaluate(()=>({bg:getComputedStyle(document.body).backgroundColor,font:getComputedStyle(document.body).fontFamily}));assert.equal(pageColors.bg,'rgb(255, 255, 255)');assert.equal(pageColors.font,'Arial');
-    await popup.setViewportSize({width:520,height:900});
+    await popup.setViewportSize({width:390,height:600});
   });
   await check('本地品牌PNG尺寸与清单一致、界面/工具栏使用同一引号图标',async()=>{
     for(const size of[16,32,48,128]){const data=readFileSync(resolve(root,`icons/icon${size}.png`));assert.equal(data.readUInt32BE(16),size);assert.equal(data.readUInt32BE(20),size);}
