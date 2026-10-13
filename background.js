@@ -1,5 +1,5 @@
 // ========== 说文 · LingoClarify — Service Worker ==========
-// 职责：配置管理、流式 API 代理、动态右键菜单、缓存、下载
+// 文件职责：右键菜单与消息分发、流式 API 代理、DeepSeek 思考参数、请求缓存和笔记下载。
 
 const CACHE = new Map();
 const CACHE_MAX = 100;
