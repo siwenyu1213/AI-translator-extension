@@ -4,20 +4,18 @@
 
 | 库 | 固定版本 | 文件和用途 | 上游来源 | 许可证 |
 | --- | --- | --- | --- | --- |
-| Marked | 18.1.0 | marked/marked.umd.js；.map仅用于调试 | [官方仓库](https://github.com/markedjs/marked)、[发布包](https://registry.npmjs.org/marked/-/marked-18.1.0.tgz) | MIT，原文在marked/LICENSE |
-| DOMPurify | 3.4.16 | dompurify/purify.min.js；.map仅用于调试 | [官方仓库固定版本](https://github.com/cure53/DOMPurify/tree/3.4.16)、[脚本原文件](https://raw.githubusercontent.com/cure53/DOMPurify/3.4.16/dist/purify.min.js) | 本项目采用Apache-2.0，原文在dompurify/LICENSE |
+| Marked | 18.1.0 | marked/marked.umd.js | [官方仓库](https://github.com/markedjs/marked)、[发布包](https://registry.npmjs.org/marked/-/marked-18.1.0.tgz) | MIT，原文在marked/LICENSE |
+| DOMPurify | 3.4.16 | dompurify/purify.min.js | [官方仓库固定版本](https://github.com/cure53/DOMPurify/tree/3.4.16)、[脚本原文件](https://raw.githubusercontent.com/cure53/DOMPurify/3.4.16/dist/purify.min.js) | 本项目采用Apache-2.0，原文在dompurify/LICENSE |
 
-Marked使用官方npm发布包中的UMD文件与LICENSE，不改写上游代码。发布包SHA-512已与npm registry的dist.integrity核对：`PamYXWWWg2nboG3oX5Ffzpy3EFZROqZJK9hSlMmUnekp7TxPs5DcT95vwd46m73/exfKCRVMtgXoPMI4FEJL6w==`。DOMPurify脚本、source map与LICENSE来自官方仓库固定版本。
+Marked使用官方npm发布包中的UMD文件与LICENSE，不改写上游代码。发布包SHA-512已与npm registry的dist.integrity核对：`PamYXWWWg2nboG3oX5Ffzpy3EFZROqZJK9hSlMmUnekp7TxPs5DcT95vwd46m73/exfKCRVMtgXoPMI4FEJL6w==`。DOMPurify脚本与LICENSE来自官方仓库固定版本。两库的source map仅用于开发者工具调试，不参与解析或清理；本机保留的 `.map` 文件由 `.gitignore` 排除，GitHub分发不包含它们。上游脚本末尾的sourceMappingURL保留原样，需要源码映射时从固定版本上游另行取得。
 
 SHA-256（原始文件字节）：
 
 | 文件 | SHA-256 |
 | --- | --- |
 | marked/marked.umd.js | f424dcb508fdf93e0137a970cfce8f3207ea2e3f37eca5f7556a52875683632a |
-| marked/marked.umd.js.map | eb305cbe6e1bf6e35e3b35a22fa03a2960f7f890ff414d99695c172b123c9f8a |
 | marked/LICENSE | 8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c |
 | dompurify/purify.min.js | 2c90a9b46d6463f26038a29b686e82bc91de01fdac9d5229e7cfe3b360134ea2 |
-| dompurify/purify.min.js.map | 52a28819cc9aacf5d0542c765e3f7c70796600959d33eab63a7bbb89361f3155 |
 | dompurify/LICENSE | cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30 |
 
 加载顺序在manifest.json中定义：theme.js → selection.js → Marked → DOMPurify → markdown.js → content.js。markdown.js负责每次解析后的标签/属性白名单、链接协议、图片替代文字、表格滚动包装与节流；不要把未经清理的parser输出直接插入网页。

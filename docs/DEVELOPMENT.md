@@ -1,6 +1,6 @@
 # 说文 · LingoClarify 开发、运行与验收
 
-当前扩展版本 **4.6.0**。用户功能见 [README](../README.md)，文件职责和接手边界见 [交接](../交接.md)。本手册描述现有入口；带日期的QA和审查文档记录各自提交，不替代当前源码。
+当前扩展版本 **4.6.0**。用户功能和文件职责见 [README](../README.md)。本手册描述现有入口与验收方法；交接材料和逐次任务QA、审查、环境记录仅本地保存，不随GitHub分发。
 
 ## 环境与目录
 
@@ -12,17 +12,17 @@
 | --- | --- |
 | 根目录、`vendor/` | 运行源码、本地依赖与许可证 |
 | `scripts/` | 可复用验证工具 |
-| `docs/` | 开发说明和可提交验收摘要 |
+| `docs/DEVELOPMENT.md` | 公开开发说明与必要验收摘要 |
 | `docs/materials/` | 有来源说明的公开、合成材料 |
-| `.local/materials/` | 私有网页样本 |
+| `.local/materials/` | 私有网页样本、逐次任务记录及交接材料 |
 | `.local/tmp/` | 一次性脚本、缓存、下载 |
 | `.local/browser-profile/` | 隔离浏览器配置 |
 | `artifacts/qa/`、`artifacts/releases/` | 生成证据与分发产物，不进入Git |
 
-本机工作目录仍为：
+克隆后进入包含 `manifest.json` 的仓库根目录，例如：
 
 ```powershell
-Set-Location -LiteralPath 'C:\Users\siwen\Desktop\Workspace\工具\AI-translator-extension'
+Set-Location -LiteralPath '<本机仓库目录>'
 ```
 
 GitHub入口为 `https://github.com/siwenyu1213/LingoClarify`。本地目录与品牌名可以不同，继续使用既有加载路径。存在 `Description.md` 时同步维护，保持本地忽略、不提交。
@@ -89,7 +89,7 @@ node scripts/verify-markdown.mjs --playwright '<已安装的 playwright 包目�
 node scripts/verify-tooltip-position.mjs --playwright '<已安装的 playwright 包目录>'
 ```
 
-本机已核实目录为 `C:/Users/siwen/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright`。默认使用Edge；支持 `--edge` 的工具可指定可执行文件。普通回归不要加旧源码对照参数，只有验证特定缺陷时按对应QA说明使用 `--ref` 或 `--expect-vulnerable`。
+传入本机实际安装的Playwright包目录，不依赖维护者的个人路径。默认使用Edge；支持 `--edge` 的工具可指定可执行文件。普通回归不要加旧源码对照参数，只有验证特定缺陷时根据工具源码中的参数说明使用 `--ref` 或 `--expect-vulnerable`。
 
 每轮创建独立profile，使用合成页面、Key和本机HTTP/SSE，不读取日常存储。工具的外部请求拦截和profile保留方式以源码/报告为准；`verify-browser.mjs`结束自动删除本轮profile，其他工具通常保留。不得清除其他任务或用户配置。
 
@@ -109,11 +109,9 @@ node scripts/verify-tooltip-position.mjs --playwright '<已安装的 playwright 
 
 ## 证据与版本保存
 
-在docs记录日期/时区、基线/待提交范围、工具版本、步骤/预期/实际、报告截图路径、未验证项、提交和GitHub状态。本次证据见 [BRANDING_QA](BRANDING_QA.md)。
+必要的可复查摘要集中在本手册记录日期/时区、基线/待提交范围、工具版本、步骤/预期/实际、报告路径和未验证项；逐次详细记录放 `.local/materials/`，报告和截图放 `artifacts/qa/`。根目录的 `交接.md`、除本手册外的 `docs/*.md` 历史记录以及 `vendor/**/*.map` 由 `.gitignore` 排除；本机保留的旧记录可继续查阅，新克隆不包含这些文件。
 
-当前三主题与引号图标改动见 [THEMES_QA](THEMES_QA.md)。主题回归同样传入 `--playwright`；清单的 web_accessible_resources 仅公开注入界面需要的本地图标和字体，静态工具逐一检查这些资源存在。
-
-2026-10-13 触发方式与DeepSeek思考控制验收见 [SETTINGS_CONTROLS_QA](SETTINGS_CONTROLS_QA.md)。新工具同样传入 `--playwright`，只使用隔离profile、合成Key和本机SSE；原生系统右键菜单的鼠标点击需人工补验。
+主题与设置回归传入 `--playwright`，只使用隔离profile、合成Key和本机SSE。清单的 web_accessible_resources 仅公开注入界面需要的本地图标和字体，静态工具逐一检查这些资源存在。原生系统右键菜单的鼠标点击需人工补验。
 
 生成报告默认仅本机保留。对外截图去除Key、授权头和私有网页，附来源说明；不提交凭据或storage导出。
 
@@ -130,3 +128,9 @@ git diff --cached
 ```
 
 GitHub同步必须核对远程提交和默认分支内容，不能把本地commit或模拟通过当作上传成功。
+
+## 2026-10-13 最小上传整理验收
+
+基线 `16a4992`，当前任务分支与 `origin/main` 一致且工作区干净。停止跟踪27个文件：交接1份、历史任务记录24份、第三方调试source map 2份；原文件仍完整保留在本机。上传清单83→56个文件，运行源码、清单、图标、字体、第三方脚本与许可证、可复用验证工具均未修改，扩展版本保持4.6.0。
+
+使用Node v24.18.1、Git 2.55.0.windows.3核验：本机静态49项通过；仅复制上传清单得到的独立目录静态49项通过；50个保留文件与基线Git内容一致；27个本地材料内容一致且已忽略；公开文档10个本地链接均指向上传文件；diff空白检查通过。详细本机证据为 `artifacts/qa/minimal-upload-2026-10-13/audit.json`，精简目录报告为该目录下的 `upload-snapshot-static.json`。本轮只整理跟踪范围与文档，未重新执行Edge交互或真实供应商请求；静态结果不表示这些功能已重新验收。

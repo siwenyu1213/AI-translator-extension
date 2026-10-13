@@ -23,3 +23,11 @@ artifacts/
 .env
 .env.*
 !.env.example
+
+# 交接与逐次任务记录仅本地保存；公开开发说明集中维护一个入口。
+/交接.md
+/docs/*.md
+!/docs/DEVELOPMENT.md
+
+# 第三方 source map 只用于本机调试，不参与扩展运行。
+/vendor/**/*.map

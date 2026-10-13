@@ -20,10 +20,11 @@
 
 ## 材料与产物存放
 
-- 最终运行成果：沿用根目录的扩展文件；可复用的验证工具放 scripts/，开发说明、验收摘要放 docs/。
+- 最终运行成果：沿用根目录的扩展文件；可复用的验证工具放 scripts/，公开开发说明与必要验收摘要集中维护 docs/DEVELOPMENT.md。
+- GitHub 最小上传范围：运行源码、运行资源与第三方许可证、README 和当前开发说明、可复用验证工具、项目维护规则及 README 使用的公开材料。交接.md、docs/ 下逐次任务验收/审查/环境记录及 vendor/ 的调试 source map 仅本地保留，遵循 .gitignore，不强制添加；新任务详细记录优先放 .local/materials/。
 - 可提交的原材料：docs/materials/，附来源、取得日期及用途；只存有权公开的非敏感材料。
 - 私有网页样本和原材料：.local/materials/；临时脚本、缓存、下载：.local/tmp/；独立浏览器配置：.local/browser-profile/。
-- 生成日志、截图、检查 JSON：artifacts/qa/；分发副本与压缩包：artifacts/releases/。这些生成目录由 .gitignore 排除，最终可复查摘要应写入 docs/。
+- 生成日志、截图、检查 JSON：artifacts/qa/；分发副本与压缩包：artifacts/releases/。这些生成目录由 .gitignore 排除，必要的最终可复查摘要写入 docs/DEVELOPMENT.md，逐次详细记录仅本地保存。
 - 不把 API Key、授权头、浏览器 storage 导出或用户私有网页内容提交到 Git。API Key 按现有设置界面输入；验证证据需去除敏感信息。
 
 ## 验证与验收证据
