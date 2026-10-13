@@ -1,5 +1,30 @@
 # 输出浮层拖动与选区避让验收
 
+## 2026-10-13 顶部控件与光标调整（当前行为）
+
+起始 `main@5fc9c1ffcae13465f5ffabe364482097f49618a3`，工作区干净；fetch 后与 `origin/main` 为 0/0。本次使用 `codex/tooltip-header-cleanup` 保存本地修改。
+
+按用户截图与要求，删除顶部“拖动”字样、四个方向按钮和“自动定位”按钮，移除点击展开、方向键/Home 移动及其样式。标题从按钮改为普通文本容器，保留抓手图标与标题；点击不再展开控件。顶部默认普通光标，左键按下后立即显示抓取光标（无需先移动），松开/取消/失焦/关闭后恢复普通光标。右键不进入拖动；关闭按钮仍是点击光标。
+
+初始避让、正文选字与滚动、流式/页面滚动保持手动位置、窗口边界约束及新选区重置继续保留。请求与配置未改，版本仍为4.6.0。README、开发说明与本地Description.md同步；后者忽略、不提交。
+
+验证环境：Node `v24.18.1`、实际隔离 headless Edge `155.0.4283.45`，加载仓库MV3扩展。使用本机已有Playwright、合成网页/Key/本机SSE，没有安装运行依赖或读取日常配置。
+
+| 检查 | 结果 | 证据 |
+| --- | --- | --- |
+| `verify-tooltip-position.mjs` | 17项通过；原定位/拖动回归，加上控件和字样不存在、点击不展开、标题非按钮、悬停/按下未移动/拖动/释放光标、右键不拖动；页面异常0 | `artifacts/qa/tooltip-header-2026-10-13/report.json` |
+| `verify-markdown-fixes.mjs` | 25项既有交互回归通过，包括流式焦点、隐藏Tab、下载故障与迟到响应、缓存/观察器；页面异常0 | `artifacts/qa/markdown-fix-2026-10-11/fixed/report.json`，本轮日期2026-10-13 |
+| `verify.mjs` / `git diff --check` | 35项静态检查通过；diff无错误 | `artifacts/qa/static-check.json` |
+| 视觉复核 | 查看顶部裁剪与拖动后全页截图，只有抓手/标题/关闭，无移动按钮及“拖动”字样 | `artifacts/qa/tooltip-header-2026-10-13/header.png`、`dragged.png` |
+
+运行命令继续使用下方Playwright与静态检查命令。新定向证据使用2026-10-13目录，保留原日期证据。浏览器与本机服务器已关闭，独立profile保留。有效凭据的真实模型、真实触屏、其他浏览器和特殊宿主页面未验收；本次不改变其请求逻辑。
+
+更新使用方式：在 `edge://extensions` 重新加载扩展，再刷新网页；在浮层顶部按住左键移动，松开恢复普通光标，新划词恢复自动避让。原有模型和Key无需修改。本地提交主题 `fix: simplify tooltip header and show drag cursor only on press`；未推送GitHub。
+
+## 2026-10-12 首次实现（历史记录）
+
+以下按钮与键盘移动的描述仅记录首次实现；当前顶部行为以上方2026-10-13记录为准。
+
 日期：2026-10-12，北京时间。起始分支 `codex/markdown-result-renderer`，工作区干净，HEAD 为 `bbd09aa5f7c49ede0d5f03cdbda347ea05b1e05e`。执行 `git fetch origin` 后当前任务分支与上游为 0/0；复用现有分支。远程 `origin/main` 的更新未合入本次功能分支。
 
 ## 修改与原因

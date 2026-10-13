@@ -52,18 +52,11 @@ function getTooltip() {
     tooltip.setAttribute('aria-hidden', 'true');
     tooltip.innerHTML = `
       <div class="ds-header">
-        <button class="ds-drag-handle" type="button" title="拖动移动；点击展开移动按钮；方向键微调" aria-label="移动结果浮层，方向键微调，点击展开移动按钮" aria-expanded="false">
+        <span class="ds-drag-handle">
           <svg aria-hidden="true" width="12" height="16" viewBox="0 0 12 16" fill="currentColor"><circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/><circle cx="3" cy="8" r="1.2"/><circle cx="9" cy="8" r="1.2"/><circle cx="3" cy="13" r="1.2"/><circle cx="9" cy="13" r="1.2"/></svg>
-          <span class="ds-brand">AI 解释</span><span class="ds-drag-hint">拖动</span>
-        </button>
+          <span class="ds-brand">AI 解释</span>
+        </span>
         <button class="ds-close" title="关闭" aria-label="关闭结果">×</button>
-      </div>
-      <div class="ds-move-controls" hidden>
-        <button type="button" data-ds-move="left" aria-label="向左移动">←</button>
-        <button type="button" data-ds-move="up" aria-label="向上移动">↑</button>
-        <button type="button" data-ds-move="down" aria-label="向下移动">↓</button>
-        <button type="button" data-ds-move="right" aria-label="向右移动">→</button>
-        <button type="button" data-ds-move="reset">自动定位</button>
       </div>
       <div class="ds-reasoning" style="display:none">
         <div class="ds-reasoning-title">思考中…</div>
@@ -99,24 +92,6 @@ function getTooltip() {
     header.addEventListener('pointerup', endTooltipDrag);
     header.addEventListener('pointercancel', endTooltipDrag);
     header.addEventListener('lostpointercapture', endTooltipDrag);
-    const handle = tooltip.querySelector('.ds-drag-handle');
-    handle.addEventListener('click', (e) => {
-      if (Date.now() - tooltipDragEndedAt < 300) { e.preventDefault(); return; }
-      const controls = tooltip.querySelector('.ds-move-controls');
-      controls.hidden = !controls.hidden;
-      handle.setAttribute('aria-expanded', String(!controls.hidden));
-      scheduleTooltipPosition();
-    });
-    handle.addEventListener('keydown', (e) => {
-      const direction = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', Home: 'reset' }[e.key];
-      if (!direction) return;
-      e.preventDefault();
-      nudgeTooltip(direction, e.shiftKey ? 40 : 10);
-    });
-    tooltip.querySelector('.ds-move-controls').addEventListener('click', (e) => {
-      const direction = e.target.closest('[data-ds-move]')?.dataset.dsMove;
-      if (direction) nudgeTooltip(direction, 40);
-    });
     document.body.appendChild(tooltip);
     new ResizeObserver(scheduleTooltipPosition).observe(tooltip);
   }
@@ -195,22 +170,13 @@ function positionTooltip(docCoords) {
   el.style.top = `${top + scrollY}px`;
 }
 
-function nudgeTooltip(direction, step) {
-  if (direction === 'reset') tooltipManualPosition = null;
-  else {
-    const rect = tooltip.getBoundingClientRect();
-    tooltipManualPosition = { left: rect.left + (direction === 'left' ? -step : direction === 'right' ? step : 0),
-      top: rect.top + (direction === 'up' ? -step : direction === 'down' ? step : 0) };
-  }
-  positionTooltip(tooltipAnchor);
-}
-
 function startTooltipDrag(e) {
   if (e.button !== 0 || !e.isPrimary || e.target.closest('.ds-close')) return;
   const rect = tooltip.getBoundingClientRect();
   const captureTarget = e.target.closest('.ds-drag-handle') || e.currentTarget;
   tooltipDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: rect.left, top: rect.top, moved: false, captureTarget };
   captureTarget.setPointerCapture(e.pointerId);
+  tooltip.classList.add('ds-dragging');
   // Preserve the original selection instead of starting a new text selection in the header.
   e.preventDefault();
 }
@@ -220,7 +186,6 @@ function moveTooltipDrag(e) {
   const dx = e.clientX - tooltipDrag.x, dy = e.clientY - tooltipDrag.y;
   if (!tooltipDrag.moved && Math.hypot(dx, dy) < 3) return;
   tooltipDrag.moved = true;
-  tooltip.classList.add('ds-dragging');
   tooltipManualPosition = { left: tooltipDrag.left + dx, top: tooltipDrag.top + dy };
   positionTooltip(tooltipAnchor);
 }
@@ -372,8 +337,6 @@ async function triggerWithStream({ text, mode, popupTitle, snapshot }) {
   tooltipAnchor = coords;
   endTooltipDrag();
   tooltipManualPosition = null;
-  el.querySelector('.ds-move-controls').hidden = true;
-  el.querySelector('.ds-drag-handle').setAttribute('aria-expanded', 'false');
   resetDownloadAction();
   const bodyEl = el.querySelector('.ds-body');
   const reasoningEl = el.querySelector('.ds-reasoning');

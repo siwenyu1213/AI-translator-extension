@@ -46,7 +46,7 @@
 
 #deepseek-explain-tooltip .ds-header {
   flex-shrink: 0;
-  cursor: grab;
+  cursor: default;
   touch-action: none;
   user-select: none;
 }
@@ -60,34 +60,10 @@
   background: transparent;
   color: #64748b;
   font: inherit;
-  cursor: grab;
+  cursor: inherit;
   touch-action: none;
 }
-#deepseek-explain-tooltip .ds-drag-hint { font-size: 11px; }
 #deepseek-explain-tooltip.ds-dragging :is(.ds-header, .ds-drag-handle) { cursor: grabbing; }
-#deepseek-explain-tooltip .ds-move-controls {
-  display: flex;
-  flex-shrink: 0;
-  gap: 4px;
-  padding: 6px 16px 0;
-}
-#deepseek-explain-tooltip .ds-move-controls[hidden] { display: none; }
-#deepseek-explain-tooltip .ds-move-controls button {
-  min-width: 28px;
-  min-height: 28px;
-  padding: 2px 6px;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  background: #fff;
-  color: #475569;
-  font: inherit;
-  cursor: pointer;
-}
-#deepseek-explain-tooltip :is(.ds-drag-handle, .ds-move-controls button):hover { background: #f1f5f9; }
-#deepseek-explain-tooltip :is(.ds-drag-handle, .ds-move-controls button):focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
-}
 #deepseek-explain-tooltip :is(.ds-quote, .ds-reasoning) { min-height: 0; overflow-y: auto; }
 #deepseek-explain-tooltip :is(.ds-actions, .ds-footer) { flex-shrink: 0; }
 

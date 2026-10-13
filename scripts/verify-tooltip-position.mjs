@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 const root = process.cwd();
 const arg = name => process.argv[process.argv.indexOf(name) + 1];
 const { chromium } = createRequire(import.meta.url)(process.argv.includes('--playwright') ? arg('--playwright') : 'playwright');
-const output = resolve(root, 'artifacts/qa/tooltip-position-2026-10-12');
+const output = resolve(root, 'artifacts/qa/tooltip-header-2026-10-13');
 const profile = resolve(root, '.local/browser-profile/tooltip-position', `run-${Date.now()}`);
 mkdirSync(output, { recursive: true }); mkdirSync(profile, { recursive: true });
 const checks = [], errors = [];
@@ -112,14 +112,39 @@ try {
     await fresh({ top: 30, stream: true }); avoids(await geometry()); await drag(200, 10); const before = await geometry(); await done(); await sleep(150);
     const after = await geometry(); fits(after); assert.ok(Math.abs(after.tip.left - before.tip.left) < 2); assert.ok(Math.abs(after.tip.top - before.tip.top) < 2); return { before, after };
   });
-  await check('Pointer buttons and keyboard provide alternatives and reset', async () => {
+  await check('Header has no move controls or drag label and a click does not expand it', async () => {
     await fresh({ top: 30 }); const initial = await geometry();
-    await page.locator('.ds-drag-handle').click(); await page.locator('[data-ds-move="right"]').click();
-    const clicked = await geometry(); assert.ok(Math.abs(clicked.tip.left - initial.tip.left - 40) < 2);
-    await page.locator('.ds-drag-handle').focus(); await page.keyboard.press('ArrowRight');
-    const keyed = await geometry(); assert.ok(Math.abs(keyed.tip.left - clicked.tip.left - 10) < 2);
-    await page.keyboard.press('Home'); await sleep(100); const reset = await geometry(); avoids(reset); assert.ok(Math.abs(reset.tip.left - initial.tip.left) < 2);
-    await page.screenshot({ path: resolve(output, 'move-controls.png') }); return { initial, clicked, keyed, reset };
+    await page.locator('.ds-drag-handle').click();
+    const header = page.locator('.ds-header');
+    assert.equal(await page.locator('.ds-move-controls, .ds-drag-hint, [data-ds-move]').count(), 0);
+    assert.equal((await header.textContent()).includes('拖动'), false);
+    assert.equal(await header.locator('button').count(), 1);
+    assert.equal(await page.locator('.ds-drag-handle').evaluate(el => el.tagName), 'SPAN');
+    const after = await geometry(); assert.ok(Math.abs(after.tip.left - initial.tip.left) < 2); assert.ok(Math.abs(after.tip.top - initial.tip.top) < 2);
+    await header.screenshot({ path: resolve(output, 'header.png') });
+    return { headerText: (await header.textContent()).trim(), initial, after };
+  });
+  await check('Cursor is normal on hover and grabbing only while left button is held', async () => {
+    const cursor = selector => page.locator(selector).evaluate(el => getComputedStyle(el).cursor);
+    const box = await page.locator('.ds-drag-handle').boundingBox();
+    await page.mouse.move(box.x + 14, box.y + 12);
+    for (const selector of ['.ds-header', '.ds-drag-handle', '.ds-brand', '.ds-drag-handle svg']) assert.equal(await cursor(selector), 'default');
+    assert.equal(await cursor('.ds-close'), 'pointer');
+    await page.mouse.down(); assert.equal(await cursor('.ds-header'), 'grabbing'); assert.equal(await cursor('.ds-brand'), 'grabbing');
+    await page.mouse.move(box.x + 100, box.y + 35); assert.equal(await cursor('.ds-header'), 'grabbing');
+    await page.mouse.up(); assert.equal(await cursor('.ds-header'), 'default'); assert.equal(await cursor('.ds-brand'), 'default');
+    const g = await geometry(); fits(g);
+    await page.screenshot({ path: resolve(output, 'dragged.png') });
+    return { hover: 'default', pressedBeforeMotion: 'grabbing', moving: 'grabbing', released: 'default', close: 'pointer', geometry: g };
+  });
+  await check('Right button on header does not activate dragging', async () => {
+    const before = await geometry(), box = await page.locator('.ds-drag-handle').boundingBox();
+    await page.mouse.move(box.x + 14, box.y + 12); await page.mouse.down({ button: 'right' });
+    assert.equal(await page.locator('.ds-header').evaluate(el => getComputedStyle(el).cursor), 'default');
+    assert.equal(await page.locator('#deepseek-explain-tooltip').evaluate(el => el.classList.contains('ds-dragging')), false);
+    await page.mouse.up({ button: 'right' }); const after = await geometry();
+    assert.ok(Math.abs(after.tip.left - before.tip.left) < 2); assert.ok(Math.abs(after.tip.top - before.tip.top) < 2);
+    return { before, after, cursor: 'default' };
   });
   await check('Escape during drag releases capture and prevents reopening', async () => {
     await fresh({ top: 30 }); const box = await page.locator('.ds-drag-handle').boundingBox();

@@ -227,13 +227,13 @@ node scripts/verify-selection-prompts.mjs
 
 当前浮层以原文snapshot Range及文档坐标回退定位，尺寸/窗口变化节流重新约束；整体高度受视口限制，关闭状态inert。Markdown重绘恢复代码/表格/链接焦点，首次整答从顶部显示。DOWNLOAD使用异步消息确认，只显示“已开始下载”而不声称文件已完成；失败可重试并隔离晚回包。全文scan提前跳过扩展UI子树。后台每次local保存继续失效配置读，仅生成字段或连接语义变化清结果缓存，展示元数据刷新保留缓存。
 
-2026-10-12 浮层新增标题区 Pointer Events 拖动、捕获/取消清理、点击方向按钮和方向键/Home 定位。自动定位依次检查选区下/上/右/左，四周无法容纳自然高度时缩小到上下较大空间。手动位置用视口坐标保存，流式增长和页面滚动保留位置，窗口缩小时边界约束；新选区清除手动位置。原文 Range 继续用于自动定位，点击移动按钮造成网页选区折叠不会改锚点。空间铺满时无法保证无重叠。验证工具与证据边界见 [TOOLTIP_POSITION_QA.md](TOOLTIP_POSITION_QA.md)：
+浮层使用标题区 Pointer Events 拖动及捕获/取消清理。2026-10-13 按用户要求删除“拖动”字样、方向/自动定位按钮与对应键盘移动逻辑；标题由按钮改为普通文本容器，不再点击展开控件。顶部默认 `cursor: default`，主指针左键按下后立即加入 `ds-dragging` 显示 `grabbing`，释放、取消、失焦或关闭时移除；右键不启动拖动，关闭按钮仍显示点击光标。自动定位依次检查选区下/上/右/左，四周无法容纳自然高度时缩小到上下较大空间。手动位置用视口坐标保存，流式增长和页面滚动保留位置，窗口缩小时边界约束；新选区清除手动位置。原文 Range 继续用于自动定位。空间铺满时无法保证无重叠。验证工具与证据边界见 [TOOLTIP_POSITION_QA.md](TOOLTIP_POSITION_QA.md)：
 
 ```powershell
 node scripts/verify-tooltip-position.mjs --playwright '<已安装的playwright包目录>'
 ```
 
-工具使用隔离的实际 Edge 扩展、合成网页/Key/本机 SSE 和真实鼠标/键盘事件；外部网络被拦截，不读取日常浏览器配置。生成报告与截图在 `artifacts/qa/tooltip-position-2026-10-12/`，独立 profile 在 `.local/browser-profile/tooltip-position/run-<时间戳>/`。结束关闭浏览器和本机服务器，保留 profile 复查。
+工具使用隔离的实际 Edge 扩展、合成网页/Key/本机 SSE 和真实鼠标/键盘事件；外部网络被拦截，不读取日常浏览器配置。当前生成报告与截图在 `artifacts/qa/tooltip-header-2026-10-13/`，此前2026-10-12证据在 `artifacts/qa/tooltip-position-2026-10-12/`；独立 profile 在 `.local/browser-profile/tooltip-position/run-<时间戳>/`。结束关闭浏览器和本机服务器，保留 profile 复查。
 
 2026-10-12的回答风格调整曾在background.js共用SELECTION_SYSTEM_PROMPT、MEANING_EXPLANATION_GUIDANCE和MARKDOWN_OUTPUT_GUIDANCE，历史验证见 [PROMPT_STYLE_QA.md](PROMPT_STYLE_QA.md)。2026-10-13改为前文 `selection-prompts.js` 的统一system与单项任务要求；语言和模型路由、DeepSeek官方思考覆盖以及全文纯译文/ID协议继续保留。提示词对思考和格式的要求不构成接口token、耗时或强制过滤保证，合成渲染与真实模型生成须分别验收。
 
