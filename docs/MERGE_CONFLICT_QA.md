@@ -37,6 +37,6 @@ main 的 PR #8 引入 v3.6.3 划词播放/关闭行为、全文批量调度和�
 
 ## 保存与使用
 
-merge 提交主题：`merge: integrate main fixes with OpenAI-compatible providers`。目标是将 `origin/main` 合入同名开发分支并推送，使 [PR #9](https://github.com/siwenyu666-beep/AI-translator-extension/pull/9) 恢复可合并；解决冲突不等于已经在 GitHub 合并 PR。实时状态通过 `gh pr view 9 --json mergeable,mergeStateStatus,state` 检查，后续 main 若继续变更需要再次核对。
+merge 提交主题：`merge: integrate main fixes with OpenAI-compatible providers`。目标是将 `origin/main` 合入同名开发分支并推送，使 [PR #9](https://github.com/siwenyu1213/LingoClarify/pull/9) 恢复可合并；解决冲突不等于已经在 GitHub 合并 PR。实时状态通过 `gh pr view 9 --json mergeable,mergeStateStatus,state` 检查，后续 main 若继续变更需要再次核对。
 
 更新后在 `edge://extensions` 重新加载扩展，并刷新已打开网页。原厂家 Key/模型继续沿用；真实服务仍需有效凭据验收。

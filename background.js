@@ -1,4 +1,4 @@
-// ========== AI 智能解释 & 翻译 — Service Worker ==========
+// ========== 说文 · LingoClarify — Service Worker ==========
 // 职责：配置管理、流式 API 代理、动态右键菜单、缓存、下载
 
 const CACHE = new Map();
@@ -20,12 +20,12 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: 'deepseek-explain',
-      title: '📖 智能解释',
+      title: '📖 说文：解释选中文字',
       contexts: ['selection']
     });
     chrome.contextMenus.create({
       id: 'deepseek-fullpage',
-      title: '🌐 全文翻译',
+      title: '🌐 说文：全文翻译',
       contexts: ['page']
     });
   });
@@ -634,10 +634,10 @@ async function handleDownload(selectedText, explanation) {
   const now = new Date();
   const pad = n => String(n).padStart(2, '0');
   const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  const filename = `笔记/AI解释_${timestamp}.txt`;
+  const filename = `笔记/说文_${timestamp}.txt`;
 
   const content = [
-    `AI 智能解释`,
+    `说文 · LingoClarify`,
     `生成时间: ${now.toLocaleString('zh-CN')}`,
     ``,
     `── 选中原文 ──`,

@@ -103,7 +103,7 @@ check('response rule has no 好的 examples and remains distinct from the select
 
 check('word legacy edges choose nearest sentence and omit unrelated README examples', () => {
   const user = build('浮层', {
-    title: 'siwenyu1213/AI-translator-extension',
+    title: 'siwenyu1213/LingoClarify',
     before: '本地规则分别给出文字构成、结构类别和可信度。例如独立消息中的“好的”标为短回应，在“这是一个好的开始”中选中“好的”标为局部片段；含义仍由模型结合材料判断。日文纯汉字可参考附近 lang 声明，缺少声明时存在歧义。\n结果',
     after: '支持 Markdown：标题、加粗/斜体、列表、引用。流式期间约每150毫秒重新解析已收到的内容。'
   });

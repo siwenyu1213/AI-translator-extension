@@ -90,6 +90,6 @@ git diff --check
 
 用户要求合并后，fetch确认原开发分支已通过PR #9合入origin/main，基线为 `f3b51241946853ea9d7a174ac37597509283b9cf`；本地主分支仅落后17个提交，无独有提交。`git merge-tree --write-tree origin/main codex/verify-adversarial-findings` 无冲突，结果树 `c76906840f3eb8e24885408b3d2d0e03300f067e` 与修复提交7b4912a的完整树一致。因此没有新的运行代码组合，无需将此前完整浏览器回归重复当作本轮新执行。
 
-修复源分支已推送，主分支合并入口为 [PR #10](https://github.com/siwenyu1213/AI-translator-extension/pull/10)，采用merge保留审查、复现与修复提交。仓库canonical地址已迁移至 `siwenyu1213/AI-translator-extension`，原origin地址仍有效并保留。README改用main安装入口、交接标记旧分支快照；Description.md仅本地更新。合并前再次执行20项静态与git diff --check通过，GitHub检查列表为空，不代表远程CI通过。
+修复源分支已推送，主分支合并入口为 [PR #10](https://github.com/siwenyu1213/LingoClarify/pull/10)，采用merge保留审查、复现与修复提交。仓库canonical地址已迁移至 `siwenyu1213/AI-translator-extension`，原origin地址仍有效并保留。README改用main安装入口、交接标记旧分支快照；Description.md仅本地更新。合并前再次执行20项静态与git diff --check通过，GitHub检查列表为空，不代表远程CI通过。
 
 最终PR状态、merge提交、同步结果和运行文件哈希核对保存在 `artifacts/qa/adversarial-merge-2026-10-11/merge-result.json`；准确GitHub合并结果以PR记录为准。已有真实供应商及复杂网站的未验证边界继续保留。

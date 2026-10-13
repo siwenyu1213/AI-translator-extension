@@ -1,4 +1,4 @@
-// ========== AI 智能解释 & 翻译 — Content Script ==========
+// ========== 说文 · LingoClarify — Content Script ==========
 // 职责：划词检测 → 流式弹窗（解释/翻译共用）、动态菜单联动、全文翻译入口
 
 let tooltip = null;
@@ -54,7 +54,7 @@ function getTooltip() {
       <div class="ds-header">
         <span class="ds-drag-handle">
           <svg aria-hidden="true" width="12" height="16" viewBox="0 0 12 16" fill="currentColor"><circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/><circle cx="3" cy="8" r="1.2"/><circle cx="9" cy="8" r="1.2"/><circle cx="3" cy="13" r="1.2"/><circle cx="9" cy="13" r="1.2"/></svg>
-          <span class="ds-brand">AI 解释</span>
+          <span class="ds-brand">说文 · 解释</span>
         </span>
         <button class="ds-close" title="关闭" aria-label="关闭结果">×</button>
       </div>
@@ -80,7 +80,7 @@ function getTooltip() {
       </div>
       <div class="ds-footer">
         <span class="ds-model-tag"></span>
-        <span class="ds-powered">Powered by AI</span>
+        <span class="ds-powered">LingoClarify</span>
       </div>
     `;
     tooltip.querySelector('.ds-close').addEventListener('click', hideTooltip);
@@ -315,7 +315,7 @@ async function triggerWithStream({ text, mode, popupTitle, snapshot }) {
   if (!text?.trim()) return;
   snapshot ||= AISelection.capture(text);
   mode ||= snapshot.analysis.mode;
-  popupTitle ||= `AI ${modeLabel(mode)}`;
+  popupTitle ||= `说文 · ${modeLabel(mode)}`;
   if (AISelection.same(snapshot, currentSelection) && tooltip?.classList.contains('ds-visible') && !tooltip.querySelector('.ds-error')) return;
 
   // 中止上一个流
@@ -550,7 +550,7 @@ async function handleExplainThis(e) {
 
   // 确保 tooltip 可见
   const el = getTooltip();
-  el.querySelector('.ds-brand').textContent = `AI ${modeLabel('D')}`;
+  el.querySelector('.ds-brand').textContent = `说文 · ${modeLabel('D')}`;
   el.classList.add('ds-visible');
   el.classList.remove('ds-hidden');
   el.style.display = 'flex';
