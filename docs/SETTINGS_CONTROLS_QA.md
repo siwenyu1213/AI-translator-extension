@@ -22,7 +22,7 @@
 | `node scripts/verify-themes.mjs --playwright <已有包目录>` | 18项实际Edge通过 | `artifacts/qa/themes-2026-10-13/report.json` |
 | `node scripts/verify-markdown.mjs --playwright <已有包目录>` | 24项实际Edge通过；含官方地址转发本机的关闭总开关请求 | `artifacts/qa/markdown/report.json` |
 | `node scripts/verify-adversarial-background.mjs --report artifacts/qa/settings-controls-2026-10-13/background-timing.json` | 2项时序与8项故障对照通过 | `artifacts/qa/settings-controls-2026-10-13/background-timing.json` |
-| `node scripts/verify.mjs --report artifacts/qa/static-check.json` | 最终报告逐项记录语法/入口/资源/版本结果 | `artifacts/qa/static-check.json` |
+| `node scripts/verify.mjs --report artifacts/qa/static-check.json` | 49项通过；职责说明和manifest介绍更新后再次通过 | `artifacts/qa/static-check.json` |
 | `git diff --check` | 通过 | 提交前执行；职责注释阶段再次执行 |
 
 截图 `deepseek-off.png`、`deepseek-on.png`保存在定向验收目录，已视觉复核开关禁用、位置及510px内部滚动布局。README设置截图更新为关闭总开关的实际Edge窗口。
@@ -40,3 +40,5 @@
 ## GitHub同步
 
 同步目标为 `siwenyu1213/LingoClarify` 的 `main` 和现有任务分支。通过普通快进/推送保留全部历史；逐文件职责提交按原顺序进入main，以便GitHub默认列表显示各自功能。权限核对为ADMIN，两分支均返回protected=false，有效分支规则为空；传统保护返回明确Branch not protected。最终远程SHA和文件最新标题的逐项核对保存在 `artifacts/qa/settings-controls-2026-10-13/github-file-descriptions.json`。
+
+已完成普通推送：功能提交 `b8df8a4`，其后20个逐文件职责提交，最后的内容快照为 `ca4c53a4f4a3a7ab2964084f441129fcb909efbd`。GitHub API逐项确认根目录20/20文件的最后标题和对应职责提交一致，main与任务分支均包含该快照；远程根目录无Description.md。此前三主题和弹窗提交也已按用户授权上传。最后补写本节只改验收文档，根目录20个文件的最新职责标题继续保留。
