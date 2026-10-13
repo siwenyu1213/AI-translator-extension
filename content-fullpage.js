@@ -1,4 +1,5 @@
-// 按需注入：以 Text 节点为翻译单元，保留 DOM 结构、节点身份与网页自己的更新。
+// 文件职责：按需全文翻译、Text 节点任务队列、动态内容观察、原文切换与取消恢复。
+// 以 Text 节点为翻译单元，保留 DOM 结构、节点身份与网页自己的更新。
 (function () {
   'use strict';
   if (window.__dsFullPageTranslatorActive) {
