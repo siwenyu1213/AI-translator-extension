@@ -11,6 +11,21 @@ let providerConnections = {}, savedKeys = {}, modelList = [], savedConfig = {};
 let catalogSnapshot = AIModelCatalog.BUILTIN, catalogRefreshing = false, catalogError = '';
 const providerErrors = new Map(), providerRequests = new Map();
 const editingKeys = new Set();
+LingoTheme.attach(document.body);
+LingoTheme.subscribe(theme => { $('ui-theme').value = theme; });
+LingoTheme.ready.then(theme => { $('ui-theme').value = theme; });
+$('ui-theme').addEventListener('change', async () => {
+  const select = $('ui-theme'), requested = LingoTheme.normalize(select.value);
+  select.disabled = true;
+  try {
+    await chrome.storage.local.set({uiTheme:requested});
+    LingoTheme.apply(requested);
+    $('theme-status').textContent = '主题已保存'; $('theme-status').className = 'hint';
+  } catch {
+    select.value = LingoTheme.current;
+    $('theme-status').textContent = '主题保存失败，请重试。'; $('theme-status').className = 'inline-error';
+  } finally { select.disabled = false; }
+});
 
 function providerConnection(provider) {
   const entry = providerConnections[provider] || {};
@@ -32,6 +47,7 @@ function showConnection() {
   const edit = !savedKeys[connectionProvider] || editingKeys.has(connectionProvider);
   $('key-editor').hidden = !edit;
   $('rewrite-key').hidden = edit;
+  $('key-saved').hidden = edit;
   $('cancel-key').hidden = !savedKeys[connectionProvider];
   $('custom-connection-button').hidden = connectionProvider !== 'custom';
   $('key-msg').textContent = '';
@@ -240,10 +256,19 @@ document.querySelectorAll('.tab-btn').forEach(button => button.addEventListener(
   captureConnection();
   $('custom-connection-dialog').close();
   activeTabIndex = button.dataset.tab === 'translate' ? 1 : 0;
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b===button));
-  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+button.dataset.tab));
+  document.querySelectorAll('.tab-btn').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-selected',String(b===button));});
+  document.querySelectorAll('.tab-panel').forEach(p=>{const active=p.id==='panel-'+button.dataset.tab;p.classList.toggle('active',active);p.hidden=!active;});
   showConnection(); renderAllModelOptions();
 }));
+document.querySelector('.tab-bar').addEventListener('keydown', event => {
+  if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+  const buttons = [...document.querySelectorAll('.tab-btn')];
+  const index = buttons.indexOf(document.activeElement);
+  if (index < 0) return;
+  event.preventDefault();
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + 2) % 2;
+  buttons[next].focus(); buttons[next].click();
+});
 tabs.forEach(tab => tab.manufacturer.addEventListener('change', () => {
   if (tab === tabs[activeTabIndex]) {captureConnection();showConnection();}
   renderModelOptions(tab);
@@ -256,7 +281,7 @@ for (const kind of ['explain','translate']) {
 }
 $('rewrite-key').addEventListener('click',()=>{
   editingKeys.add(connectionProvider);
-  $('key-editor').hidden=false; $('rewrite-key').hidden=true;
+  $('key-editor').hidden=false; $('rewrite-key').hidden=true; $('key-saved').hidden=true;
   $apiKey.value=''; $apiKey.focus();
 });
 $('cancel-key').addEventListener('click',async()=> {

@@ -4,11 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>说文 · LingoClarify</title>
+<link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="popup.css">
 </head>
-<body>
+<body class="lc-theme" data-lc-theme="cobalt">
 <div class="container">
-  <h1 class="title">说文 · LingoClarify <span class="version">v4.6.0</span></h1>
+  <header class="brand-header">
+    <span class="lc-brand-icon" aria-hidden="true"></span>
+    <div><h1 class="title">说文</h1><p class="brand-subtitle">LingoClarify <span class="version">v4.6.0</span></p></div>
+  </header>
   <p id="catalog-status" class="catalog-error" role="alert" hidden></p>
   <div id="disabled-extension" class="section" hidden>
     <p class="hint">扩展当前已停用。</p>
@@ -16,17 +20,23 @@
   </div>
 
   <!-- ═══ 标签切换 ═══ -->
-  <div class="tab-bar">
-    <button class="tab-btn active" data-tab="explain">📖 解释</button>
-    <button class="tab-btn" data-tab="translate">🌐 全文翻译</button>
+  <div class="tab-bar" role="tablist" aria-label="配置用途">
+    <button type="button" class="tab-btn active" id="tab-explain" role="tab" aria-selected="true" aria-controls="panel-explain" data-tab="explain"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 6c-3-3-7-3-10-2v15c3-1 7-1 10 2 3-3 7-3 10-2V4c-3-1-7-1-10 2Zm0 0v15"/></svg>解释</button>
+    <button type="button" class="tab-btn" id="tab-translate" role="tab" aria-selected="false" aria-controls="panel-translate" data-tab="translate"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 5h12M9 2v3M5 5c1 5 4 8 8 10M13 5c-1 5-4 8-8 10M14 21l4-10 4 10M15.5 18h5"/></svg>全文翻译</button>
   </div>
 
   <!-- ═══ 解释标签设置 ═══ -->
-  <div class="tab-panel active" id="panel-explain">
+  <div class="tab-panel active" id="panel-explain" role="tabpanel" aria-labelledby="tab-explain">
+    <div class="section field-pair">
+      <div><label class="label" for="explain-manufacturer">模型厂家</label>
+      <select id="explain-manufacturer" class="select" aria-controls="explain-model"></select></div>
+      <div><label class="label" for="explain-language">解释语言</label>
+      <select id="explain-language" class="select">
+        <option value="auto">自动（推荐）</option><option value="zh">中文</option><option value="en">English</option>
+      </select></div>
+    </div>
     <div class="section">
-      <label class="label" for="explain-manufacturer">模型厂家</label>
-      <select id="explain-manufacturer" class="select" aria-controls="explain-model"></select>
-      <label class="label label-spaced" for="explain-model">该厂家模型</label>
+      <label class="label" for="explain-model">模型</label>
       <select id="explain-model" class="select" aria-describedby="explain-model-detail"></select>
       <p id="explain-model-detail" class="hint"></p>
 
@@ -37,7 +47,6 @@
         <input type="checkbox" id="explain-thinking">
         <span class="toggle-text">深度思考模式</span>
       </label>
-      <p class="hint">当前版本对 DeepSeek 官方接口固定关闭思考，忽略此开关；其他接口仅在支持 reasoning_effort 时开启。</p>
     </div>
 
     <div class="section" id="explain-effort-section" style="display:none">
@@ -49,22 +58,21 @@
       </select>
     </div>
 
-    <div class="section">
-      <label class="label" for="explain-language">解释语言偏好</label>
-      <select id="explain-language" class="select">
-        <option value="auto">自动检测（推荐）</option>
-        <option value="zh">始终用中文</option>
-        <option value="en">始终用英文</option>
-      </select>
-    </div>
   </div>
 
   <!-- ═══ 翻译标签设置 ═══ -->
-  <div class="tab-panel" id="panel-translate">
+  <div class="tab-panel" id="panel-translate" role="tabpanel" aria-labelledby="tab-translate" hidden>
+    <div class="section field-pair">
+      <div><label class="label" for="translate-manufacturer">模型厂家</label>
+      <select id="translate-manufacturer" class="select" aria-controls="translate-model"></select></div>
+      <div><label class="label" for="target-language">翻译目标语言</label>
+      <select id="target-language" class="select">
+        <option value="zh">中文</option><option value="en">English</option><option value="ja">日本語</option><option value="ko">한국어</option>
+        <option value="fr">Français</option><option value="de">Deutsch</option><option value="es">Español</option><option value="pt">Português</option><option value="ru">Русский</option><option value="ar">العربية</option>
+      </select></div>
+    </div>
     <div class="section">
-      <label class="label" for="translate-manufacturer">模型厂家</label>
-      <select id="translate-manufacturer" class="select" aria-controls="translate-model"></select>
-      <label class="label label-spaced" for="translate-model">该厂家模型</label>
+      <label class="label" for="translate-model">模型</label>
       <select id="translate-model" class="select" aria-describedby="translate-model-detail"></select>
       <p id="translate-model-detail" class="hint"></p>
 
@@ -75,7 +83,6 @@
         <input type="checkbox" id="translate-thinking">
         <span class="toggle-text">深度思考模式</span>
       </label>
-      <p class="hint">当前版本对 DeepSeek 官方接口固定关闭思考，忽略此开关；其他接口关闭时使用模型默认行为。</p>
     </div>
 
     <div class="section" id="translate-effort-section" style="display:none">
@@ -87,21 +94,6 @@
       </select>
     </div>
 
-    <div class="section">
-      <label class="label" for="target-language">翻译目标语言</label>
-      <select id="target-language" class="select">
-        <option value="zh">中文</option>
-        <option value="en">English</option>
-        <option value="ja">日本語</option>
-        <option value="ko">한국어</option>
-        <option value="fr">Français</option>
-        <option value="de">Deutsch</option>
-        <option value="es">Español</option>
-        <option value="pt">Português</option>
-        <option value="ru">Русский</option>
-        <option value="ar">العربية</option>
-      </select>
-    </div>
   </div>
 
   <div class="section key-section">
@@ -115,7 +107,7 @@
       </div>
       <p id="key-msg" class="inline-error" role="alert"></p>
     </div>
-    <button type="button" id="rewrite-key" class="fetch-btn" hidden>重新填写 API Key</button>
+    <div id="key-saved" class="key-saved" hidden><span>API Key 已保存</span><button type="button" id="rewrite-key" class="mini-btn" hidden>重新填写</button></div>
   </div>
   <button type="button" id="custom-connection-button" class="connection-link" hidden>配置自定义接口</button>
   <dialog id="custom-connection-dialog">
@@ -130,12 +122,18 @@
     </div>
   </dialog>
 
-  <button id="save-btn" class="save-btn">💾 保存设置</button>
-  <div id="status" class="status"></div>
+  <button type="button" id="save-btn" class="save-btn">保存设置</button>
+  <div id="status" class="status" role="status" aria-live="polite"></div>
+  <div class="theme-section">
+    <label class="label" for="ui-theme">主题风格</label>
+    <select id="ui-theme" class="select" aria-describedby="theme-status"><option value="cobalt">钴蓝纸页（默认）</option><option value="playful">蜜桃涂鸦</option><option value="vellum">靛蓝手稿</option></select>
+    <p id="theme-status" class="hint" role="status" aria-live="polite">切换后自动保存</p>
+  </div>
 </div>
 
 <script src="model-catalog.js"></script>
 <script src="config.js"></script>
+<script src="theme.js"></script>
 <script src="popup.js"></script>
 </body>
 </html>

@@ -16,6 +16,7 @@ AI Translation & Contextual Explanation for the Web
 - **复制与笔记下载**：复制回答的 Markdown 原文，或下载包含所选原文和回答的 TXT。
 - **解释与翻译分别配置**：两个用途可选择不同厂家、模型和语言；各厂家保存自己的 Key 和模型列表。
 - **自定义接口**：可连接满足兼容协议的第三方网关、聚合服务或本机服务。
+- **三种主题**：钴蓝纸页（默认）、蜜桃涂鸦、靛蓝手稿，设置、划词浮层与全文工具栏同步切换。
 
 ## 安装与首次配置
 
@@ -40,6 +41,8 @@ git clone https://github.com/siwenyu1213/LingoClarify.git
 ![说文设置窗口](docs/materials/screenshots/settings.png)
 
 截图来自实际 Edge 中的扩展设置页，使用本机模拟接口与合成配置，展示当前界面。
+
+在设置窗口底部选择“主题风格”即可切换外观，选择后自动保存，无需点击“保存设置”。三种主题共用蜜桃涂鸦的布局与引号品牌图标；主题切换不保存正在编辑的 Key、厂家、模型或语言草稿。
 
 ## 怎么使用
 
@@ -138,6 +141,7 @@ git diff --check
 - [开发与验收方法](docs/DEVELOPMENT.md)
 - [当前项目交接](交接.md)
 - [改名与最新版本文档验收](docs/BRANDING_QA.md)
+- [三主题与图标验收](docs/THEMES_QA.md)
 - [第三方库来源与许可证](vendor/README.md)
 - [项目工作规则](AGENTS.md)
 

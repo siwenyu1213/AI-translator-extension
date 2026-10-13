@@ -40,8 +40,8 @@ GitHub入口为 `https://github.com/siwenyu1213/LingoClarify`。本地目录与�
 ## 当前调用关系
 
 - 后台加载 `model-catalog.js`、`config.js`、`selection.js`、`selection-prompts.js`；只使用选区模块的无DOM分析。
-- 自动内容注入：`selection.js` → Marked → DOMPurify → `markdown.js` → `content.js`，样式为 `content.css`。
-- 设置页加载 `model-catalog.js`、`config.js`、`popup.js`，共用配置与查询逻辑。
+- 自动内容注入：`theme.js` → `selection.js` → Marked → DOMPurify → `markdown.js` → `content.js`，样式为 `theme.css`、`content.css`。
+- 设置页加载 `model-catalog.js`、`config.js`、`theme.js`、`popup.js`，共用配置与查询逻辑。外观模块独立保存 `uiTheme`，只更新扩展根元素，默认钴蓝纸页；字体和引号图标本地打包。
 - 全文由后台按需注入 `content-fullpage.js`，通过端口取得单条或批量结果。
 
 划词本地分类选择单项任务，以统一system要求和JSON材料发送一次生成。外语完整句段用翻译连接，其余解释用解释连接；“解释此句”使用解读任务。所在句及必要材料有预算，回答仍为Markdown正文。全文纯译文和批量ID协议独立。
@@ -65,6 +65,7 @@ git diff --check
 
 | 范围 | 工具 |
 | --- | --- |
+| 主题持久化、草稿隔离、页面同步、图标/字体与键盘/窄屏 | `scripts/verify-themes.mjs` |
 | 配置、后台、路由、SSE和失败的离线模拟 | `node scripts/verify-api.mjs` |
 | 本地分类与提示词/材料构建 | `node scripts/verify-selection-prompts.mjs` |
 | 选区分类离线语料 | `node scripts/verify-selection.mjs --node-only` |
@@ -106,6 +107,8 @@ node scripts/verify-tooltip-position.mjs --playwright '<已安装的 playwright 
 ## 证据与版本保存
 
 在docs记录日期/时区、基线/待提交范围、工具版本、步骤/预期/实际、报告截图路径、未验证项、提交和GitHub状态。本次证据见 [BRANDING_QA](BRANDING_QA.md)。
+
+当前三主题与引号图标改动见 [THEMES_QA](THEMES_QA.md)。主题回归同样传入 `--playwright`；清单的 web_accessible_resources 仅公开注入界面需要的本地图标和字体，静态工具逐一检查这些资源存在。
 
 生成报告默认仅本机保留。对外截图去除Key、授权头和私有网页，附来源说明；不提交凭据或storage导出。
 

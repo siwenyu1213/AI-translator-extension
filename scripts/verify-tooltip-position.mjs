@@ -93,9 +93,10 @@ try {
     ['Short landscape viewport', { width: 850, height: 375, top: 155, textWidth: 600 }]
   ]) await check(name, async () => { await fresh(options); const g = await geometry(); avoids(g); await page.screenshot({ path: resolve(output, `${checks.length}.png`) }); return g; });
   await check('Drag preserves selected text and moves result', async () => {
-    await fresh({ top: 80 }); const before = await geometry(), selected = await page.evaluate(() => getSelection().toString());
+    // 新阅读字号与品牌头部更高；将样本上移，留出35px自由拖动空间。
+    await fresh({ top: 30 }); const before = await geometry(), selected = await page.evaluate(() => getSelection().toString());
     await drag(180, 35); const after = await geometry(); fits(after);
-    assert.ok(Math.abs(after.tip.left - before.tip.left - 180) < 2); assert.ok(Math.abs(after.tip.top - before.tip.top - 35) < 2);
+    assert.ok(Math.abs(after.tip.left - before.tip.left - 180) < 2, JSON.stringify({before,after})); assert.ok(Math.abs(after.tip.top - before.tip.top - 35) < 2, JSON.stringify({before,after}));
     assert.equal(await page.evaluate(() => getSelection().toString()), selected); return { before, after, selected };
   });
   await check('Drag clamps to viewport and releases outside header', async () => {

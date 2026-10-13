@@ -365,3 +365,47 @@
 }
 #deepseek-explain-tooltip .ds-btn:disabled { cursor: wait; opacity: .65; }
 #deepseek-explain-tooltip .ds-actions { flex-wrap: wrap; }
+
+/* 三主题共用蜜桃涂鸦轮廓与操作布局；不影响网页正文。 */
+#deepseek-explain-tooltip {
+  background: var(--lc-bg); color: var(--lc-ink); border: 1.5px solid var(--lc-border);
+  border-radius: 21px 9px 19px 7px; box-shadow: 0 6px 24px var(--lc-shadow);
+  font-family: var(--lc-body-font); font-size: 14px;
+}
+#deepseek-explain-tooltip .ds-header { padding: 10px 16px 8px; border-bottom: 1px solid var(--lc-rule); }
+#deepseek-explain-tooltip .lc-brand-icon { width: 22px; height: 22px; }
+#deepseek-explain-tooltip .ds-drag-handle { color: var(--lc-muted); gap: 7px; }
+#deepseek-explain-tooltip .ds-brand { color: var(--lc-muted); font-size: 12px; letter-spacing: 0; text-transform: none; }
+#deepseek-explain-tooltip .ds-close { width: 30px; height: 30px; color: var(--lc-ink); margin: 0; }
+#deepseek-explain-tooltip .ds-close:hover { color: var(--lc-ink); background: var(--lc-soft); }
+#deepseek-explain-tooltip .ds-quote { background: var(--lc-surface); color: var(--lc-muted); border: 1px solid var(--lc-border); border-radius: 12px 4px 11px 5px; margin-top: 12px; font-size: 13px; font-style: normal; }
+#deepseek-explain-tooltip .ds-body { color: var(--lc-ink); font-size: 14px; }
+#deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6) { color: var(--lc-ink); font-family: var(--lc-title-font); }
+#deepseek-explain-tooltip .ds-markdown h1 { font-size: 23px; }
+#deepseek-explain-tooltip .ds-markdown h2 { font-size: 21px; }
+#deepseek-explain-tooltip .ds-markdown h3 { font-size: 18px; }
+#deepseek-explain-tooltip .ds-markdown blockquote { background: var(--lc-surface); color: var(--lc-muted); border-color: var(--lc-accent); }
+#deepseek-explain-tooltip .ds-markdown :is(code,pre,th) { color: var(--lc-ink); background: var(--lc-surface); }
+#deepseek-explain-tooltip .ds-markdown pre code { background: transparent; }
+#deepseek-explain-tooltip .ds-markdown td { background: var(--lc-bg); }
+#deepseek-explain-tooltip .ds-markdown :is(th,td,pre,hr) { border-color: var(--lc-rule); }
+#deepseek-explain-tooltip .ds-markdown a, #deepseek-explain-tooltip .ds-streaming::after { color: var(--lc-accent); }
+#deepseek-explain-tooltip .ds-markdown a:not([href]) { color: inherit; }
+#deepseek-explain-tooltip .ds-btn { background: var(--lc-surface); color: var(--lc-ink); border: 1px solid var(--lc-border); border-radius: 5px; font-size: 12px; min-height: 32px; }
+#deepseek-explain-tooltip .ds-btn:hover { background: var(--lc-soft); color: var(--lc-ink); border-color: var(--lc-border); }
+#deepseek-explain-tooltip .ds-btn:active { background: var(--lc-soft); }
+#deepseek-explain-tooltip .ds-error { color: var(--lc-error); }
+#deepseek-explain-tooltip .ds-footer { border-color: var(--lc-rule); }
+#deepseek-explain-tooltip .ds-model-tag { color: var(--lc-muted); background: var(--lc-surface); font-size: 11px; }
+#deepseek-explain-tooltip .ds-powered { color: var(--lc-muted); font-size: 11px; }
+#deepseek-explain-tooltip .ds-reasoning { background: var(--lc-surface); border-color: var(--lc-border); }
+#deepseek-explain-tooltip :is(.ds-reasoning-title,.ds-reasoning-body) { color: var(--lc-muted); }
+#deepseek-explain-tooltip :is(.ds-close,.ds-btn,a,pre,.ds-md-table):focus-visible { outline-color: var(--lc-accent); }
+#ds-translate-toolbar { flex-wrap: wrap; gap: 10px; background: var(--lc-bg); color: var(--lc-ink); border-bottom: 1px solid var(--lc-border); font-family: var(--lc-body-font); }
+#ds-translate-toolbar .lc-brand-icon { width: 24px; height: 24px; }
+#ds-translate-toolbar .ds-tb-progress { color: var(--lc-muted); font-size: 12px; }
+#ds-translate-toolbar .ds-tb-btn { display: inline-flex; align-items: center; min-height: 32px; border-color: var(--lc-border); color: var(--lc-ink); background: var(--lc-surface); font-family: inherit; }
+#ds-translate-toolbar .ds-tb-btn:hover { background: var(--lc-soft); }
+#ds-translate-toolbar .ds-tb-danger { border-color: var(--lc-error); color: var(--lc-error); }
+#ds-translate-toolbar .ds-tb-danger:hover { background: var(--lc-error-bg); }
+#ds-translate-toolbar .ds-tb-btn:focus-visible { outline: 2px solid var(--lc-accent); outline-offset: 2px; }

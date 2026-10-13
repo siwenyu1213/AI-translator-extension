@@ -59,7 +59,10 @@ async function sample(next, viewport = { width: 1000, height: 900 }) {
   page = await context.newPage();
   await page.setViewportSize(viewport);
   page.on('pageerror', error => errors.push(error.message));
-  page.on('request', req => { if (!req.url().startsWith(base)) network.push(req.url()); });
+  page.on('request', req => {
+    const extensionAssets = `chrome-extension://${new URL(worker.url()).host}/`;
+    if (!req.url().startsWith(base) && !req.url().startsWith(extensionAssets)) network.push(req.url());
+  });
   await page.goto(`${base}/sample/${sequence++}`);
   await page.waitForFunction(() => document.querySelector('#word'));
   // Ensure the extension's isolated world has initialized the content script.
@@ -253,7 +256,7 @@ try {
       try {
         await popup.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`);
         await popup.waitForFunction(() => document.querySelector('#explain-thinking').checked);
-        assert.ok((await popup.locator('.hint').allTextContents()).filter(text => text.includes('固定关闭思考')).length >= 2);
+        assert.equal((await popup.locator('body').textContent()).includes('固定关闭思考'), false);
       } finally { await popup.close(); }
       const state = await worker.evaluate(() => chrome.storage.local.get(['explainThinkingEnabled', 'translateThinkingEnabled']));
       assert.equal(state.explainThinkingEnabled, true); assert.equal(state.translateThinkingEnabled, true);
@@ -344,7 +347,7 @@ try {
     });
     assert.ok(layout.tooltipWidth <= 360); assert.ok(layout.bodyScrollWidth <= layout.bodyWidth + 1);
     assert.ok(layout.tableScrollWidth > layout.tableWidth); assert.ok(layout.preScrollWidth > layout.preWidth);
-    assert.equal(layout.headingSize, '17px'); assert.equal(layout.outsideSize, '22px');
+    assert.equal(layout.headingSize, '21px'); assert.equal(layout.outsideSize, '22px');
     await body().locator('.ds-md-table').focus(); await page.keyboard.press('ArrowRight');
     await page.waitForTimeout(250); assert.ok(await body().locator('.ds-md-table').evaluate(el => el.scrollLeft > 0));
     await body().evaluate(el => { el.scrollTop = 0; }); await page.screenshot({ path: resolve(output, 'narrow.png') });

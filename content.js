@@ -48,11 +48,13 @@ function getTooltip() {
   if (!tooltip) {
     tooltip = document.createElement('div');
     tooltip.id = 'deepseek-explain-tooltip';
+    LingoTheme.attach(tooltip);
     tooltip.inert = true;
     tooltip.setAttribute('aria-hidden', 'true');
     tooltip.innerHTML = `
       <div class="ds-header">
         <span class="ds-drag-handle">
+          <span class="lc-brand-icon" aria-hidden="true"></span>
           <svg aria-hidden="true" width="12" height="16" viewBox="0 0 12 16" fill="currentColor"><circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/><circle cx="3" cy="8" r="1.2"/><circle cx="9" cy="8" r="1.2"/><circle cx="3" cy="13" r="1.2"/><circle cx="9" cy="13" r="1.2"/></svg>
           <span class="ds-brand">说文 · 解释</span>
         </span>
@@ -458,7 +460,7 @@ async function handleCopy(e) {
     const btn = tooltip.querySelector('.ds-btn-copy .ds-btn-label');
     const original = btn.textContent;
     btn.textContent = '已复制';
-    btn.style.color = '#16a34a';
+    btn.style.color = 'var(--lc-success)';
     setTimeout(() => { btn.textContent = original; btn.style.color = ''; }, 1500);
   } catch {
     const ta = document.createElement('textarea');
@@ -502,7 +504,7 @@ async function handleDownload(e) {
   request.pending = false;
   button.disabled = false;
   label.textContent = result?.ok ? '已开始下载' : '下载失败，重试';
-  label.style.color = result?.ok ? '#16a34a' : '#dc2626';
+  label.style.color = result?.ok ? 'var(--lc-success)' : 'var(--lc-error)';
   if (result?.ok) request.timer = setTimeout(() => {
     if (downloadRequest === request) resetDownloadAction();
   }, 1500);

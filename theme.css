@@ -1,0 +1,29 @@
+/* theme.js通过扩展绝对地址注册本地字体；中文使用系统字体。 */
+
+/* 变量只落到扩展自有根元素，不改宿主网页的主题或字体。 */
+.lc-theme {
+  --lc-bg: #fdfae7; --lc-surface: #fdfae7; --lc-soft: #f1efd7;
+  --lc-ink: #111111; --lc-muted: #5c5b60; --lc-accent: #1e2bfa; --lc-on: #fdfae7;
+  --lc-border: #9293bd; --lc-rule: #d4d1c3; --lc-error: #b42318; --lc-error-bg: #fff0e8;
+  --lc-success: #25633e; --lc-shadow: #11111112;
+  --lc-body-font: 'LC Inter', 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --lc-title-font: 'LC Space', 'Microsoft YaHei', sans-serif;
+  color-scheme: light;
+}
+.lc-theme[data-lc-theme='playful'] {
+  --lc-bg: #f0c8a0; --lc-surface: #f7dec6; --lc-soft: #e8b88e;
+  --lc-ink: #1a1a1a; --lc-muted: #55402f; --lc-accent: #1a1a1a; --lc-on: #f7dec6;
+  --lc-border: #1a1a1a; --lc-rule: #ac7c54;
+  --lc-body-font: 'LC Space', 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --lc-title-font: 'LC Syne', 'Microsoft YaHei', sans-serif;
+}
+.lc-theme[data-lc-theme='vellum'] {
+  --lc-bg: #2a3870; --lc-surface: #343f80; --lc-soft: #3b4787;
+  --lc-ink: #e8d85c; --lc-muted: #ebdfab; --lc-accent: #e8d85c; --lc-on: #2a3870;
+  --lc-border: #a79f76; --lc-rule: #737c9c; --lc-error: #ffb8b2; --lc-error-bg: #483859;
+  --lc-success: #b5ecbf; --lc-shadow: #00000024;
+  --lc-body-font: 'LC Inter', 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --lc-title-font: 'LC Cormorant', 'SimSun', Georgia, serif;
+  color-scheme: dark;
+}
+.lc-brand-icon { display: inline-block; flex: none; width: 40px; height: 40px; background: var(--lc-brand-image) center / contain no-repeat; }

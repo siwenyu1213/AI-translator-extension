@@ -225,7 +225,8 @@
       stop(); aborted = false; window.__dsFullPageTranslatorActive = true;
       if (!toolbar) {
         toolbar = document.createElement('div'); toolbar.id = 'ds-translate-toolbar';
-        toolbar.innerHTML = '<span class="ds-tb-status">翻译中…</span><span class="ds-tb-progress" id="ds-tb-progress">0 / 0</span><button class="ds-tb-btn" id="ds-tb-show-original">显示原文</button><button class="ds-tb-btn ds-tb-danger" id="ds-tb-cancel">取消翻译</button>';
+        LingoTheme.attach(toolbar);
+        toolbar.innerHTML = '<span class="lc-brand-icon" aria-hidden="true"></span><span class="ds-tb-status">翻译中…</span><span class="ds-tb-progress" id="ds-tb-progress">0 / 0</span><button type="button" class="ds-tb-btn" id="ds-tb-show-original">显示原文</button><button type="button" class="ds-tb-btn ds-tb-danger" id="ds-tb-cancel">取消翻译</button>';
         document.body.prepend(toolbar);
         toolbar.querySelector('#ds-tb-show-original').addEventListener('click', toggleOriginal);
         toolbar.querySelector('#ds-tb-cancel').addEventListener('click', cancel);

@@ -60,6 +60,7 @@ if (manifest) {
   const paths = [manifest.background?.service_worker, manifest.action?.default_popup,
     ...(manifest.content_scripts || []).flatMap(script => [...(script.js || []), ...(script.css || [])]),
     ...Object.values(manifest.icons || {}), ...Object.values(manifest.action?.default_icon || {})];
+  paths.push(...(manifest.web_accessible_resources || []).flatMap(entry => entry.resources || []));
   for (const path of new Set(paths)) check(`Manifest resource: ${path}`, () => resource(path));
 }
 check('Popup local script/style references and displayed version', () => {
