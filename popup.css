@@ -1,23 +1,26 @@
 /* 蜜桃涂鸦布局；三主题的色彩与字体由 theme.css 提供。 */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
-body { width: 380px; max-width: 100vw; font: 14px/1.5 var(--lc-body-font); color: var(--lc-ink); background: var(--lc-bg); }
+/* 根元素给原生弹窗明确的首选宽度，body在缩放/屏幕限幅时适应实际视口。 */
+html { width: 520px; overflow-x: hidden; }
+body { width: 520px; max-width: 100vw; font: 14px/1.5 var(--lc-body-font); color: var(--lc-ink); background: var(--lc-bg); }
 .container { padding: 22px; }
 .brand-header { display: flex; gap: 13px; align-items: center; margin: 0 0 22px; }
+.brand-header > div { min-width: 0; }
 .title { font: 700 29px/1.15 var(--lc-title-font); letter-spacing: -.5px; }
-.brand-subtitle { margin-top: 5px; font: 500 14px/1.5 var(--lc-title-font); }
+.brand-subtitle { margin-top: 5px; font: 500 14px/1.5 var(--lc-title-font); white-space: nowrap; }
 .version { font: 400 11px/1.5 var(--lc-body-font); color: var(--lc-muted); margin-left: 5px; }
 .tab-bar { display: flex; gap: 9px; margin: 0 0 21px; }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
-.tab-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex: 1; min-height: 40px; padding: 8px 5px; border: 1.5px solid var(--lc-border); border-radius: 5px; background: var(--lc-surface); color: var(--lc-ink); font-size: 13px; }
+.tab-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex: 1; min-width: 0; min-height: 40px; padding: 8px 5px; border: 1.5px solid var(--lc-border); border-radius: 5px; background: var(--lc-surface); color: var(--lc-ink); font-size: 13px; white-space: nowrap; }
 .tab-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .tab-btn.active { color: var(--lc-on); background: var(--lc-accent); border-color: var(--lc-accent); }
 .tab-btn:hover:not(.active) { background: var(--lc-soft); }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 .section { margin-bottom: 17px; }
-.field-pair { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; }
+.field-pair { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(0,1fr); gap: 14px; }
 .field-pair > div { min-width: 0; }
 .label { display: block; margin-bottom: 6px; color: var(--lc-ink); font-size: 12px; font-weight: 600; }
 .label-spaced { margin-top: 16px; }
@@ -31,7 +34,8 @@ button { cursor: pointer; }
 .toggle-label input { width: 17px; height: 17px; accent-color: var(--lc-accent); }
 .toggle-text { font-size: 13px; }
 .key-section { padding: 12px; margin-top: 19px; border: 1.5px solid var(--lc-border); border-radius: 5px 11px 6px 10px; background: var(--lc-soft); }
-.key-saved { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.key-saved { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; font-size: 12px; }
+.key-saved > span, .key-saved .mini-btn { flex-shrink: 0; white-space: nowrap; }
 .key-saved .mini-btn { border: 0; background: transparent; padding: 5px 0 5px 8px; }
 .key-actions { display: flex; gap: 8px; margin-top: 10px; }
 .mini-btn, .fetch-btn { min-height: 34px; padding: 6px 10px; border: 1.5px solid var(--lc-border); border-radius: 5px; color: var(--lc-ink); background: var(--lc-surface); font-size: 12px; }
@@ -54,4 +58,14 @@ dialog::backdrop { background: #11182766; }
 dialog h2 { font: 600 21px/1.4 var(--lc-title-font); margin-bottom: 15px; }
 body[data-lc-theme='vellum'] .title { font-weight: 500; font-size: 32px; }
 body[data-lc-theme='vellum'] .brand-subtitle { font-size: 20px; }
+@media (max-width: 440px) {
+  .container { padding: 18px 16px; }
+  .field-pair { grid-template-columns: minmax(0,1fr); gap: 14px; }
+  .brand-subtitle .version { display: block; margin: 2px 0 0; }
+}
+@media (max-width: 260px) {
+  .container { padding: 16px 12px; }
+  .tab-btn { font-size: 12px; gap: 5px; padding-inline: 4px; }
+  .tab-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+}
 @media (prefers-reduced-motion: no-preference) { button { transition: background .15s, color .15s; } }

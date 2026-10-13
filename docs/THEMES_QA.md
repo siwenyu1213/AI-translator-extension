@@ -2,6 +2,8 @@
 
 日期：2026-10-13，北京时间。扩展保持 4.6.0。起始 HEAD：de98ff6d44da43d85883b4a6e2d6a2a74654329a；分支 codex/tooltip-header-cleanup，起始工作区干净，fetch 后与上游 0/0。此次保存本地完成点，不推送或发布。
 
+后续宽度修复：以干净 fc95436545b145d1ec62ac818b4dac5c0d7c7d7a 为基线，解决用户截图中的厂家截字、全文翻译与Key操作拆行。根元素明确首选宽度520px（原380px），实际视口限幅时body适应；440px以下厂家/语言改为单列，操作文字不拆字，Key操作空间不足时整组换行。三种主题、图标及配置语义保持。更新verify-themes和当前设置截图，保存独立本地修复提交。
+
 ## 最终行为
 
 - 设置页、划词浮层与全文工具栏共用蜜桃涂鸦的控件布局、轻微不规则轮廓和阅读层次。
@@ -17,7 +19,7 @@ Node 24.18.1；Edge 155.0.4283.45；Playwright 使用本机既有包。实际解
 
 | 检查 | 结果 | 证据 |
 | --- | --- | --- |
-| verify-themes.mjs | 16 项实际 Edge 通过：默认/迁移、三界面同步、主题持久化、草稿隔离、写入失败、键盘、320/375px布局、对比度、本地字体与图标实际加载、原文/取消/关闭 | artifacts/qa/themes-2026-10-13/report.json |
+| verify-themes.mjs | 最新17项实际 Edge通过：原16项与新增520px/真实150%和200%浏览器缩放的布局检查 | artifacts/qa/themes-2026-10-13/report.json |
 | verify-markdown.mjs | 24 项实际 Edge 通过：流式/Markdown/复制/TXT/思考策略/错误恢复/无远程渲染 | artifacts/qa/markdown/report.json |
 | verify-tooltip-position.mjs | 17 项实际 Edge 通过：避让、拖动、流式/滚动/窗口约束、关闭与光标 | artifacts/qa/tooltip-header-2026-10-13/report.json |
 | verify-adversarial-config.mjs | 5 项实际 Edge 通过：停用恢复、换址、Key 草稿、迟到响应、模型过滤 | artifacts/qa/adversarial-fix-2026-10-11/config/ |
@@ -25,6 +27,8 @@ Node 24.18.1；Edge 155.0.4283.45；Playwright 使用本机既有包。实际解
 | verify.mjs 与 git diff --check | 48 项静态通过，diff 无空白错误 | artifacts/qa/static-check.json |
 
 三种主题的设置、划词结果与工具栏截图位于 artifacts/qa/themes-2026-10-13/；正文/提示/主按钮文本对比度均不低于 4.5:1。已逐张视觉复核。本机生成截图不包含真实凭据。
+
+宽度专项使用chrome.tabs.setZoom改变实际Edge扩展页缩放，100%/150%/200%的CSS可用视口为520/347/260px。后两种自动单列，DeepSeek与DeepSeek-V4.1-Flash完整文字的测量宽度均小于控件可用宽度；标签与Key文字保持整段。长展示名由QA明确替换，仅用于排版压力测试，连接仍为本机合成接口。对应截图popup-width-zoom-1.png、-1.5.png、-2.png。本轮17项主题与48项静态重新执行；表中其他回归是前一轮成果，CSS仅修改设置页，内容脚本与API未变。
 
 旧回归适配了三个明确变化：设置页不再出现固定关闭提示；h2 从17px调整到21px，宿主标题仍独立保持22px；本地扩展字体/图标请求属于本地资源，远程渲染请求仍要求为空。拖动样本上移以保留35px自由拖动空间，独立的边界约束测试仍保留。
 

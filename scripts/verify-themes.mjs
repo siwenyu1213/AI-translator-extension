@@ -49,7 +49,7 @@ try{
   await worker.evaluate(()=>{AIModelCatalog.refresh=async()=>({...AIModelCatalog.BUILTIN,source:AIModelCatalog.SOURCE,providers:AIModelCatalog.BUILTIN.providers.map(provider=>({...provider,stale:false}))});});
   await worker.evaluate(()=>chrome.storage.local.clear());
   const url=`chrome-extension://${new URL(worker.url()).host}/popup.html`;
-  popup=await context.newPage();popup.on('pageerror',e=>errors.push(e.message));await popup.setViewportSize({width:380,height:900});await popup.goto(url);
+  popup=await context.newPage();popup.on('pageerror',e=>errors.push(e.message));await popup.setViewportSize({width:520,height:900});await popup.goto(url);
   await popup.waitForFunction(()=>document.querySelector('#explain-manufacturer').options.length===11);
   await check('旧配置和首次使用默认钴蓝纸页，三主题可选，删除 DeepSeek 提示',async()=>{
     await popup.evaluate(()=>LingoTheme.ready);
@@ -61,7 +61,7 @@ try{
   });
   await check('首次无 Key 也可独立保存主题，关闭并重开保留',async()=>{
     await setTheme('playful');assert.equal((await worker.evaluate(()=>chrome.storage.local.get('uiTheme'))).uiTheme,'playful');
-    await popup.close();popup=await context.newPage();popup.on('pageerror',e=>errors.push(e.message));await popup.setViewportSize({width:380,height:900});await popup.goto(url);
+    await popup.close();popup=await context.newPage();popup.on('pageerror',e=>errors.push(e.message));await popup.setViewportSize({width:520,height:900});await popup.goto(url);
     await popup.waitForFunction(()=>document.querySelector('#ui-theme').value==='playful');
   });
   await worker.evaluate(async base=>{await chrome.storage.local.set(AIConfig.migrate({apiConfigVersion:1,modelCatalogVersion:1,providerConfigVersion:1,enabled:true,triggerMode:'auto',language:'zh',targetLanguage:'zh',explainManufacturer:'custom',translateManufacturer:'custom',explainModel:'qa-model',translateModel:'qa-model',modelList:['qa-model'],providerConnections:{custom:{apiBaseUrl:base+'/v1',apiKey:'theme-synthetic-only',availableModels:['qa-model'],modelEntries:[{id:'qa-model'}],modelsCheckedAt:'2026-10-13'}}}));},base);
@@ -98,6 +98,32 @@ try{
       return colors;
     });
   }
+  await check('520px宽弹窗与150%/200%浏览器缩放，操作不拆字、长厂家/型号可读',async()=>{
+    const labels=await popup.evaluate(()=>{
+      const provider=document.querySelector('#explain-manufacturer').selectedOptions[0],model=document.querySelector('#explain-model').selectedOptions[0];
+      const original={provider:provider.textContent,model:model.textContent};provider.textContent='DeepSeek';model.textContent='DeepSeek-V4.1-Flash';return original;
+    });
+    const layouts=[];
+    try{
+      for(const zoom of[1,1.5,2]){
+        await popup.evaluate(async zoom=>{const tab=await chrome.tabs.getCurrent();await chrome.tabs.setZoom(tab.id,zoom);},zoom);
+        await popup.evaluate(()=>document.fonts.ready);
+        const layout=await popup.evaluate(()=>{
+          const fits=element=>{const style=getComputedStyle(element),canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font=style.font;const text=element.selectedOptions[0].textContent;return{text,width:element.clientWidth,required:ctx.measureText(text).width+Number.parseFloat(style.paddingLeft)+Number.parseFloat(style.paddingRight)+24};};
+          const tab=document.querySelector('#tab-translate'),key=document.querySelector('#key-saved'),button=document.querySelector('#rewrite-key');
+          return{width:innerWidth,body:document.body.getBoundingClientRect().width,columns:getComputedStyle(document.querySelector('.field-pair')).gridTemplateColumns,provider:fits(document.querySelector('#explain-manufacturer')),model:fits(document.querySelector('#explain-model')),tabWrap:getComputedStyle(tab).whiteSpace,keyWrap:getComputedStyle(key.firstElementChild).whiteSpace,buttonWrap:getComputedStyle(button).whiteSpace};
+        });
+        assert.ok(layout.body<=layout.width);assert.ok(layout.provider.width>=layout.provider.required,JSON.stringify(layout));assert.ok(layout.model.width>=layout.model.required,JSON.stringify(layout));
+        assert.equal(layout.tabWrap,'nowrap');assert.equal(layout.keyWrap,'nowrap');assert.equal(layout.buttonWrap,'nowrap');
+        if(zoom===1)assert.equal(layout.body,520);
+        // 浏览器缩放后的元素截图clip仍按未缩放CSS坐标计算；捕获整个视口避免误裁。
+        await popup.screenshot({path:resolve(output,`popup-width-zoom-${zoom}.png`)});layouts.push({zoom,...layout});
+      }
+    }finally{
+      await popup.evaluate(async labels=>{const tab=await chrome.tabs.getCurrent();await chrome.tabs.setZoom(tab.id,1);document.querySelector('#explain-manufacturer').selectedOptions[0].textContent=labels.provider;document.querySelector('#explain-model').selectedOptions[0].textContent=labels.model;},labels);
+    }
+    return{layouts,boundary:'Actual Edge tab zoom and synthetic display labels; native toolbar popup sizing not captured'};
+  });
   await check('切主题不保存模型/语言/Key 草稿，保存设置不回退主题',async()=>{
     await popup.locator('#explain-language').selectOption('en');await popup.locator('#rewrite-key').click();await popup.locator('#api-key').fill('unsaved-synthetic-draft');
     await setTheme('playful');assert.deepEqual(await snapshot(),before);assert.equal(await popup.locator('#api-key').inputValue(),'unsaved-synthetic-draft');
@@ -122,11 +148,11 @@ try{
     assert.equal(await popup.evaluate(()=>document.activeElement.id),'ui-theme');
   });
   await check('320px 设置页与375px结果/工具栏无横向溢出，网页本身样式不变',async()=>{
-    await popup.setViewportSize({width:320,height:600});assert.equal(await popup.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    await popup.setViewportSize({width:320,height:600});assert.equal(await popup.evaluate(()=>document.body.scrollWidth<=innerWidth),true);
     await page.setViewportSize({width:375,height:650});
     const geometry=await page.locator('#ds-translate-toolbar').evaluate(el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,width:innerWidth};});assert.ok(geometry.left>=0&&geometry.right<=geometry.width);
     const pageColors=await page.evaluate(()=>({bg:getComputedStyle(document.body).backgroundColor,font:getComputedStyle(document.body).fontFamily}));assert.equal(pageColors.bg,'rgb(255, 255, 255)');assert.equal(pageColors.font,'Arial');
-    await popup.setViewportSize({width:380,height:900});
+    await popup.setViewportSize({width:520,height:900});
   });
   await check('本地品牌PNG尺寸与清单一致、界面/工具栏使用同一引号图标',async()=>{
     for(const size of[16,32,48,128]){const data=readFileSync(resolve(root,`icons/icon${size}.png`));assert.equal(data.readUInt32BE(16),size);assert.equal(data.readUInt32BE(20),size);}
