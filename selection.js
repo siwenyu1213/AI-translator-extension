@@ -1,4 +1,5 @@
-// Bounded, local selection analysis. Semantic uncertainty is preserved for the model.
+// 文件职责：本地选区分类、Range 快照、所在句与预算内 DOM 上下文提取。
+// Semantic uncertainty is preserved for the model.
 globalThis.AISelection = (() => {
   const BLOCK = 'p,li,td,th,pre,blockquote,h1,h2,h3,h4,h5,h6,figcaption,dd,dt,summary';
   const SCOPE = 'article,section,main,li,td,th,blockquote,[role="listitem"],[data-message-id],.comment,.message';
