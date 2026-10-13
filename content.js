@@ -1,5 +1,5 @@
 // ========== 说文 · LingoClarify — Content Script ==========
-// 职责：划词检测 → 流式弹窗（解释/翻译共用）、动态菜单联动、全文翻译入口
+// 文件职责：自动/右键划词、流式结果浮层、选区避让与拖动、复制/导出及全文翻译入口。
 
 let tooltip = null;
 let currentText = null;
