@@ -1,4 +1,5 @@
-// 设置窗口：按接口开放列表选模型，Key 保存后收起，保留旧通用设置。
+// 文件职责：设置持久化、厂家模型查询、Key 编辑、DeepSeek 开关联动与触发方式保存。
+// 按接口开放列表选模型，Key 保存后收起，保留上下文偏好。
 const $ = id => document.getElementById(id);
 const $apiKey = $('api-key'), $apiBaseUrl = $('api-base-url');
 const $catalogStatus = $('catalog-status'), $status = $('status');
