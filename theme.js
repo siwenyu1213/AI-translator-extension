@@ -1,4 +1,5 @@
-// 外观只读写 uiTheme，不携带或保存接口、Key、模型草稿。
+// 文件职责：独立保存/同步 uiTheme、应用三主题、加载扩展本地图标和字体。
+// 外观不携带或保存接口、Key、模型草稿。
 (() => {
   const THEMES = Object.freeze(['cobalt', 'playful', 'vellum']);
   const normalize = value => THEMES.includes(value) ? value : 'cobalt';
