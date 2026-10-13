@@ -55,3 +55,9 @@ gh repo view siwenyu1213/LingoClarify --json nameWithOwner,description,defaultBr
 ```
 
 GitHub历史提交、PR和验收快照保留。本次没有创建Release或修改历史发布；默认分支源码和当前说明是交付入口。Description.md已核对本地忽略及索引无记录，不上传。
+
+### 已完成的远程核对
+
+2026-10-13，仓库已改名为`siwenyu1213/LingoClarify`，About简介与6个topics已更新。源代码与文档提交`8bdd037e287c62cdbe5de132244d858e1b041925`已通过普通原子推送同步到main及codex/tooltip-header-cleanup，包含493798a的浮层调整；未创建PR或强推。
+
+GitHub API核对：默认分支main、两个远程提交均等于本地HEAD；远端README与本地逐字一致，manifest名称正确，两张截图blob SHA与本地一致。GitHub返回的README渲染HTML包含新标题和两张截图。记录在上述github-result.json与rendered-readme.html，工作区干净，Description.md未跟踪。后续本段验收记录的文档提交不改变已验收运行源码。
