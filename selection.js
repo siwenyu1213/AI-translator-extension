@@ -24,6 +24,10 @@ globalThis.AISelection = (() => {
     const words = segments(value, 'word').filter(s => s.isWordLike).length || value.split(/\s+/).filter(Boolean).length;
     const sentences = segments(value, 'sentence').filter(s => /\p{L}|\p{N}/u.test(s.segment)).length;
     const dependency = /^(?:因此|但是|然而|上述|该|它|这|同上|其他情形|所以|此外|其)|\b(?:this|that|these|those|they|it|however|therefore|former|latter)\b/i.test(value);
+    const contextDependency = /^(?:(?:this|that|it|these|those)\s+(?:is|are|was|were)\s+(?:called|known|referred|termed|named)|上述|该|这种|这类|此类|这一|这(?:称为|叫作|就是|意味着))/i.test((info.sentenceBefore || '').trim());
+    const responseLike = /^(?:好的|好|嗯|哦|是的|不是|谢谢|收到|可以|行|你好|ok|okay|yes|no|thanks|hello|hi)[。.!?！？]*$/i.test(value);
+    const embedded = !!(info.before?.trim() || info.after?.trim());
+    let completeness = info.partialWord ? 'partial_word' : 'complete';
     let category, confidence = 'medium', reason;
     const kind = info.kind || 'prose';
     const code = kind === 'code' || /^(?:const|let|var)\s+[\w$]+\s*=/.test(value)
@@ -49,12 +53,19 @@ globalThis.AISelection = (() => {
         || /(?:です|ます|でした|ません|합니다|입니다|했어요|있다)[。.!?]?$/.test(value)
         || /(?:是|不是|已经|应当|应该|必须|可以|不能|不构成|意味着|表明|说明|导致|认为)/.test(value)
         || /^(?:我|你|他|她|我们|他们)(?:喜欢|需要|想要|希望|去|看|爱)/.test(value);
-      const embedded = !!(info.before?.trim() || info.after?.trim());
-      if (/^(?:好的|好|嗯|哦|是的|不是|谢谢|收到|可以|行|你好|ok|okay|yes|no|thanks|hello|hi)[。.!?！？]*$/i.test(value) && !embedded) { category = 'response'; reason = '独立短回应，具体含义依赖语境'; }
-      else if (terminal || grammar) { category = embedded && !terminal && info.partial ? 'fragment' : 'sentence'; reason = '句末或句式信号'; }
-      else if (info.partialWord) { category = 'fragment'; reason = '单词内部的局部选区'; }
+      const responseInSentence = /[\p{L}\p{N}]/u.test((info.sentenceBefore ?? info.before ?? '') + (info.sentenceAfter ?? info.after ?? ''));
+      // Position is distinct from meaning: a complete term inside a sentence remains a term.
+      // Only narrow dependency/truncation evidence marks a fragment; this is not a parser.
+      const dependentFragment = /^(?:它|他|她|这|那|其|该|上述|同上|因此|所以|但是|然而|此外|this|that|these|those|they|it|former|latter|however|therefore)$/i.test(value);
+      const truncated = info.partial && (/^(?:的|中的|之中的|之于|于其中)/.test(value)
+        || /^(?:我|你|他|她|这|那|该|因为|如果|虽然).*(?:的|地|得|因为|虽然|如果|但是|以及|或者)$/.test(value)
+        || /\b(?:of|with|for|and|or|because|although|if)\s*$/i.test(value)
+        || (words > 1 && /\b(?:am|is|are|was|were|have|has|had|will|would|can|could|should|must|do|does|did|been)\s*$/i.test(value)));
+      if (info.partialWord) { category = 'fragment'; reason = '单词内部的局部选区'; }
+      else if (responseLike) { category = responseInSentence ? 'phrase' : 'response'; reason = responseInSentence ? '句内短表达，按所在句确定作用' : '独立短回应，具体含义依赖语境'; }
+      else if (dependentFragment || truncated) { category = 'fragment'; completeness = 'dependent'; reason = '指代、省略或截断关系需要语境'; }
+      else if (terminal || grammar) { category = 'sentence'; reason = '句末或句式信号'; }
       else if (words === 1 && language === 'foreign') { category = 'word'; reason = '单个外语词'; }
-      else if (embedded && info.partial) { category = 'fragment'; reason = '所在句子中的局部选区'; }
       else if ((language === 'foreign' && words <= 8) || (['zh','ja','ko'].includes(language) && [...value].length <= 24)) { category = 'phrase'; reason = '短语或名称，保留语义歧义'; }
       else { category = 'uncertain'; confidence = 'low'; reason = '结构证据不足，由生成模型结合语境判断'; }
     }
@@ -63,7 +74,7 @@ globalThis.AISelection = (() => {
     const mode = special || language === 'mixed' || language === 'unknown' ? 'C'
       : foreign ? (['sentence','passage'].includes(category) ? 'B' : ['word','phrase','response'].includes(category) || (category === 'fragment' && words <= 8) ? 'A' : 'C')
         : ['sentence','passage'].includes(category) ? 'D' : 'C';
-    return { language, category, confidence, reason, mode, dependency, words };
+    return { language, category, confidence, reason, mode, dependency, contextDependency, words, responseLike, position: embedded ? 'embedded' : 'standalone', completeness };
   }
   function element(node) { return node?.nodeType === 1 ? node : node?.parentElement; }
   function visible(el) {
@@ -152,22 +163,51 @@ globalThis.AISelection = (() => {
     const last = list.filter(s => s.index + s.segment.length <= limit).at(-1);
     return last ? value.slice(0, last.index + last.segment.length) : value.slice(0, limit);
   }
+  function containingSentence(before, text, after) {
+    const value = before + text + after, from = before.length, to = from + text.length;
+    const list = segments(value, 'sentence');
+    const first = list.find(s => s.index + s.segment.length > from);
+    const last = list.find(s => s.index + s.segment.length >= to);
+    // Segmenter absence uses only trustworthy punctuation edges, not a text-position search.
+    const left = first ? first.index : (before.match(/.*(?:[。！？!?]|(?<!\d)\.(?=\s))\s*/s)?.[0].length || 0);
+    const right = last ? last.index + last.segment.length : to + (after.match(/^[\s\S]*?(?:[。！？!?]|(?<!\d)\.(?=\s|$))/)?.[0].length ?? after.length);
+    const sentence = { before: before.slice(left), after: after.slice(0, right - to), complete: true };
+    if ((!left && before.length === HARD_LIMIT) || (right === value.length && after.length === HARD_LIMIT)) sentence.complete = false;
+    return { sentence, before: before.slice(0, left), after: after.slice(right - to) };
+  }
   function capture(text) {
+    text = text.trim();
     const sel = getSelection();
-    const range = sel?.rangeCount && !sel.isCollapsed && sel.toString().trim() === text.trim() ? sel.getRangeAt(0).cloneRange() : null;
+    const range = sel?.rangeCount && !sel.isCollapsed && sel.toString().trim() === text ? sel.getRangeAt(0).cloneRange() : null;
     if (!range) return { text, range: null, analysis: analyze(text), context: null };
     const start = block(range.startContainer), end = block(range.endContainer);
     const el = element(range.startContainer), cell = el?.closest('td,th');
     const kind = el?.closest('pre,code') ? 'code' : cell ? 'table' : el?.closest('h1,h2,h3,h4,h5,h6') ? 'heading' : 'prose';
-    let before = pieces(start, range, 'before'), after = pieces(end, range, 'after');
+    // The payload is trimmed, but spaces selected around it still belong to the source sentence.
+    // Preserve them in the context edges without moving the saved Range or searching for text.
+    const selected = range.toString();
+    const leading = selected.slice(0, selected.length - selected.trimStart().length);
+    const trailing = selected.slice(selected.trimEnd().length);
+    let before = (pieces(start, range, 'before') + leading).slice(-HARD_LIMIT);
+    let after = (trailing + pieces(end, range, 'after')).slice(0, HARD_LIMIT);
     const lang = el?.closest('[lang]')?.getAttribute('lang') || document.documentElement.lang;
     const partial = start === end && (before.trim() || after.trim()) && !/[。.!?！？]\s*$/.test(before) && !/^\s*[。.!?！？]/.test(after);
     const partialWord = (/\p{Script=Latin}$/u.test(before) && /^\p{Script=Latin}/u.test(text)) || (/\p{Script=Latin}$/u.test(text) && /^\p{Script=Latin}/u.test(after));
-    const analysis = analyze(text, { kind, before, after, partial: !!partial, partialWord, lang });
+    const localParts = start === end && kind === 'prose' && text.length <= 1500 ? containingSentence(before, text, after) : null;
+    const analysis = analyze(text, { kind, before, after, partial: !!partial, partialWord, lang, sentenceBefore: localParts?.sentence.before, sentenceAfter: localParts?.sentence.after });
     const scope = start.closest(SCOPE) || document.body;
     const prev = neighbor(start, -1, scope), next = neighbor(end, 1, end.closest(SCOPE) || document.body);
     // A full selection supplies its own context. Short selections get a richer default.
-    const budget = text.length > 1500 ? 800 : analysis.dependency || ['code','table','formula','reference'].includes(analysis.category) ? 2500 : 1500;
+    const budget = text.length > 1500 ? 800 : analysis.dependency || analysis.contextDependency || ['code','table','formula','reference'].includes(analysis.category) ? 2500 : 1500;
+    const expand = analysis.dependency || analysis.contextDependency || ['fragment','response','heading','code','table','formula','reference','uncertain'].includes(analysis.category);
+    let sentence = null;
+    if (start === end && kind === 'prose' && text.length <= 1500 && !['passage','code'].includes(analysis.category)) {
+      const parts = localParts;
+      sentence = parts.sentence;
+      before = expand ? parts.before : '';
+      after = expand ? parts.after : '';
+      if (!sentence.before && !sentence.after) sentence = null;
+    } else if (!expand && start === end) { before = ''; after = ''; }
     const metadata = [];
     if (cell) {
       const table = cell.closest('table');
@@ -190,25 +230,38 @@ globalThis.AISelection = (() => {
     }
     if (heading) metadata.push('小标题：' + pieces(heading, null, 'after', 120));
     const title = metadata.length ? '' : document.title.slice(0, 120);
+    // An actual language declaration is useful for Han-only Japanese; language-rule prose is not.
+    const sourceLanguage = analysis.language === 'ja' && !/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(text) && /^ja\b/i.test(lang || '') ? 'ja' : '';
     const details = [...new Set(metadata)].join('\n').slice(0, 360);
-    const available = Math.min(HARD_LIMIT, budget) - title.length - details.length;
-    // Preserve same-block material first; then fill spare capacity with adjacent blocks.
+    let available = Math.min(HARD_LIMIT, budget) - title.length - details.length - sourceLanguage.length;
+    // The containing sentence is primary. Supplemental context never repeats its edges.
+    if (sentence) {
+      const left = Math.min(sentence.before.length, Math.ceil(available * .6));
+      const right = Math.min(sentence.after.length, available - left);
+      const leftLimit = Math.min(sentence.before.length, available - right);
+      if (leftLimit < sentence.before.length || right < sentence.after.length) sentence.complete = false;
+      sentence.before = clip(sentence.before, leftLimit, 'before');
+      sentence.after = clip(sentence.after, right, 'after');
+      available -= sentence.before.length + sentence.after.length;
+    }
     let left = Math.min(before.length, Math.ceil(available * .6));
     let right = Math.min(after.length, available - left);
     left = Math.min(before.length, available - right);
     before = clip(before, left, 'before');
     after = clip(after, right, 'after');
     let spare = available - before.length - after.length;
-    if (prev && spare > 0 && kind !== 'table') {
-      const extra = clip(pieces(prev, null, 'before'), Math.min(500, spare), 'before');
-      before = (extra + (extra && before ? '\n' : '') + before).slice(-available + after.length);
+    if (expand && prev && spare > 0 && kind !== 'table') {
+      const separator = before ? '\n' : '';
+      const extra = clip(pieces(prev, null, 'before'), Math.max(0, Math.min(500, spare - separator.length)), 'before');
+      if (extra) before = extra + separator + before;
     }
     spare = available - before.length - after.length;
-    if (next && spare > 0 && kind !== 'table') {
-      const extra = clip(pieces(next, null, 'after'), Math.min(kind === 'heading' ? 900 : 400, spare), 'after');
-      after = (after + (after && extra ? '\n' : '') + extra).slice(0, available - before.length);
+    if (expand && next && spare > 0 && kind !== 'table') {
+      const separator = after ? '\n' : '';
+      const extra = clip(pieces(next, null, 'after'), Math.max(0, Math.min(kind === 'heading' ? 900 : 400, spare - separator.length)), 'after');
+      if (extra) after += separator + extra;
     }
-    return { text, range, analysis, context: { title, before, after, details, budget } };
+    return { text, range, analysis, context: { title, before, after, details, sentence, lang: sourceLanguage, budget } };
   }
   function same(a, b) {
     if (!a || !b || a.text !== b.text) return false;
