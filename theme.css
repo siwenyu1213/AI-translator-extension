@@ -28,3 +28,50 @@
   color-scheme: dark;
 }
 .lc-brand-icon { display: inline-block; flex: none; width: 40px; height: 40px; background: var(--lc-brand-image) center / contain no-repeat; }
+
+/*
+中文逐句导读（不参与运行）
+
+一、这个文件在项目中做什么
+共用主题样式：为三种外观定义颜色、字体和品牌图标。
+theme.js 设置 data-lc-theme → 本文件匹配对应主题 → popup.css / content.css 使用变量。
+以两个减号开头的是 CSS 变量；var(...) 表示读取变量，可统一更换整套颜色。
+
+二、先认识常见写法
+选择器 { 属性: 值; }：先指定元素，再规定它的外观。# 匹配 id，点号匹配 class。
+px 是像素；vw/vh 是窗口宽高的百分之一；百分号通常按所在容器计算。
+var(...) 读取主题变量；calc/min/max 根据窗口和已有值计算尺寸。
+margin 是外边距，padding 是内边距；2 个值表示上下/左右，3 个值表示上/左右/下，4 个值表示上/右/下/左。
+hover 是鼠标停留，active 是按下，focus-visible 是可见键盘焦点，disabled 是禁用。
+同一属性出现多次时，要结合选择器优先级和先后顺序；后段主题样式会覆盖部分初始颜色。
+
+三、按原代码顺序逐句看
+行号对应本文件上方原代码；空行和原有说明不重复解释。
+同一行有多句时按先后用分号分开；跨行表达式在起始行解释，并标明续行。
+第 5 行：为 .lc-theme 设置下面样式。
+第 6 行：主题底色（--lc-bg）设为 #fdfae7，作用于 .lc-theme；控件背景色（--lc-surface）设为 #fdfae7，作用于 .lc-theme；浅强调底色（--lc-soft）设为 #f1efd7，作用于 .lc-theme。
+第 7 行：主题正文色（--lc-ink）设为 #111111，作用于 .lc-theme；次要文字色（--lc-muted）设为 #5c5b60，作用于 .lc-theme；主题强调色（--lc-accent）设为 #1e2bfa，作用于 .lc-theme；强调底色上的文字色（--lc-on）设为 #fdfae7，作用于 .lc-theme。
+第 8 行：主题边框色（--lc-border）设为 #9293bd，作用于 .lc-theme；分隔线色（--lc-rule）设为 #d4d1c3，作用于 .lc-theme；错误文字色（--lc-error）设为 #b42318，作用于 .lc-theme；错误背景色（--lc-error-bg）设为 #fff0e8，作用于 .lc-theme。
+第 9 行：成功提示色（--lc-success）设为 #25633e，作用于 .lc-theme；主题阴影色（--lc-shadow）设为 #11111112，作用于 .lc-theme。
+第 10 行：正文字体（--lc-body-font）设为 'LC Inter', 'Segoe UI', 'Microsoft YaHei', sans-serif，作用于 .lc-theme。
+第 11 行：标题字体（--lc-title-font）设为 'LC Space', 'Microsoft YaHei', sans-serif，作用于 .lc-theme。
+第 12 行：原生控件的明暗模式（color-scheme）设为 light，作用于 .lc-theme。
+第 13 行：结束 .lc-theme 的样式范围。
+第 14 行：为 .lc-theme[data-lc-theme='playful'] 设置下面样式。
+第 15 行：主题底色（--lc-bg）设为 #f0c8a0，作用于 .lc-theme[data-lc-theme='playful']；控件背景色（--lc-surface）设为 #f7dec6，作用于 .lc-theme[data-lc-theme='playful']；浅强调底色（--lc-soft）设为 #e8b88e，作用于 .lc-theme[data-lc-theme='playful']。
+第 16 行：主题正文色（--lc-ink）设为 #1a1a1a，作用于 .lc-theme[data-lc-theme='playful']；次要文字色（--lc-muted）设为 #55402f，作用于 .lc-theme[data-lc-theme='playful']；主题强调色（--lc-accent）设为 #1a1a1a，作用于 .lc-theme[data-lc-theme='playful']；强调底色上的文字色（--lc-on）设为 #f7dec6，作用于 .lc-theme[data-lc-theme='playful']。
+第 17 行：主题边框色（--lc-border）设为 #1a1a1a，作用于 .lc-theme[data-lc-theme='playful']；分隔线色（--lc-rule）设为 #ac7c54，作用于 .lc-theme[data-lc-theme='playful']。
+第 18 行：正文字体（--lc-body-font）设为 'LC Space', 'Segoe UI', 'Microsoft YaHei', sans-serif，作用于 .lc-theme[data-lc-theme='playful']。
+第 19 行：标题字体（--lc-title-font）设为 'LC Syne', 'Microsoft YaHei', sans-serif，作用于 .lc-theme[data-lc-theme='playful']。
+第 20 行：结束 .lc-theme[data-lc-theme='playful'] 的样式范围。
+第 21 行：为 .lc-theme[data-lc-theme='vellum'] 设置下面样式。
+第 22 行：主题底色（--lc-bg）设为 #2a3870，作用于 .lc-theme[data-lc-theme='vellum']；控件背景色（--lc-surface）设为 #343f80，作用于 .lc-theme[data-lc-theme='vellum']；浅强调底色（--lc-soft）设为 #3b4787，作用于 .lc-theme[data-lc-theme='vellum']。
+第 23 行：主题正文色（--lc-ink）设为 #e8d85c，作用于 .lc-theme[data-lc-theme='vellum']；次要文字色（--lc-muted）设为 #ebdfab，作用于 .lc-theme[data-lc-theme='vellum']；主题强调色（--lc-accent）设为 #e8d85c，作用于 .lc-theme[data-lc-theme='vellum']；强调底色上的文字色（--lc-on）设为 #2a3870，作用于 .lc-theme[data-lc-theme='vellum']。
+第 24 行：主题边框色（--lc-border）设为 #a79f76，作用于 .lc-theme[data-lc-theme='vellum']；分隔线色（--lc-rule）设为 #737c9c，作用于 .lc-theme[data-lc-theme='vellum']；错误文字色（--lc-error）设为 #ffb8b2，作用于 .lc-theme[data-lc-theme='vellum']；错误背景色（--lc-error-bg）设为 #483859，作用于 .lc-theme[data-lc-theme='vellum']。
+第 25 行：成功提示色（--lc-success）设为 #b5ecbf，作用于 .lc-theme[data-lc-theme='vellum']；主题阴影色（--lc-shadow）设为 #00000024，作用于 .lc-theme[data-lc-theme='vellum']。
+第 26 行：正文字体（--lc-body-font）设为 'LC Inter', 'Segoe UI', 'Microsoft YaHei', sans-serif，作用于 .lc-theme[data-lc-theme='vellum']。
+第 27 行：标题字体（--lc-title-font）设为 'LC Cormorant', 'SimSun', Georgia, serif，作用于 .lc-theme[data-lc-theme='vellum']。
+第 28 行：原生控件的明暗模式（color-scheme）设为 dark，作用于 .lc-theme[data-lc-theme='vellum']。
+第 29 行：结束 .lc-theme[data-lc-theme='vellum'] 的样式范围。
+第 30 行：为 .lc-brand-icon 设置下面样式；显示和布局方式（display）设为 inline-block，作用于 .lc-brand-icon；弹性布局中的伸展和收缩比例（flex）设为 none，作用于 .lc-brand-icon；宽度（width）设为 40px，作用于 .lc-brand-icon；高度（height）设为 40px，作用于 .lc-brand-icon；背景（background）设为 var(--lc-brand-image) center / contain no-repeat，作用于 .lc-brand-icon；结束 .lc-brand-icon 的样式范围。
+*/

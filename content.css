@@ -409,3 +409,384 @@
 #ds-translate-toolbar .ds-tb-danger { border-color: var(--lc-error); color: var(--lc-error); }
 #ds-translate-toolbar .ds-tb-danger:hover { background: var(--lc-error-bg); }
 #ds-translate-toolbar .ds-tb-btn:focus-visible { outline: 2px solid var(--lc-accent); outline-offset: 2px; }
+
+/*
+中文逐句导读（不参与运行）
+
+一、这个文件在项目中做什么
+网页界面样式：控制结果浮层、Markdown 正文、思考区和全文工具栏。
+content.js 创建浮层，content-fullpage.js 创建工具栏；本文件负责尺寸、颜色和状态。
+选择器说明给谁设样式；同等优先级时，后面的规则通常覆盖前面的同名属性。
+
+二、先认识常见写法
+选择器 { 属性: 值; }：先指定元素，再规定它的外观。# 匹配 id，点号匹配 class。
+px 是像素；vw/vh 是窗口宽高的百分之一；百分号通常按所在容器计算。
+var(...) 读取主题变量；calc/min/max 根据窗口和已有值计算尺寸。
+margin 是外边距，padding 是内边距；2 个值表示上下/左右，3 个值表示上/左右/下，4 个值表示上/右/下/左。
+hover 是鼠标停留，active 是按下，focus-visible 是可见键盘焦点，disabled 是禁用。
+同一属性出现多次时，要结合选择器优先级和先后顺序；后段主题样式会覆盖部分初始颜色。
+
+三、按原代码顺序逐句看
+行号对应本文件上方原代码；空行和原有说明不重复解释。
+同一行有多句时按先后用分号分开；跨行表达式在起始行解释，并标明续行。
+第 3 行：为 #deepseek-explain-tooltip 设置下面样式。
+第 4 行：定位方式（position）设为 absolute，作用于 #deepseek-explain-tooltip。
+第 5 行：叠放层级，越大越靠前（z-index）设为 2147483647，作用于 #deepseek-explain-tooltip。
+第 6 行：宽度（width）设为 360px，作用于 #deepseek-explain-tooltip。
+第 7 行：最大宽度（max-width）设为 calc(100vw - 24px)，作用于 #deepseek-explain-tooltip。
+第 8 行：最大高度（max-height）设为 min(var(--ds-placement-height, 100vh), calc(var(--ds-viewport-height, 100vh) - 20px))，作用于 #deepseek-explain-tooltip。
+第 9 行：尺寸是否包括内边距和边框（box-sizing）设为 border-box，作用于 #deepseek-explain-tooltip。
+第 10 行：弹性布局的排列方向（flex-direction）设为 column，作用于 #deepseek-explain-tooltip。
+第 11 行：背景（background）设为 #ffffff，作用于 #deepseek-explain-tooltip。
+第 12 行：边框（border）设为 1px solid #e8e8ed，作用于 #deepseek-explain-tooltip。
+第 13 行：各角的圆角大小（border-radius）设为 12px，作用于 #deepseek-explain-tooltip。
+第 14 行：阴影（box-shadow）设为 0 1px 2px rgba(0, 0, 0, 0.04),     0 4px 16px rgba(0, 0, 0, 0.08),     0 12px 40px rgba(0, 0, 0, 0.06)，作用于 #deepseek-explain-tooltip。
+第 15 行：继续前一项 阴影（box-shadow） 的值：0 1px 2px rgba(0, 0, 0, 0.04),。
+第 16 行：继续前一项 阴影（box-shadow） 的值：0 4px 16px rgba(0, 0, 0, 0.08),。
+第 17 行：继续前一项 阴影（box-shadow） 的值：0 12px 40px rgba(0, 0, 0, 0.06);。
+第 18 行：字体及备用字体（font-family）设为 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",     "Microsoft YaHei", "Helvetica Neue", sans-serif，作用于 #deepseek-explain-tooltip。
+第 19 行：继续前一项 字体及备用字体（font-family） 的值："Microsoft YaHei", "Helvetica Neue", sans-serif;。
+第 20 行：字号（font-size）设为 13px，作用于 #deepseek-explain-tooltip。
+第 21 行：行高（line-height）设为 1.7，作用于 #deepseek-explain-tooltip。
+第 22 行：文字或图标颜色（color）设为 #1e1e1e，作用于 #deepseek-explain-tooltip。
+第 23 行：超出区域的处理（overflow）设为 hidden，作用于 #deepseek-explain-tooltip。
+第 24 行：显示和布局方式（display）设为 none，作用于 #deepseek-explain-tooltip。
+第 25 行：是否允许选择文字（user-select）设为 text，作用于 #deepseek-explain-tooltip。
+第 26 行：兼容浏览器的文字选择规则（-webkit-user-select）设为 text，作用于 #deepseek-explain-tooltip。
+第 27 行：结束 #deepseek-explain-tooltip 的样式范围。
+第 29 行：为 #deepseek-explain-tooltip.ds-visible 设置下面样式。
+第 30 行：显示和布局方式（display）设为 flex，作用于 #deepseek-explain-tooltip.ds-visible。
+第 31 行：不透明程度，0 隐藏、1 完全显示（opacity）设为 1，作用于 #deepseek-explain-tooltip.ds-visible。
+第 32 行：结束 #deepseek-explain-tooltip.ds-visible 的样式范围。
+第 34 行：为 #deepseek-explain-tooltip.ds-hidden 设置下面样式。
+第 35 行：不透明程度，0 隐藏、1 完全显示（opacity）设为 0，作用于 #deepseek-explain-tooltip.ds-hidden。
+第 36 行：是否接收鼠标事件（pointer-events）设为 none，作用于 #deepseek-explain-tooltip.ds-hidden。
+第 37 行：结束 #deepseek-explain-tooltip.ds-hidden 的样式范围。
+第 40 行：为 .ds-header 设置下面样式。
+第 41 行：显示和布局方式（display）设为 flex，作用于 .ds-header。
+第 42 行：弹性布局横轴对齐（align-items）设为 center，作用于 .ds-header。
+第 43 行：弹性布局主轴对齐（justify-content）设为 space-between，作用于 .ds-header。
+第 44 行：内边距；多值按上、右、下、左解释（padding）设为 10px 16px 0，作用于 .ds-header。
+第 45 行：结束 .ds-header 的样式范围。
+第 47 行：为 #deepseek-explain-tooltip .ds-header 设置下面样式。
+第 48 行：空间不足时的收缩比例（flex-shrink）设为 0，作用于 #deepseek-explain-tooltip .ds-header。
+第 49 行：鼠标指针样式（cursor）设为 default，作用于 #deepseek-explain-tooltip .ds-header。
+第 50 行：触摸默认动作（touch-action）设为 none，作用于 #deepseek-explain-tooltip .ds-header。
+第 51 行：是否允许选择文字（user-select）设为 none，作用于 #deepseek-explain-tooltip .ds-header。
+第 52 行：结束 #deepseek-explain-tooltip .ds-header 的样式范围。
+第 53 行：为 #deepseek-explain-tooltip .ds-drag-handle 设置下面样式。
+第 54 行：显示和布局方式（display）设为 inline-flex，作用于 #deepseek-explain-tooltip .ds-drag-handle。
+第 55 行：弹性布局横轴对齐（align-items）设为 center，作用于 #deepseek-explain-tooltip .ds-drag-handle。
+第 56 行：子项之间的间隔（gap）设为 6px，作用于 #deepseek-explain-tooltip .ds-drag-handle。
+第 57 行：最小高度（min-height）设为 28px，作用于 #deepseek-explain-tooltip .ds-drag-handle。
+第 58 行：内边距；多值按上、右、下、左解释（padding）设为 0，作用于 #deepseek-explain-tooltip .ds-drag-handle。
+第 59 行：边框（border）设为 0，作用于 #deepseek-explain-tooltip .ds-drag-handle。
+第 60 行：背景（background）设为 transparent，作用于 #deepseek-explain-tooltip .ds-drag-handle。
+第 61 行：文字或图标颜色（color）设为 #64748b，作用于 #deepseek-explain-tooltip .ds-drag-handle。
+第 62 行：字体、字号和行高的组合（font）设为 inherit，作用于 #deepseek-explain-tooltip .ds-drag-handle。
+第 63 行：鼠标指针样式（cursor）设为 inherit，作用于 #deepseek-explain-tooltip .ds-drag-handle。
+第 64 行：触摸默认动作（touch-action）设为 none，作用于 #deepseek-explain-tooltip .ds-drag-handle。
+第 65 行：结束 #deepseek-explain-tooltip .ds-drag-handle 的样式范围。
+第 66 行：为 #deepseek-explain-tooltip.ds-dragging :is(.ds-header, .ds-drag-handle) 设置下面样式；鼠标指针样式（cursor）设为 grabbing，作用于 #deepseek-explain-tooltip.ds-dragging :is(.ds-header, .ds-drag-handle)；结束 #deepseek-explain-tooltip.ds-dragging :is(.ds-header, .ds-drag-handle) 的样式范围。
+第 67 行：为 #deepseek-explain-tooltip :is(.ds-quote, .ds-reasoning) 设置下面样式；最小高度（min-height）设为 0，作用于 #deepseek-explain-tooltip :is(.ds-quote, .ds-reasoning)；纵向超出区域的处理（overflow-y）设为 auto，作用于 #deepseek-explain-tooltip :is(.ds-quote, .ds-reasoning)；结束 #deepseek-explain-tooltip :is(.ds-quote, .ds-reasoning) 的样式范围。
+第 68 行：为 #deepseek-explain-tooltip :is(.ds-actions, .ds-footer) 设置下面样式；空间不足时的收缩比例（flex-shrink）设为 0，作用于 #deepseek-explain-tooltip :is(.ds-actions, .ds-footer)；结束 #deepseek-explain-tooltip :is(.ds-actions, .ds-footer) 的样式范围。
+第 70 行：为 .ds-brand 设置下面样式。
+第 71 行：字号（font-size）设为 11px，作用于 .ds-brand。
+第 72 行：字重，越大越粗（font-weight）设为 600，作用于 .ds-brand。
+第 73 行：文字或图标颜色（color）设为 #94a3b8，作用于 .ds-brand。
+第 74 行：字间距（letter-spacing）设为 0.4px，作用于 .ds-brand。
+第 75 行：文字大小写处理（text-transform）设为 uppercase，作用于 .ds-brand。
+第 76 行：结束 .ds-brand 的样式范围。
+第 78 行：为 .ds-close 设置下面样式。
+第 79 行：宽度（width）设为 22px，作用于 .ds-close。
+第 80 行：高度（height）设为 22px，作用于 .ds-close。
+第 81 行：边框（border）设为 none，作用于 .ds-close。
+第 82 行：背景（background）设为 transparent，作用于 .ds-close。
+第 83 行：字号（font-size）设为 16px，作用于 .ds-close。
+第 84 行：文字或图标颜色（color）设为 #c0c0c8，作用于 .ds-close。
+第 85 行：鼠标指针样式（cursor）设为 pointer，作用于 .ds-close。
+第 86 行：各角的圆角大小（border-radius）设为 5px，作用于 .ds-close。
+第 87 行：显示和布局方式（display）设为 flex，作用于 .ds-close。
+第 88 行：弹性布局横轴对齐（align-items）设为 center，作用于 .ds-close。
+第 89 行：弹性布局主轴对齐（justify-content）设为 center，作用于 .ds-close。
+第 90 行：行高（line-height）设为 1，作用于 .ds-close。
+第 91 行：内边距；多值按上、右、下、左解释（padding）设为 0，作用于 .ds-close。
+第 92 行：顶部外边距（margin-top）设为 -2px，作用于 .ds-close。
+第 93 行：状态变化过渡效果（transition）设为 background 0.15s, color 0.15s，作用于 .ds-close。
+第 94 行：结束 .ds-close 的样式范围。
+第 96 行：为 .ds-close:hover 设置下面样式。
+第 97 行：背景（background）设为 #f1f5f9，作用于 .ds-close:hover。
+第 98 行：文字或图标颜色（color）设为 #64748b，作用于 .ds-close:hover。
+第 99 行：结束 .ds-close:hover 的样式范围。
+第 102 行：为 .ds-quote 设置下面样式。
+第 103 行：外边距；多值按上、右、下、左解释（margin）设为 8px 16px 0，作用于 .ds-quote。
+第 104 行：内边距；多值按上、右、下、左解释（padding）设为 8px 12px，作用于 .ds-quote。
+第 105 行：字号（font-size）设为 12px，作用于 .ds-quote。
+第 106 行：文字或图标颜色（color）设为 #64748b，作用于 .ds-quote。
+第 107 行：字体是否倾斜（font-style）设为 italic，作用于 .ds-quote。
+第 108 行：行高（line-height）设为 1.5，作用于 .ds-quote。
+第 109 行：背景（background）设为 #f8fafc，作用于 .ds-quote。
+第 110 行：左边框（border-left）设为 3px solid #2563eb，作用于 .ds-quote。
+第 111 行：各角的圆角大小（border-radius）设为 0 6px 6px 0，作用于 .ds-quote。
+第 112 行：单词换行规则（word-break）设为 break-word，作用于 .ds-quote。
+第 113 行：空格和换行处理（white-space）设为 normal，作用于 .ds-quote。
+第 114 行：结束 .ds-quote 的样式范围。
+第 117 行：为 .ds-body 设置下面样式。
+第 118 行：内边距；多值按上、右、下、左解释（padding）设为 12px 16px 8px，作用于 .ds-body。
+第 119 行：字号（font-size）设为 13px，作用于 .ds-body。
+第 120 行：文字或图标颜色（color）设为 #334155，作用于 .ds-body。
+第 121 行：单词换行规则（word-break）设为 break-word，作用于 .ds-body。
+第 122 行：最小高度（min-height）设为 0，作用于 .ds-body。
+第 123 行：弹性布局中的伸展和收缩比例（flex）设为 0 1 auto，作用于 .ds-body。
+第 124 行：最大高度（max-height）设为 40vh，作用于 .ds-body。
+第 125 行：纵向超出区域的处理（overflow-y）设为 auto，作用于 .ds-body。
+第 126 行：空格和换行处理（white-space）设为 pre-line，作用于 .ds-body。
+第 127 行：结束 .ds-body 的样式范围。
+第 130 行：为 #deepseek-explain-tooltip .ds-markdown 设置下面样式。
+第 131 行：空格和换行处理（white-space）设为 normal，作用于 #deepseek-explain-tooltip .ds-markdown。
+第 132 行：过长文字换行规则（overflow-wrap）设为 anywhere，作用于 #deepseek-explain-tooltip .ds-markdown。
+第 133 行：单词换行规则（word-break）设为 normal，作用于 #deepseek-explain-tooltip .ds-markdown。
+第 134 行：行高（line-height）设为 1.75，作用于 #deepseek-explain-tooltip .ds-markdown。
+第 135 行：结束 #deepseek-explain-tooltip .ds-markdown 的样式范围。
+第 136 行：为 #deepseek-explain-tooltip .ds-markdown * 设置下面样式；尺寸是否包括内边距和边框（box-sizing）设为 border-box，作用于 #deepseek-explain-tooltip .ds-markdown *；结束 #deepseek-explain-tooltip .ds-markdown * 的样式范围。
+第 137 行：为 #deepseek-explain-tooltip .ds-markdown p 设置下面样式；外边距；多值按上、右、下、左解释（margin）设为 0 0 10px，作用于 #deepseek-explain-tooltip .ds-markdown p；字体、字号和行高的组合（font）设为 inherit，作用于 #deepseek-explain-tooltip .ds-markdown p；文字或图标颜色（color）设为 inherit，作用于 #deepseek-explain-tooltip .ds-markdown p；结束 #deepseek-explain-tooltip .ds-markdown p 的样式范围。
+第 138 行：为 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6) 设置下面样式。
+第 139 行：显示和布局方式（display）设为 block，作用于 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6)；外边距；多值按上、右、下、左解释（margin）设为 16px 0 8px，作用于 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6)；内边距；多值按上、右、下、左解释（padding）设为 0，作用于 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6)；边框（border）设为 0，作用于 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6)。
+第 140 行：字体及备用字体（font-family）设为 inherit，作用于 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6)；字重，越大越粗（font-weight）设为 650，作用于 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6)；行高（line-height）设为 1.45，作用于 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6)；文字或图标颜色（color）设为 #1e293b，作用于 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6)。
+第 141 行：文字大小写处理（text-transform）设为 none，作用于 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6)；字间距（letter-spacing）设为 normal，作用于 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6)。
+第 142 行：结束 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6) 的样式范围。
+第 143 行：为 #deepseek-explain-tooltip .ds-markdown h1 设置下面样式；字号（font-size）设为 19px，作用于 #deepseek-explain-tooltip .ds-markdown h1；结束 #deepseek-explain-tooltip .ds-markdown h1 的样式范围。
+第 144 行：为 #deepseek-explain-tooltip .ds-markdown h2 设置下面样式；字号（font-size）设为 17px，作用于 #deepseek-explain-tooltip .ds-markdown h2；结束 #deepseek-explain-tooltip .ds-markdown h2 的样式范围。
+第 145 行：为 #deepseek-explain-tooltip .ds-markdown h3 设置下面样式；字号（font-size）设为 15px，作用于 #deepseek-explain-tooltip .ds-markdown h3；结束 #deepseek-explain-tooltip .ds-markdown h3 的样式范围。
+第 146 行：为 #deepseek-explain-tooltip .ds-markdown :is(h4,h5,h6) 设置下面样式；字号（font-size）设为 13px，作用于 #deepseek-explain-tooltip .ds-markdown :is(h4,h5,h6)；结束 #deepseek-explain-tooltip .ds-markdown :is(h4,h5,h6) 的样式范围。
+第 147 行：为 #deepseek-explain-tooltip .ds-markdown :is(ul,ol) 设置下面样式；外边距；多值按上、右、下、左解释（margin）设为 8px 0 12px，作用于 #deepseek-explain-tooltip .ds-markdown :is(ul,ol)；内边距；多值按上、右、下、左解释（padding）设为 0 0 0 22px，作用于 #deepseek-explain-tooltip .ds-markdown :is(ul,ol)；结束 #deepseek-explain-tooltip .ds-markdown :is(ul,ol) 的样式范围。
+第 148 行：为 #deepseek-explain-tooltip .ds-markdown ul 设置下面样式；列表标记样式（list-style）设为 disc outside，作用于 #deepseek-explain-tooltip .ds-markdown ul；结束 #deepseek-explain-tooltip .ds-markdown ul 的样式范围。
+第 149 行：为 #deepseek-explain-tooltip .ds-markdown ol 设置下面样式；列表标记样式（list-style）设为 decimal outside，作用于 #deepseek-explain-tooltip .ds-markdown ol；结束 #deepseek-explain-tooltip .ds-markdown ol 的样式范围。
+第 150 行：为 #deepseek-explain-tooltip .ds-markdown li 设置下面样式；显示和布局方式（display）设为 list-item，作用于 #deepseek-explain-tooltip .ds-markdown li；外边距；多值按上、右、下、左解释（margin）设为 4px 0，作用于 #deepseek-explain-tooltip .ds-markdown li；内边距；多值按上、右、下、左解释（padding）设为 0，作用于 #deepseek-explain-tooltip .ds-markdown li；结束 #deepseek-explain-tooltip .ds-markdown li 的样式范围。
+第 151 行：为 #deepseek-explain-tooltip .ds-markdown li > p 设置下面样式；外边距；多值按上、右、下、左解释（margin）设为 0，作用于 #deepseek-explain-tooltip .ds-markdown li > p；结束 #deepseek-explain-tooltip .ds-markdown li > p 的样式范围。
+第 152 行：为 #deepseek-explain-tooltip .ds-markdown strong 设置下面样式；字重，越大越粗（font-weight）设为 700，作用于 #deepseek-explain-tooltip .ds-markdown strong；结束 #deepseek-explain-tooltip .ds-markdown strong 的样式范围。
+第 153 行：为 #deepseek-explain-tooltip .ds-markdown em 设置下面样式；字体是否倾斜（font-style）设为 italic，作用于 #deepseek-explain-tooltip .ds-markdown em；结束 #deepseek-explain-tooltip .ds-markdown em 的样式范围。
+第 154 行：为 #deepseek-explain-tooltip .ds-markdown del 设置下面样式；下划线或删除线（text-decoration）设为 line-through，作用于 #deepseek-explain-tooltip .ds-markdown del；结束 #deepseek-explain-tooltip .ds-markdown del 的样式范围。
+第 155 行：为 #deepseek-explain-tooltip .ds-markdown blockquote 设置下面样式。
+第 156 行：外边距；多值按上、右、下、左解释（margin）设为 10px 0，作用于 #deepseek-explain-tooltip .ds-markdown blockquote；内边距；多值按上、右、下、左解释（padding）设为 8px 12px，作用于 #deepseek-explain-tooltip .ds-markdown blockquote；左边框（border-left）设为 3px solid #94a3b8，作用于 #deepseek-explain-tooltip .ds-markdown blockquote。
+第 157 行：背景（background）设为 #f8fafc，作用于 #deepseek-explain-tooltip .ds-markdown blockquote；文字或图标颜色（color）设为 #475569，作用于 #deepseek-explain-tooltip .ds-markdown blockquote；字体、字号和行高的组合（font）设为 inherit，作用于 #deepseek-explain-tooltip .ds-markdown blockquote。
+第 158 行：结束 #deepseek-explain-tooltip .ds-markdown blockquote 的样式范围。
+第 159 行：为 #deepseek-explain-tooltip .ds-markdown code 设置下面样式。
+第 160 行：字体及备用字体（font-family）设为 Consolas, "SFMono-Regular", monospace，作用于 #deepseek-explain-tooltip .ds-markdown code；字号（font-size）设为 12px，作用于 #deepseek-explain-tooltip .ds-markdown code。
+第 161 行：内边距；多值按上、右、下、左解释（padding）设为 2px 4px，作用于 #deepseek-explain-tooltip .ds-markdown code；各角的圆角大小（border-radius）设为 4px，作用于 #deepseek-explain-tooltip .ds-markdown code；背景（background）设为 #f1f5f9，作用于 #deepseek-explain-tooltip .ds-markdown code；文字或图标颜色（color）设为 #0f172a，作用于 #deepseek-explain-tooltip .ds-markdown code。
+第 162 行：空格和换行处理（white-space）设为 pre-wrap，作用于 #deepseek-explain-tooltip .ds-markdown code；过长文字换行规则（overflow-wrap）设为 anywhere，作用于 #deepseek-explain-tooltip .ds-markdown code。
+第 163 行：结束 #deepseek-explain-tooltip .ds-markdown code 的样式范围。
+第 164 行：为 #deepseek-explain-tooltip .ds-markdown pre 设置下面样式。
+第 165 行：显示和布局方式（display）设为 block，作用于 #deepseek-explain-tooltip .ds-markdown pre；最大宽度（max-width）设为 100%，作用于 #deepseek-explain-tooltip .ds-markdown pre；外边距；多值按上、右、下、左解释（margin）设为 10px 0，作用于 #deepseek-explain-tooltip .ds-markdown pre；内边距；多值按上、右、下、左解释（padding）设为 12px，作用于 #deepseek-explain-tooltip .ds-markdown pre。
+第 166 行：超出区域的处理（overflow）设为 auto，作用于 #deepseek-explain-tooltip .ds-markdown pre；边框（border）设为 1px solid #e2e8f0，作用于 #deepseek-explain-tooltip .ds-markdown pre；各角的圆角大小（border-radius）设为 6px，作用于 #deepseek-explain-tooltip .ds-markdown pre。
+第 167 行：背景（background）设为 #f8fafc，作用于 #deepseek-explain-tooltip .ds-markdown pre；文字或图标颜色（color）设为 #0f172a，作用于 #deepseek-explain-tooltip .ds-markdown pre；文字对齐（text-align）设为 left，作用于 #deepseek-explain-tooltip .ds-markdown pre。
+第 168 行：结束 #deepseek-explain-tooltip .ds-markdown pre 的样式范围。
+第 169 行：为 #deepseek-explain-tooltip .ds-markdown pre code 设置下面样式。
+第 170 行：显示和布局方式（display）设为 block，作用于 #deepseek-explain-tooltip .ds-markdown pre code；内边距；多值按上、右、下、左解释（padding）设为 0，作用于 #deepseek-explain-tooltip .ds-markdown pre code；背景（background）设为 transparent，作用于 #deepseek-explain-tooltip .ds-markdown pre code。
+第 171 行：空格和换行处理（white-space）设为 pre，作用于 #deepseek-explain-tooltip .ds-markdown pre code；过长文字换行规则（overflow-wrap）设为 normal，作用于 #deepseek-explain-tooltip .ds-markdown pre code；单词换行规则（word-break）设为 normal，作用于 #deepseek-explain-tooltip .ds-markdown pre code；行高（line-height）设为 1.6，作用于 #deepseek-explain-tooltip .ds-markdown pre code。
+第 172 行：结束 #deepseek-explain-tooltip .ds-markdown pre code 的样式范围。
+第 173 行：为 #deepseek-explain-tooltip .ds-markdown a 设置下面样式；文字或图标颜色（color）设为 #1d4ed8，作用于 #deepseek-explain-tooltip .ds-markdown a；下划线或删除线（text-decoration）设为 underline，作用于 #deepseek-explain-tooltip .ds-markdown a；结束 #deepseek-explain-tooltip .ds-markdown a 的样式范围。
+第 174 行：为 #deepseek-explain-tooltip .ds-markdown a:not([href]) 设置下面样式；文字或图标颜色（color）设为 inherit，作用于 #deepseek-explain-tooltip .ds-markdown a:not([href])；下划线或删除线（text-decoration）设为 none，作用于 #deepseek-explain-tooltip .ds-markdown a:not([href])；结束 #deepseek-explain-tooltip .ds-markdown a:not([href]) 的样式范围。
+第 175 行：为 #deepseek-explain-tooltip .ds-markdown :is(a,pre,.ds-md-table):focus-visible 设置下面样式。
+第 176 行：键盘焦点轮廓（outline）设为 2px solid #2563eb，作用于 #deepseek-explain-tooltip .ds-markdown :is(a,pre,.ds-md-table):focus-visible；焦点轮廓与边缘的距离（outline-offset）设为 2px，作用于 #deepseek-explain-tooltip .ds-markdown :is(a,pre,.ds-md-table):focus-visible。
+第 177 行：结束 #deepseek-explain-tooltip .ds-markdown :is(a,pre,.ds-md-table):focus-visible 的样式范围。
+第 178 行：为 #deepseek-explain-tooltip .ds-markdown .ds-md-table 设置下面样式；最大宽度（max-width）设为 100%，作用于 #deepseek-explain-tooltip .ds-markdown .ds-md-table；横向超出区域的处理（overflow-x）设为 auto，作用于 #deepseek-explain-tooltip .ds-markdown .ds-md-table；外边距；多值按上、右、下、左解释（margin）设为 10px 0，作用于 #deepseek-explain-tooltip .ds-markdown .ds-md-table；结束 #deepseek-explain-tooltip .ds-markdown .ds-md-table 的样式范围。
+第 179 行：为 #deepseek-explain-tooltip .ds-markdown table 设置下面样式；显示和布局方式（display）设为 table，作用于 #deepseek-explain-tooltip .ds-markdown table；宽度（width）设为 100%，作用于 #deepseek-explain-tooltip .ds-markdown table；表格边框是否合并（border-collapse）设为 collapse，作用于 #deepseek-explain-tooltip .ds-markdown table；字体、字号和行高的组合（font）设为 inherit，作用于 #deepseek-explain-tooltip .ds-markdown table；结束 #deepseek-explain-tooltip .ds-markdown table 的样式范围。
+第 180 行：为 #deepseek-explain-tooltip .ds-markdown :is(th,td) 设置下面样式。
+第 181 行：最小宽度（min-width）设为 90px，作用于 #deepseek-explain-tooltip .ds-markdown :is(th,td)；内边距；多值按上、右、下、左解释（padding）设为 7px 9px，作用于 #deepseek-explain-tooltip .ds-markdown :is(th,td)；边框（border）设为 1px solid #cbd5e1，作用于 #deepseek-explain-tooltip .ds-markdown :is(th,td)。
+第 182 行：文字对齐（text-align）设为 left，作用于 #deepseek-explain-tooltip .ds-markdown :is(th,td)；单元格等内容的垂直对齐（vertical-align）设为 top，作用于 #deepseek-explain-tooltip .ds-markdown :is(th,td)；背景（background）设为 #fff，作用于 #deepseek-explain-tooltip .ds-markdown :is(th,td)；文字或图标颜色（color）设为 inherit，作用于 #deepseek-explain-tooltip .ds-markdown :is(th,td)。
+第 183 行：结束 #deepseek-explain-tooltip .ds-markdown :is(th,td) 的样式范围。
+第 184 行：为 #deepseek-explain-tooltip .ds-markdown th 设置下面样式；字重，越大越粗（font-weight）设为 650，作用于 #deepseek-explain-tooltip .ds-markdown th；背景（background）设为 #f1f5f9，作用于 #deepseek-explain-tooltip .ds-markdown th；结束 #deepseek-explain-tooltip .ds-markdown th 的样式范围。
+第 185 行：为 #deepseek-explain-tooltip .ds-markdown input[type="checkbox"] 设置下面样式；右侧外边距（margin-right）设为 6px，作用于 #deepseek-explain-tooltip .ds-markdown input[type="checkbox"]；结束 #deepseek-explain-tooltip .ds-markdown input[type="checkbox"] 的样式范围。
+第 186 行：为 #deepseek-explain-tooltip .ds-markdown hr 设置下面样式；外边距；多值按上、右、下、左解释（margin）设为 14px 0，作用于 #deepseek-explain-tooltip .ds-markdown hr；边框（border）设为 0，作用于 #deepseek-explain-tooltip .ds-markdown hr；上边框（border-top）设为 1px solid #e2e8f0，作用于 #deepseek-explain-tooltip .ds-markdown hr；结束 #deepseek-explain-tooltip .ds-markdown hr 的样式范围。
+第 187 行：为 #deepseek-explain-tooltip .ds-markdown > :first-child 设置下面样式；顶部外边距（margin-top）设为 0，作用于 #deepseek-explain-tooltip .ds-markdown > :first-child；结束 #deepseek-explain-tooltip .ds-markdown > :first-child 的样式范围。
+第 188 行：为 #deepseek-explain-tooltip .ds-markdown > :last-child 设置下面样式；底部外边距（margin-bottom）设为 0，作用于 #deepseek-explain-tooltip .ds-markdown > :last-child；结束 #deepseek-explain-tooltip .ds-markdown > :last-child 的样式范围。
+第 189 行：为 #deepseek-explain-tooltip .ds-markdown blockquote > :last-child 设置下面样式；底部外边距（margin-bottom）设为 0，作用于 #deepseek-explain-tooltip .ds-markdown blockquote > :last-child；结束 #deepseek-explain-tooltip .ds-markdown blockquote > :last-child 的样式范围。
+第 190 行：当 (prefers-reduced-motion: reduce) 的屏幕条件成立时使用下面样式。
+第 191 行：为 #deepseek-explain-tooltip .ds-streaming::after 设置下面样式；动画名称、周期和重复方式（animation）设为 none，作用于 #deepseek-explain-tooltip .ds-streaming::after；结束 #deepseek-explain-tooltip .ds-streaming::after 的样式范围。
+第 192 行：结束 @media (prefers-reduced-motion: reduce) 的样式范围。
+第 195 行：为 .ds-body.ds-streaming::after 设置下面样式。
+第 196 行：伪元素显示的内容（content）设为 '▍'，作用于 .ds-body.ds-streaming::after。
+第 197 行：动画名称、周期和重复方式（animation）设为 ds-blink 1s step-end infinite，作用于 .ds-body.ds-streaming::after。
+第 198 行：文字或图标颜色（color）设为 #2563eb，作用于 .ds-body.ds-streaming::after。
+第 199 行：结束 .ds-body.ds-streaming::after 的样式范围。
+第 201 行：定义动画 ds-blink。
+第 202 行：为 50% 设置下面样式；不透明程度，0 隐藏、1 完全显示（opacity）设为 0，作用于 50%；结束 50% 的样式范围。
+第 203 行：结束 @keyframes ds-blink 的样式范围。
+第 206 行：为 .ds-actions 设置下面样式。
+第 207 行：显示和布局方式（display）设为 none，作用于 .ds-actions。
+第 208 行：弹性布局横轴对齐（align-items）设为 center，作用于 .ds-actions。
+第 209 行：子项之间的间隔（gap）设为 6px，作用于 .ds-actions。
+第 210 行：内边距；多值按上、右、下、左解释（padding）设为 4px 16px 10px，作用于 .ds-actions。
+第 211 行：结束 .ds-actions 的样式范围。
+第 213 行：为 .ds-btn 设置下面样式。
+第 214 行：显示和布局方式（display）设为 inline-flex，作用于 .ds-btn。
+第 215 行：弹性布局横轴对齐（align-items）设为 center，作用于 .ds-btn。
+第 216 行：子项之间的间隔（gap）设为 4px，作用于 .ds-btn。
+第 217 行：内边距；多值按上、右、下、左解释（padding）设为 4px 10px，作用于 .ds-btn。
+第 218 行：边框（border）设为 1px solid #e2e8f0，作用于 .ds-btn。
+第 219 行：各角的圆角大小（border-radius）设为 6px，作用于 .ds-btn。
+第 220 行：背景（background）设为 #ffffff，作用于 .ds-btn。
+第 221 行：文字或图标颜色（color）设为 #64748b，作用于 .ds-btn。
+第 222 行：字号（font-size）设为 11px，作用于 .ds-btn。
+第 223 行：字体及备用字体（font-family）设为 inherit，作用于 .ds-btn。
+第 224 行：鼠标指针样式（cursor）设为 pointer，作用于 .ds-btn。
+第 225 行：状态变化过渡效果（transition）设为 background 0.15s, border-color 0.15s, color 0.15s，作用于 .ds-btn。
+第 226 行：键盘焦点轮廓（outline）设为 none，作用于 .ds-btn。
+第 227 行：结束 .ds-btn 的样式范围。
+第 229 行：为 .ds-btn:hover 设置下面样式。
+第 230 行：背景（background）设为 #f1f5f9，作用于 .ds-btn:hover。
+第 231 行：边框颜色（border-color）设为 #cbd5e1，作用于 .ds-btn:hover。
+第 232 行：文字或图标颜色（color）设为 #334155，作用于 .ds-btn:hover。
+第 233 行：结束 .ds-btn:hover 的样式范围。
+第 235 行：为 .ds-btn:active 设置下面样式。
+第 236 行：背景（background）设为 #e2e8f0，作用于 .ds-btn:active。
+第 237 行：结束 .ds-btn:active 的样式范围。
+第 239 行：为 .ds-btn-icon 设置下面样式。
+第 240 行：显示和布局方式（display）设为 flex，作用于 .ds-btn-icon。
+第 241 行：弹性布局横轴对齐（align-items）设为 center，作用于 .ds-btn-icon。
+第 242 行：结束 .ds-btn-icon 的样式范围。
+第 244 行：为 .ds-btn-label 设置下面样式。
+第 245 行：字重，越大越粗（font-weight）设为 500，作用于 .ds-btn-label。
+第 246 行：结束 .ds-btn-label 的样式范围。
+第 249 行：为 .ds-error 设置下面样式。
+第 250 行：文字或图标颜色（color）设为 #dc2626，作用于 .ds-error。
+第 251 行：字号（font-size）设为 12px，作用于 .ds-error。
+第 252 行：结束 .ds-error 的样式范围。
+第 255 行：为 .ds-footer 设置下面样式。
+第 256 行：显示和布局方式（display）设为 flex，作用于 .ds-footer。
+第 257 行：弹性布局横轴对齐（align-items）设为 center，作用于 .ds-footer。
+第 258 行：弹性布局主轴对齐（justify-content）设为 space-between，作用于 .ds-footer。
+第 259 行：内边距；多值按上、右、下、左解释（padding）设为 6px 16px 8px，作用于 .ds-footer。
+第 260 行：上边框（border-top）设为 1px solid #f1f5f9，作用于 .ds-footer。
+第 261 行：结束 .ds-footer 的样式范围。
+第 263 行：为 .ds-model-tag 设置下面样式。
+第 264 行：字号（font-size）设为 10px，作用于 .ds-model-tag。
+第 265 行：文字或图标颜色（color）设为 #94a3b8，作用于 .ds-model-tag。
+第 266 行：背景（background）设为 #f1f5f9，作用于 .ds-model-tag。
+第 267 行：内边距；多值按上、右、下、左解释（padding）设为 2px 7px，作用于 .ds-model-tag。
+第 268 行：各角的圆角大小（border-radius）设为 4px，作用于 .ds-model-tag。
+第 269 行：字间距（letter-spacing）设为 0.2px，作用于 .ds-model-tag。
+第 270 行：结束 .ds-model-tag 的样式范围。
+第 272 行：为 .ds-powered 设置下面样式。
+第 273 行：字号（font-size）设为 10px，作用于 .ds-powered。
+第 274 行：文字或图标颜色（color）设为 #cbd5e1，作用于 .ds-powered。
+第 275 行：结束 .ds-powered 的样式范围。
+第 281 行：为 #ds-translate-toolbar 设置下面样式。
+第 282 行：定位方式（position）设为 fixed，作用于 #ds-translate-toolbar。
+第 283 行：距顶部的位置（top）设为 0，作用于 #ds-translate-toolbar。
+第 284 行：距左侧的位置（left）设为 0，作用于 #ds-translate-toolbar。
+第 285 行：距右侧的位置（right）设为 0，作用于 #ds-translate-toolbar。
+第 286 行：叠放层级，越大越靠前（z-index）设为 2147483646，作用于 #ds-translate-toolbar。
+第 287 行：显示和布局方式（display）设为 flex，作用于 #ds-translate-toolbar。
+第 288 行：弹性布局横轴对齐（align-items）设为 center，作用于 #ds-translate-toolbar。
+第 289 行：弹性布局主轴对齐（justify-content）设为 center，作用于 #ds-translate-toolbar。
+第 290 行：子项之间的间隔（gap）设为 12px，作用于 #ds-translate-toolbar。
+第 291 行：内边距；多值按上、右、下、左解释（padding）设为 8px 16px，作用于 #ds-translate-toolbar。
+第 292 行：背景（background）设为 #1e293b，作用于 #ds-translate-toolbar。
+第 293 行：文字或图标颜色（color）设为 #e2e8f0，作用于 #ds-translate-toolbar。
+第 294 行：字体及备用字体（font-family）设为 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",     "Microsoft YaHei", "Helvetica Neue", sans-serif，作用于 #ds-translate-toolbar。
+第 295 行：继续前一项 字体及备用字体（font-family） 的值："Microsoft YaHei", "Helvetica Neue", sans-serif;。
+第 296 行：字号（font-size）设为 13px，作用于 #ds-translate-toolbar。
+第 297 行：阴影（box-shadow）设为 0 2px 8px rgba(0,0,0,0.15)，作用于 #ds-translate-toolbar。
+第 298 行：结束 #ds-translate-toolbar 的样式范围。
+第 300 行：为 #ds-translate-toolbar .ds-tb-status 设置下面样式。
+第 301 行：字重，越大越粗（font-weight）设为 500，作用于 #ds-translate-toolbar .ds-tb-status。
+第 302 行：结束 #ds-translate-toolbar .ds-tb-status 的样式范围。
+第 304 行：为 #ds-translate-toolbar .ds-tb-progress 设置下面样式。
+第 305 行：字号（font-size）设为 11px，作用于 #ds-translate-toolbar .ds-tb-progress。
+第 306 行：文字或图标颜色（color）设为 #94a3b8，作用于 #ds-translate-toolbar .ds-tb-progress。
+第 307 行：结束 #ds-translate-toolbar .ds-tb-progress 的样式范围。
+第 309 行：为 .ds-tb-btn 设置下面样式。
+第 310 行：内边距；多值按上、右、下、左解释（padding）设为 4px 10px，作用于 .ds-tb-btn。
+第 311 行：边框（border）设为 1px solid #475569，作用于 .ds-tb-btn。
+第 312 行：各角的圆角大小（border-radius）设为 5px，作用于 .ds-tb-btn。
+第 313 行：背景（background）设为 transparent，作用于 .ds-tb-btn。
+第 314 行：文字或图标颜色（color）设为 #cbd5e1，作用于 .ds-tb-btn。
+第 315 行：字号（font-size）设为 12px，作用于 .ds-tb-btn。
+第 316 行：鼠标指针样式（cursor）设为 pointer，作用于 .ds-tb-btn。
+第 317 行：状态变化过渡效果（transition）设为 background 0.15s，作用于 .ds-tb-btn。
+第 318 行：结束 .ds-tb-btn 的样式范围。
+第 320 行：为 .ds-tb-btn:hover 设置下面样式。
+第 321 行：背景（background）设为 #334155，作用于 .ds-tb-btn:hover。
+第 322 行：结束 .ds-tb-btn:hover 的样式范围。
+第 324 行：为 .ds-tb-btn.ds-tb-danger 设置下面样式。
+第 325 行：边框颜色（border-color）设为 #dc2626，作用于 .ds-tb-btn.ds-tb-danger。
+第 326 行：文字或图标颜色（color）设为 #fca5a5，作用于 .ds-tb-btn.ds-tb-danger。
+第 327 行：结束 .ds-tb-btn.ds-tb-danger 的样式范围。
+第 329 行：为 .ds-tb-btn.ds-tb-danger:hover 设置下面样式。
+第 330 行：背景（background）设为 #7f1d1d，作用于 .ds-tb-btn.ds-tb-danger:hover。
+第 331 行：结束 .ds-tb-btn.ds-tb-danger:hover 的样式范围。
+第 334 行：为 .ds-reasoning 设置下面样式。
+第 335 行：外边距；多值按上、右、下、左解释（margin）设为 8px 16px 0，作用于 .ds-reasoning。
+第 336 行：内边距；多值按上、右、下、左解释（padding）设为 8px 10px，作用于 .ds-reasoning。
+第 337 行：背景（background）设为 #f8fafc，作用于 .ds-reasoning。
+第 338 行：边框（border）设为 1px solid #e2e8f0，作用于 .ds-reasoning。
+第 339 行：各角的圆角大小（border-radius）设为 6px，作用于 .ds-reasoning。
+第 340 行：结束 .ds-reasoning 的样式范围。
+第 342 行：为 .ds-reasoning-title 设置下面样式。
+第 343 行：字号（font-size）设为 11px，作用于 .ds-reasoning-title。
+第 344 行：字重，越大越粗（font-weight）设为 600，作用于 .ds-reasoning-title。
+第 345 行：文字或图标颜色（color）设为 #64748b，作用于 .ds-reasoning-title。
+第 346 行：底部外边距（margin-bottom）设为 4px，作用于 .ds-reasoning-title。
+第 347 行：结束 .ds-reasoning-title 的样式范围。
+第 349 行：为 .ds-reasoning-body 设置下面样式。
+第 350 行：字号（font-size）设为 12px，作用于 .ds-reasoning-body。
+第 351 行：文字或图标颜色（color）设为 #64748b，作用于 .ds-reasoning-body。
+第 352 行：行高（line-height）设为 1.6，作用于 .ds-reasoning-body。
+第 353 行：最大高度（max-height）设为 18vh，作用于 .ds-reasoning-body。
+第 354 行：纵向超出区域的处理（overflow-y）设为 auto，作用于 .ds-reasoning-body。
+第 355 行：空格和换行处理（white-space）设为 pre-wrap，作用于 .ds-reasoning-body。
+第 356 行：单词换行规则（word-break）设为 break-word，作用于 .ds-reasoning-body。
+第 357 行：结束 .ds-reasoning-body 的样式范围。
+第 360 行：为 #deepseek-explain-tooltip :is(.ds-header,.ds-actions,.ds-footer,.ds-quote) 设置下面样式；空间不足时的收缩比例（flex-shrink）设为 0，作用于 #deepseek-explain-tooltip :is(.ds-header,.ds-actions,.ds-footer,.ds-quote)；结束 #deepseek-explain-tooltip :is(.ds-header,.ds-actions,.ds-footer,.ds-quote) 的样式范围。
+第 361 行：为 #deepseek-explain-tooltip .ds-quote 设置下面样式；最大高度（max-height）设为 min(72px, 12vh)，作用于 #deepseek-explain-tooltip .ds-quote；纵向超出区域的处理（overflow-y）设为 auto，作用于 #deepseek-explain-tooltip .ds-quote；结束 #deepseek-explain-tooltip .ds-quote 的样式范围。
+第 362 行：为 #deepseek-explain-tooltip .ds-reasoning 设置下面样式；最小高度（min-height）设为 0，作用于 #deepseek-explain-tooltip .ds-reasoning；弹性布局中的伸展和收缩比例（flex）设为 0 1 auto，作用于 #deepseek-explain-tooltip .ds-reasoning；纵向超出区域的处理（overflow-y）设为 auto，作用于 #deepseek-explain-tooltip .ds-reasoning；结束 #deepseek-explain-tooltip .ds-reasoning 的样式范围。
+第 363 行：为 #deepseek-explain-tooltip :is(.ds-close,.ds-btn):focus-visible 设置下面样式。
+第 364 行：键盘焦点轮廓（outline）设为 2px solid #2563eb，作用于 #deepseek-explain-tooltip :is(.ds-close,.ds-btn):focus-visible；焦点轮廓与边缘的距离（outline-offset）设为 2px，作用于 #deepseek-explain-tooltip :is(.ds-close,.ds-btn):focus-visible。
+第 365 行：结束 #deepseek-explain-tooltip :is(.ds-close,.ds-btn):focus-visible 的样式范围。
+第 366 行：为 #deepseek-explain-tooltip .ds-btn:disabled 设置下面样式；鼠标指针样式（cursor）设为 wait，作用于 #deepseek-explain-tooltip .ds-btn:disabled；不透明程度，0 隐藏、1 完全显示（opacity）设为 .65，作用于 #deepseek-explain-tooltip .ds-btn:disabled；结束 #deepseek-explain-tooltip .ds-btn:disabled 的样式范围。
+第 367 行：为 #deepseek-explain-tooltip .ds-actions 设置下面样式；弹性布局是否换行（flex-wrap）设为 wrap，作用于 #deepseek-explain-tooltip .ds-actions；结束 #deepseek-explain-tooltip .ds-actions 的样式范围。
+第 370 行：为 #deepseek-explain-tooltip 设置下面样式。
+第 371 行：背景（background）设为 var(--lc-bg)，作用于 #deepseek-explain-tooltip；文字或图标颜色（color）设为 var(--lc-ink)，作用于 #deepseek-explain-tooltip；边框（border）设为 1.5px solid var(--lc-border)，作用于 #deepseek-explain-tooltip。
+第 372 行：各角的圆角大小（border-radius）设为 21px 9px 19px 7px，作用于 #deepseek-explain-tooltip；阴影（box-shadow）设为 0 6px 24px var(--lc-shadow)，作用于 #deepseek-explain-tooltip。
+第 373 行：字体及备用字体（font-family）设为 var(--lc-body-font)，作用于 #deepseek-explain-tooltip；字号（font-size）设为 14px，作用于 #deepseek-explain-tooltip。
+第 374 行：结束 #deepseek-explain-tooltip 的样式范围。
+第 375 行：为 #deepseek-explain-tooltip .ds-header 设置下面样式；内边距；多值按上、右、下、左解释（padding）设为 10px 16px 8px，作用于 #deepseek-explain-tooltip .ds-header；下边框（border-bottom）设为 1px solid var(--lc-rule)，作用于 #deepseek-explain-tooltip .ds-header；结束 #deepseek-explain-tooltip .ds-header 的样式范围。
+第 376 行：为 #deepseek-explain-tooltip .lc-brand-icon 设置下面样式；宽度（width）设为 22px，作用于 #deepseek-explain-tooltip .lc-brand-icon；高度（height）设为 22px，作用于 #deepseek-explain-tooltip .lc-brand-icon；结束 #deepseek-explain-tooltip .lc-brand-icon 的样式范围。
+第 377 行：为 #deepseek-explain-tooltip .ds-drag-handle 设置下面样式；文字或图标颜色（color）设为 var(--lc-muted)，作用于 #deepseek-explain-tooltip .ds-drag-handle；子项之间的间隔（gap）设为 7px，作用于 #deepseek-explain-tooltip .ds-drag-handle；结束 #deepseek-explain-tooltip .ds-drag-handle 的样式范围。
+第 378 行：为 #deepseek-explain-tooltip .ds-brand 设置下面样式；文字或图标颜色（color）设为 var(--lc-muted)，作用于 #deepseek-explain-tooltip .ds-brand；字号（font-size）设为 12px，作用于 #deepseek-explain-tooltip .ds-brand；字间距（letter-spacing）设为 0，作用于 #deepseek-explain-tooltip .ds-brand；文字大小写处理（text-transform）设为 none，作用于 #deepseek-explain-tooltip .ds-brand；结束 #deepseek-explain-tooltip .ds-brand 的样式范围。
+第 379 行：为 #deepseek-explain-tooltip .ds-close 设置下面样式；宽度（width）设为 30px，作用于 #deepseek-explain-tooltip .ds-close；高度（height）设为 30px，作用于 #deepseek-explain-tooltip .ds-close；文字或图标颜色（color）设为 var(--lc-ink)，作用于 #deepseek-explain-tooltip .ds-close；外边距；多值按上、右、下、左解释（margin）设为 0，作用于 #deepseek-explain-tooltip .ds-close；结束 #deepseek-explain-tooltip .ds-close 的样式范围。
+第 380 行：为 #deepseek-explain-tooltip .ds-close:hover 设置下面样式；文字或图标颜色（color）设为 var(--lc-ink)，作用于 #deepseek-explain-tooltip .ds-close:hover；背景（background）设为 var(--lc-soft)，作用于 #deepseek-explain-tooltip .ds-close:hover；结束 #deepseek-explain-tooltip .ds-close:hover 的样式范围。
+第 381 行：为 #deepseek-explain-tooltip .ds-quote 设置下面样式；背景（background）设为 var(--lc-surface)，作用于 #deepseek-explain-tooltip .ds-quote；文字或图标颜色（color）设为 var(--lc-muted)，作用于 #deepseek-explain-tooltip .ds-quote；边框（border）设为 1px solid var(--lc-border)，作用于 #deepseek-explain-tooltip .ds-quote；各角的圆角大小（border-radius）设为 12px 4px 11px 5px，作用于 #deepseek-explain-tooltip .ds-quote；顶部外边距（margin-top）设为 12px，作用于 #deepseek-explain-tooltip .ds-quote；字号（font-size）设为 13px，作用于 #deepseek-explain-tooltip .ds-quote；字体是否倾斜（font-style）设为 normal，作用于 #deepseek-explain-tooltip .ds-quote；结束 #deepseek-explain-tooltip .ds-quote 的样式范围。
+第 382 行：为 #deepseek-explain-tooltip .ds-body 设置下面样式；文字或图标颜色（color）设为 var(--lc-ink)，作用于 #deepseek-explain-tooltip .ds-body；字号（font-size）设为 14px，作用于 #deepseek-explain-tooltip .ds-body；结束 #deepseek-explain-tooltip .ds-body 的样式范围。
+第 383 行：为 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6) 设置下面样式；文字或图标颜色（color）设为 var(--lc-ink)，作用于 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6)；字体及备用字体（font-family）设为 var(--lc-title-font)，作用于 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6)；结束 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6) 的样式范围。
+第 384 行：为 #deepseek-explain-tooltip .ds-markdown h1 设置下面样式；字号（font-size）设为 23px，作用于 #deepseek-explain-tooltip .ds-markdown h1；结束 #deepseek-explain-tooltip .ds-markdown h1 的样式范围。
+第 385 行：为 #deepseek-explain-tooltip .ds-markdown h2 设置下面样式；字号（font-size）设为 21px，作用于 #deepseek-explain-tooltip .ds-markdown h2；结束 #deepseek-explain-tooltip .ds-markdown h2 的样式范围。
+第 386 行：为 #deepseek-explain-tooltip .ds-markdown h3 设置下面样式；字号（font-size）设为 18px，作用于 #deepseek-explain-tooltip .ds-markdown h3；结束 #deepseek-explain-tooltip .ds-markdown h3 的样式范围。
+第 387 行：为 #deepseek-explain-tooltip .ds-markdown blockquote 设置下面样式；背景（background）设为 var(--lc-surface)，作用于 #deepseek-explain-tooltip .ds-markdown blockquote；文字或图标颜色（color）设为 var(--lc-muted)，作用于 #deepseek-explain-tooltip .ds-markdown blockquote；边框颜色（border-color）设为 var(--lc-accent)，作用于 #deepseek-explain-tooltip .ds-markdown blockquote；结束 #deepseek-explain-tooltip .ds-markdown blockquote 的样式范围。
+第 388 行：为 #deepseek-explain-tooltip .ds-markdown :is(code,pre,th) 设置下面样式；文字或图标颜色（color）设为 var(--lc-ink)，作用于 #deepseek-explain-tooltip .ds-markdown :is(code,pre,th)；背景（background）设为 var(--lc-surface)，作用于 #deepseek-explain-tooltip .ds-markdown :is(code,pre,th)；结束 #deepseek-explain-tooltip .ds-markdown :is(code,pre,th) 的样式范围。
+第 389 行：为 #deepseek-explain-tooltip .ds-markdown pre code 设置下面样式；背景（background）设为 transparent，作用于 #deepseek-explain-tooltip .ds-markdown pre code；结束 #deepseek-explain-tooltip .ds-markdown pre code 的样式范围。
+第 390 行：为 #deepseek-explain-tooltip .ds-markdown td 设置下面样式；背景（background）设为 var(--lc-bg)，作用于 #deepseek-explain-tooltip .ds-markdown td；结束 #deepseek-explain-tooltip .ds-markdown td 的样式范围。
+第 391 行：为 #deepseek-explain-tooltip .ds-markdown :is(th,td,pre,hr) 设置下面样式；边框颜色（border-color）设为 var(--lc-rule)，作用于 #deepseek-explain-tooltip .ds-markdown :is(th,td,pre,hr)；结束 #deepseek-explain-tooltip .ds-markdown :is(th,td,pre,hr) 的样式范围。
+第 392 行：为 #deepseek-explain-tooltip .ds-markdown a, #deepseek-explain-tooltip .ds-streaming::after 设置下面样式；文字或图标颜色（color）设为 var(--lc-accent)，作用于 #deepseek-explain-tooltip .ds-markdown a, #deepseek-explain-tooltip .ds-streaming::after；结束 #deepseek-explain-tooltip .ds-markdown a, #deepseek-explain-tooltip .ds-streaming::after 的样式范围。
+第 393 行：为 #deepseek-explain-tooltip .ds-markdown a:not([href]) 设置下面样式；文字或图标颜色（color）设为 inherit，作用于 #deepseek-explain-tooltip .ds-markdown a:not([href])；结束 #deepseek-explain-tooltip .ds-markdown a:not([href]) 的样式范围。
+第 394 行：为 #deepseek-explain-tooltip .ds-btn 设置下面样式；背景（background）设为 var(--lc-surface)，作用于 #deepseek-explain-tooltip .ds-btn；文字或图标颜色（color）设为 var(--lc-ink)，作用于 #deepseek-explain-tooltip .ds-btn；边框（border）设为 1px solid var(--lc-border)，作用于 #deepseek-explain-tooltip .ds-btn；各角的圆角大小（border-radius）设为 5px，作用于 #deepseek-explain-tooltip .ds-btn；字号（font-size）设为 12px，作用于 #deepseek-explain-tooltip .ds-btn；最小高度（min-height）设为 32px，作用于 #deepseek-explain-tooltip .ds-btn；结束 #deepseek-explain-tooltip .ds-btn 的样式范围。
+第 395 行：为 #deepseek-explain-tooltip .ds-btn:hover 设置下面样式；背景（background）设为 var(--lc-soft)，作用于 #deepseek-explain-tooltip .ds-btn:hover；文字或图标颜色（color）设为 var(--lc-ink)，作用于 #deepseek-explain-tooltip .ds-btn:hover；边框颜色（border-color）设为 var(--lc-border)，作用于 #deepseek-explain-tooltip .ds-btn:hover；结束 #deepseek-explain-tooltip .ds-btn:hover 的样式范围。
+第 396 行：为 #deepseek-explain-tooltip .ds-btn:active 设置下面样式；背景（background）设为 var(--lc-soft)，作用于 #deepseek-explain-tooltip .ds-btn:active；结束 #deepseek-explain-tooltip .ds-btn:active 的样式范围。
+第 397 行：为 #deepseek-explain-tooltip .ds-error 设置下面样式；文字或图标颜色（color）设为 var(--lc-error)，作用于 #deepseek-explain-tooltip .ds-error；结束 #deepseek-explain-tooltip .ds-error 的样式范围。
+第 398 行：为 #deepseek-explain-tooltip .ds-footer 设置下面样式；边框颜色（border-color）设为 var(--lc-rule)，作用于 #deepseek-explain-tooltip .ds-footer；结束 #deepseek-explain-tooltip .ds-footer 的样式范围。
+第 399 行：为 #deepseek-explain-tooltip .ds-model-tag 设置下面样式；文字或图标颜色（color）设为 var(--lc-muted)，作用于 #deepseek-explain-tooltip .ds-model-tag；背景（background）设为 var(--lc-surface)，作用于 #deepseek-explain-tooltip .ds-model-tag；字号（font-size）设为 11px，作用于 #deepseek-explain-tooltip .ds-model-tag；结束 #deepseek-explain-tooltip .ds-model-tag 的样式范围。
+第 400 行：为 #deepseek-explain-tooltip .ds-powered 设置下面样式；文字或图标颜色（color）设为 var(--lc-muted)，作用于 #deepseek-explain-tooltip .ds-powered；字号（font-size）设为 11px，作用于 #deepseek-explain-tooltip .ds-powered；结束 #deepseek-explain-tooltip .ds-powered 的样式范围。
+第 401 行：为 #deepseek-explain-tooltip .ds-reasoning 设置下面样式；背景（background）设为 var(--lc-surface)，作用于 #deepseek-explain-tooltip .ds-reasoning；边框颜色（border-color）设为 var(--lc-border)，作用于 #deepseek-explain-tooltip .ds-reasoning；结束 #deepseek-explain-tooltip .ds-reasoning 的样式范围。
+第 402 行：为 #deepseek-explain-tooltip :is(.ds-reasoning-title,.ds-reasoning-body) 设置下面样式；文字或图标颜色（color）设为 var(--lc-muted)，作用于 #deepseek-explain-tooltip :is(.ds-reasoning-title,.ds-reasoning-body)；结束 #deepseek-explain-tooltip :is(.ds-reasoning-title,.ds-reasoning-body) 的样式范围。
+第 403 行：为 #deepseek-explain-tooltip :is(.ds-close,.ds-btn,a,pre,.ds-md-table):focus-visible 设置下面样式；焦点轮廓颜色（outline-color）设为 var(--lc-accent)，作用于 #deepseek-explain-tooltip :is(.ds-close,.ds-btn,a,pre,.ds-md-table):focus-visible；结束 #deepseek-explain-tooltip :is(.ds-close,.ds-btn,a,pre,.ds-md-table):focus-visible 的样式范围。
+第 404 行：为 #ds-translate-toolbar 设置下面样式；弹性布局是否换行（flex-wrap）设为 wrap，作用于 #ds-translate-toolbar；子项之间的间隔（gap）设为 10px，作用于 #ds-translate-toolbar；背景（background）设为 var(--lc-bg)，作用于 #ds-translate-toolbar；文字或图标颜色（color）设为 var(--lc-ink)，作用于 #ds-translate-toolbar；下边框（border-bottom）设为 1px solid var(--lc-border)，作用于 #ds-translate-toolbar；字体及备用字体（font-family）设为 var(--lc-body-font)，作用于 #ds-translate-toolbar；结束 #ds-translate-toolbar 的样式范围。
+第 405 行：为 #ds-translate-toolbar .lc-brand-icon 设置下面样式；宽度（width）设为 24px，作用于 #ds-translate-toolbar .lc-brand-icon；高度（height）设为 24px，作用于 #ds-translate-toolbar .lc-brand-icon；结束 #ds-translate-toolbar .lc-brand-icon 的样式范围。
+第 406 行：为 #ds-translate-toolbar .ds-tb-progress 设置下面样式；文字或图标颜色（color）设为 var(--lc-muted)，作用于 #ds-translate-toolbar .ds-tb-progress；字号（font-size）设为 12px，作用于 #ds-translate-toolbar .ds-tb-progress；结束 #ds-translate-toolbar .ds-tb-progress 的样式范围。
+第 407 行：为 #ds-translate-toolbar .ds-tb-btn 设置下面样式；显示和布局方式（display）设为 inline-flex，作用于 #ds-translate-toolbar .ds-tb-btn；弹性布局横轴对齐（align-items）设为 center，作用于 #ds-translate-toolbar .ds-tb-btn；最小高度（min-height）设为 32px，作用于 #ds-translate-toolbar .ds-tb-btn；边框颜色（border-color）设为 var(--lc-border)，作用于 #ds-translate-toolbar .ds-tb-btn；文字或图标颜色（color）设为 var(--lc-ink)，作用于 #ds-translate-toolbar .ds-tb-btn；背景（background）设为 var(--lc-surface)，作用于 #ds-translate-toolbar .ds-tb-btn；字体及备用字体（font-family）设为 inherit，作用于 #ds-translate-toolbar .ds-tb-btn；结束 #ds-translate-toolbar .ds-tb-btn 的样式范围。
+第 408 行：为 #ds-translate-toolbar .ds-tb-btn:hover 设置下面样式；背景（background）设为 var(--lc-soft)，作用于 #ds-translate-toolbar .ds-tb-btn:hover；结束 #ds-translate-toolbar .ds-tb-btn:hover 的样式范围。
+第 409 行：为 #ds-translate-toolbar .ds-tb-danger 设置下面样式；边框颜色（border-color）设为 var(--lc-error)，作用于 #ds-translate-toolbar .ds-tb-danger；文字或图标颜色（color）设为 var(--lc-error)，作用于 #ds-translate-toolbar .ds-tb-danger；结束 #ds-translate-toolbar .ds-tb-danger 的样式范围。
+第 410 行：为 #ds-translate-toolbar .ds-tb-danger:hover 设置下面样式；背景（background）设为 var(--lc-error-bg)，作用于 #ds-translate-toolbar .ds-tb-danger:hover；结束 #ds-translate-toolbar .ds-tb-danger:hover 的样式范围。
+第 411 行：为 #ds-translate-toolbar .ds-tb-btn:focus-visible 设置下面样式；键盘焦点轮廓（outline）设为 2px solid var(--lc-accent)，作用于 #ds-translate-toolbar .ds-tb-btn:focus-visible；焦点轮廓与边缘的距离（outline-offset）设为 2px，作用于 #ds-translate-toolbar .ds-tb-btn:focus-visible；结束 #ds-translate-toolbar .ds-tb-btn:focus-visible 的样式范围。
+*/

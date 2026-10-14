@@ -52,6 +52,14 @@ DeepSeek官方hostname精确匹配后，分别读取 `explainDeepSeekThinkingEna
 
 设置页共用“划词触发方式”位于两面板的思考强度区域下方，保存 `triggerMode: auto/contextMenu`；已有网页通过storage变化即时更新。原生选区菜单始终注册，两种模式均可点击。
 
+## 源码入门导读
+
+项目自有的十个根目录 JavaScript、三个 CSS、`popup.html` 和 `icons/brand.svg`，在文件末尾附有“中文逐句导读（不参与运行）”。先介绍文件职责和调用关系，再说明常见写法，最后按原代码行号解释非空代码行。原有注释和空行不重复解释；同一行有多句时按顺序说明，跨行表达式结合起始行和续行阅读。
+
+推荐从 `popup.html` 理解界面，接着看 `popup.js` 的设置操作，再看 `content.js` 的划词入口、`background.js` 的请求与消息。`config.js` 共用配置，`selection.js` 采集和分析选区，`selection-prompts.js` 组装模型任务，`markdown.js` 排版回答，`content-fullpage.js` 管理整页翻译，主题和 CSS 负责外观。
+
+`manifest.json` 是严格 JSON，不能加入注释；它的 28 行说明放在 `popup.html` 末尾的第四部分。第三方 `vendor/` 库、字体、PNG 图片和验证脚本不属于本轮逐句导读范围。未来修改原代码时，应同步维护末尾解释及引用行号。
+
 ## 最低检查
 
 每次改动至少运行：
@@ -134,3 +142,11 @@ GitHub同步必须核对远程提交和默认分支内容，不能把本地commi
 基线 `16a4992`，当前任务分支与 `origin/main` 一致且工作区干净。停止跟踪27个文件：交接1份、历史任务记录24份、第三方调试source map 2份；原文件仍完整保留在本机。上传清单83→56个文件，运行源码、清单、图标、字体、第三方脚本与许可证、可复用验证工具均未修改，扩展版本保持4.6.0。
 
 使用Node v24.18.1、Git 2.55.0.windows.3核验：本机静态49项通过；仅复制上传清单得到的独立目录静态49项通过；50个保留文件与基线Git内容一致；27个本地材料内容一致且已忽略；公开文档10个本地链接均指向上传文件；diff空白检查通过。详细本机证据为 `artifacts/qa/minimal-upload-2026-10-13/audit.json`，精简目录报告为该目录下的 `upload-snapshot-static.json`。本轮只整理跟踪范围与文档，未重新执行Edge交互或真实供应商请求；静态结果不表示这些功能已重新验收。
+
+## 2026-10-14 入门导读验收
+
+基线 `b89327d`，起始工作区干净，复用 `codex/tooltip-header-cleanup`；fetch 后与上游 0/0。15 个自有运行源码文件仅在末尾追加中文注释，`manifest.json` 保持原样，其逐行说明随 `popup.html` 保存。同步本手册与仅本地的 `Description.md`；版本保持 4.6.0。
+
+Node v24.18.1 静态检查 49 项通过，`git diff --check` 通过。15 个文件的原始字节均为修改后文件的完整前缀；十个 JavaScript 的可执行语法树相同。使用 Edge 155.0.4283.45 比较三份 CSS 的 CSSOM 规则，以及 HTML/SVG 去注释后的元素树，均与基线一致。操作为对照读取基线、核对说明行号、解析并比较，预期只增加注释，实际结果符合。证据为 `artifacts/qa/static-check.json` 和 `artifacts/qa/beginner-guide-2026-10-14/equivalence.json`。
+
+本轮没有更改功能路径，没有重新执行扩展交互、原生右键或真实供应商 API 请求；上述解析一致性不代表这些路径新增了端到端验收。无需重新配置；要让浏览器使用当前文件可在 `edge://extensions` 重新加载，并刷新已打开的网页。
