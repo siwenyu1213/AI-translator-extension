@@ -21,3 +21,5 @@ SHA-256（原始文件字节）：
 加载顺序在manifest.json中定义：theme.js → selection.js → Marked → DOMPurify → markdown.js → content.js。markdown.js负责每次解析后的标签/属性白名单、链接协议、图片替代文字、表格滚动包装与节流；不要把未经清理的parser输出直接插入网页。
 
 2026-10-13 新增三主题的本地字体，来源、许可和原始字节哈希见 [fonts/README](fonts/README.md)。字体不是执行脚本，不改变 Markdown 的清理规则。
+
+2026-10-16新增本地文楷屏幕阅读版完整字库WOFF2；采用SIL OFL 1.1，机械转换/来源与哈希见[fonts/README](fonts/README.md)。运行时不下载远程字体。

@@ -6,7 +6,9 @@
 
 | 文件 | 来源与用途 |
 | --- | --- |
-| `screenshots/settings.png` | 实际扩展设置页，展示题签、用途页签、当前模型、开关与语言/触发设置 |
+| `screenshots/settings.png` | 实际扩展设置页，展示文楷题签、用途页签、当前模型、自绘菜单触发按钮与语言/触发设置 |
 | `screenshots/result.png` | 合成英语网页中的实际划词浮层，展示纸页侧边、选区、词条与模拟Markdown回答 |
 
-原始本机证据分别为`artifacts/qa/lexicon-ui/cobalt-settings.png`和`cobalt-result.png`（同目录）。截图不证明真实供应商生成能力、回答质量或速度。生成证据及逐次记录仅本地保存；可复用验证方法见[开发说明](../DEVELOPMENT.md)。
+原始本机证据分别为`artifacts/qa/select-menu/settings.png`和`result.png`（同目录）。截图不证明真实供应商生成能力、回答质量或速度。生成证据及逐次记录仅本地保存；可复用验证方法见[开发说明](../DEVELOPMENT.md)。
+
+2026-10-16菜单与字体更新：同目录manufacturer-open.png（仅本地）展示自绘厂家菜单，中文使用文楷屏幕版、英文使用Space Grotesk/Syne。截图中的厂家、型号和回答仍为合成数据。

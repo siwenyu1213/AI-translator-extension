@@ -41,7 +41,7 @@ GitHub入口为 `https://github.com/siwenyu1213/LingoClarify`。本地目录与�
 
 - 后台加载 `model-catalog.js`、`config.js`、`selection.js`、`selection-prompts.js`；只使用选区模块的无DOM分析。
 - 自动内容注入：`theme.js` → `selection.js` → Marked → DOMPurify → `markdown.js` → `content.js`，样式为 `theme.css`、`content.css`。
-- 设置页加载 `model-catalog.js`、`config.js`、`theme.js`、`popup.js`，共用配置与查询逻辑。外观模块独立保存 `uiTheme`，只更新扩展根元素，默认纸本文笺；cobalt/playful/vellum分别对应纸本文笺、清浅青、冷灰蓝，三配色共用词典布局，字体本地打包。
+- 设置页加载 `model-catalog.js`、`config.js`、`theme.js`、`popup.js`、`select-menu.js`，共用配置与查询逻辑。外观模块独立保存 `uiTheme`，只更新扩展根元素，默认纸本文笺；cobalt/playful/vellum分别对应纸本文笺、清浅青、冷灰蓝，三配色共用词典布局，字体本地打包。
 - 全文由后台按需注入 `content-fullpage.js`，通过端口取得单条或批量结果。
 - 全文工具栏桌面宽度为视口的约三分之一、水平居中，窄屏最小宽度受视口限制。下方单个 `ds-tb-toggle` 方框箭头控制 `ds-tb-panel` 整体收起/展开，按钮持续保留且焦点不变；收起内容设为inert并从辅助技术隐藏。180ms收起/浮现动画遵从减少动画偏好，任务、进度与主题继续运行。隐藏状态再次注入时只打开当前工具栏；取消移除整个入口，新启动默认展开，不保存全局偏好。
 
@@ -182,3 +182,13 @@ popup.js仅将共用trigger-mode控件移动到当前用途的语言行，保留
 基线db49d6f，复用codex/ui-reading-redesign。用户指出厂家菜单打开时出现额外绿色框；原因是popup.css通用:focus-visible在厂家容器1px边框外再次添加2px主题色outline。本轮仅对.model-pair内的select取消outline，覆盖解释/翻译两个用途的厂家与型号控件；原有容器边框和其他按钮/输入框焦点样式保留。
 
 北京时间2026-10-16，在隔离Edge155.0.4283.45、Node24.18.1中用合成厂家/型号验证：重加旧规则时复现2px实线，修复后三配色×两用途×厂家/型号共12种状态均无额外outline，厂家原边框仍1px；保存按钮键盘焦点仍为实线。51项静态和git diff --check通过；报告及前后局部截图为artifacts/qa/model-focus/report.json、before.png、after.png，静态报告artifacts/qa/static-check.json。未执行真实供应商或原生工具栏窗口截图，本轮不重复整套功能回归。验收浏览器已关闭；仅本地提交UI小修，并行流式修改未纳入，Description.md同步且继续本地忽略，版本4.6.0。
+
+## 2026-10-16 自绘下拉菜单与本地设计字体
+
+基线3a485a3，复用codex/ui-reading-redesign。按用户要求替换灰色系统下拉列表，并移除界面中宋体/黑体等系统字体的显式指定。新增select-menu.js，在popup.js之后加载：原select继续承载配置与change事件，自绘按钮负责显示，popover列表提供选中勾选、悬停、高度限制、长列表搜索、上下/Home/End/Enter/Escape/Tab和点击外部关闭；原生select不参与鼠标和Tab操作。菜单监听原选项/禁用状态变化，厂家切换、异步列表、无型号、用途切换及主题写入失败继续同步。搜索框blur/change不会触发菜单重绘，避免点击搜索结果时选项被提前移除。新增scripts/verify-select-menu.mjs，可用--playwright和--output复验。
+
+字体改为本地霞鹜文楷屏幕阅读版v1.522处理中文、Space Grotesk处理英文正文与菜单、Syne处理英文标题；设置、结果、全文工具栏共用字体变量。新wenkai-screen.woff2保留完整字库，来源/许可/哈希及机械转换方式见vendor/fonts/README.md和wenkai-OFL.txt；仅用于网页嵌入，无CDN或系统字体安装，不新增扩展运行依赖。制作时使用的fontTools仅在.local/tmp中。压缩资源12,761,284字节，原始TTF与制作工具不纳入提交；清单只新增字体可访问资源。原型生成器的字体也同步更新，版本仍4.6.0。
+
+北京时间2026-10-16，Edge155.0.4283.45、Node24.18.1、Playwright1.62.1隔离配置下7组菜单/字体验收通过，包括实际点击、搜索空结果和过滤选择回写、保存重开、两用途、停用/异步型号、键盘退出、三配色×260/320/390px边界、滚动关闭。CDP实际字形证据确认中文标题与结果正文由LXGW WenKai Screen自定义字体渲染，英文型号由Space Grotesk自定义字体渲染。19主题（含150/200%标签页缩放）、9设置/DeepSeek、17拖动、11全文工具栏及54静态检查、git diff --check通过，测试浏览器/本机服务均已关闭。
+
+本轮菜单报告与截图为artifacts/qa/select-menu/report.json、manufacturer-open.png、settings.png、result.png；主题与全文工具栏报告分别为同目录themes/report.json和toolbar/report.json；设置与拖动报告沿用各工具既有路径，以本轮HEAD/内容识别，设置工具日期字符串仍是旧常量。静态报告artifacts/qa/static-check.json。所有配置/模型及SSE均为合成，不证明真实供应商或模型质量；原生工具栏窗口视觉与其他浏览器仍未验收。当前本地预览与公开截图已更新，并行流式修改继续保留，Description同步且本地忽略。

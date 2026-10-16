@@ -96,7 +96,7 @@ try{
     await check(`${theme} 正文/提示/按钮文本对比度与本地字体`,async()=>{
       const colors=await popup.evaluate(()=>{const body=getComputedStyle(document.body),hint=getComputedStyle(document.querySelector('#theme-status')),button=getComputedStyle(document.querySelector('#save-btn'));return{bg:body.backgroundColor,ink:body.color,muted:hint.color,button:button.backgroundColor,on:button.color};});
       for(const value of[ratio(colors.bg,colors.ink),ratio(colors.bg,colors.muted),ratio(colors.button,colors.on)])assert.ok(value>=4.5,String(value));
-      const family=theme==='playful'?'LC Space':'LC Inter';
+      const family='LC Space';
       for(const surface of[popup,page]){
         const faces=await surface.evaluate(()=>[...document.fonts].map(face=>({family:face.family,status:face.status})));
         assert.equal(faces.some(face=>face.family.replaceAll('"','')===family&&face.status==='loaded'),true,JSON.stringify({surface:surface===popup?'popup':'page',faces}));

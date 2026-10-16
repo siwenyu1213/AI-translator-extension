@@ -5,16 +5,14 @@
   --lc-ink: #263d36; --lc-muted: #5d695f; --lc-accent: #36594b; --lc-on: #ffffff;
   --lc-border: #8b9685; --lc-rule: #c8cbbb; --lc-error: #b42318; --lc-error-bg: #fff0ed;
   --lc-success: #246a48; --lc-shadow: #20374414;
-  --lc-body-font: 'LC Inter', 'Segoe UI', 'Microsoft YaHei', sans-serif;
-  --lc-title-font: 'LC Cormorant', 'SimSun', 'Songti SC', Georgia, serif;
+  --lc-body-font: 'LC Space', 'LC WenKai', cursive;
+  --lc-title-font: 'LC Syne', 'LC WenKai', cursive;
   color-scheme: light;
 }
 .lc-theme[data-lc-theme='playful'] {
   --lc-bg: #f5f8f8; --lc-surface: #ffffff; --lc-soft: #e8f0f0;
   --lc-ink: #203744; --lc-muted: #526973; --lc-accent: #126b63; --lc-on: #ffffff;
   --lc-border: #93a9ad; --lc-rule: #d8e3e5; --lc-shadow: #20374414;
-  --lc-body-font: 'LC Space', 'Segoe UI', 'Microsoft YaHei', sans-serif;
-  --lc-title-font: 'LC Cormorant', 'SimSun', 'Songti SC', Georgia, serif;
 }
 .lc-theme[data-lc-theme='vellum'] {
   --lc-bg: #f0f3f8; --lc-surface: #ffffff; --lc-soft: #e4eaf4;
@@ -48,7 +46,7 @@
 #deepseek-explain-tooltip.lc-theme .ds-reasoning { border: 1px solid var(--lc-rule); border-radius: 6px; background: var(--lc-bg); }
 #deepseek-explain-tooltip.lc-theme[data-lc-theme='playful'] { border-radius: 4px; }
 #deepseek-explain-tooltip.lc-theme[data-lc-theme='playful'] .ds-header { border-bottom: 2px solid var(--lc-ink); }
-#deepseek-explain-tooltip.lc-theme[data-lc-theme='playful'] .ds-markdown :is(h1,h2,h3) { font-family: 'SimSun', 'Songti SC', serif; }
+#deepseek-explain-tooltip.lc-theme .ds-markdown code { font-family: 'LC Space', 'LC WenKai', monospace; }
 #deepseek-explain-tooltip.lc-theme[data-lc-theme='vellum'] { border-radius: 6px; }
 #deepseek-explain-tooltip.lc-theme[data-lc-theme='vellum'] .ds-body { padding: 10px 16px; line-height: 1.75; }
 #deepseek-explain-tooltip.lc-theme[data-lc-theme='vellum'] .ds-markdown { line-height: 1.75; }

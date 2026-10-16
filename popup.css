@@ -5,8 +5,8 @@ html { width: 390px; overflow-x: hidden; }
 body { width: 390px; max-width: 100vw; max-height: 510px; overflow-y: auto; font: 13px/1.55 var(--lc-body-font); color: var(--lc-ink); background: var(--lc-bg); scrollbar-color: var(--lc-border) var(--lc-bg); }
 .container { display: flex; flex-direction: column; min-height: 510px; padding: 20px 22px 14px; border-left: 6px solid var(--lc-accent); }
 .brand-header { border-bottom: 2px solid var(--lc-ink); padding-bottom: 12px; }
-.title { font: 500 40px/1.1 'SimSun', 'Songti SC', serif; letter-spacing: 6px; }
-.brand-subtitle { margin-top: 4px; font: 13px/1.4 Georgia, serif; letter-spacing: .6px; }
+.title { font: 400 40px/1.1 var(--lc-title-font); letter-spacing: 6px; }
+.brand-subtitle { margin-top: 4px; font: 13px/1.4 var(--lc-title-font); letter-spacing: .6px; }
 .version { float: right; font: 11px/1.5 var(--lc-body-font); letter-spacing: 0; margin-top: 1px; color: var(--lc-muted); }
 .tab-bar { display: flex; gap: 20px; margin: 8px 0 10px; border-bottom: 1px solid var(--lc-rule); }
 button, input, select { font: inherit; }
@@ -17,7 +17,7 @@ button { cursor: pointer; }
 .tab-btn:hover:not(.active) { color: var(--lc-ink); }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
-.model-heading { font: 500 22px/1.3 'SimSun', 'Songti SC', serif; margin-bottom: 9px; }
+.model-heading { font: 400 22px/1.3 var(--lc-title-font); margin-bottom: 9px; }
 .section { margin-bottom: 12px; }
 .field-pair { display: grid; grid-template-columns: minmax(112px,.9fr) minmax(0,1.7fr); gap: 12px; }
 .field-pair > div { min-width: 0; }
@@ -25,7 +25,7 @@ button { cursor: pointer; }
 .manufacturer-field { display: flex; align-items: center; border: 1px solid var(--lc-border); min-height: 56px; }
 .manufacturer-field .select { font-size: 12px; padding-inline: 5px; }
 .model-field { display: flex; align-items: center; }
-.model-field .select { font: 500 19px/1.4 'LC Cormorant', 'SimSun', Georgia, serif; padding-inline: 0; }
+.model-field .select { font: 500 15px/1.4 var(--lc-body-font); padding-inline: 0; }
 .model-field .select:has(option[value='']:only-child) { font: 12px/1.5 var(--lc-body-font); }
 .model-detail { margin-bottom: 10px; }
 .label { display: block; margin-bottom: 5px; color: var(--lc-muted); font-size: 12px; font-weight: 400; }
@@ -80,13 +80,13 @@ button:disabled { opacity: .6; cursor: wait; }
 .theme-section .select { border: 0; background: transparent; font-size: 12px; min-height: 32px; padding-left: 0; }
 dialog { width: min(336px, calc(100vw - 28px)); max-height: calc(100vh - 28px); overflow-y: auto; margin: auto; border: 1px solid var(--lc-border); border-radius: 4px; padding: 20px; color: var(--lc-ink); background: var(--lc-bg); box-shadow: 0 16px 48px var(--lc-shadow); }
 dialog::backdrop { background: #263d3666; }
-dialog h2 { font: 500 23px/1.4 'SimSun', 'Songti SC', serif; margin-bottom: 15px; }
+dialog h2 { font: 400 23px/1.4 var(--lc-title-font); margin-bottom: 15px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 @media (max-width: 340px) {
   .container { padding: 16px 14px 12px; }
   .field-pair { grid-template-columns: minmax(0,1fr); gap: 8px; }
   .manufacturer-field { min-height: 36px; }
-  .model-field .select { font-size: 18px; }
+  .model-field .select { font-size: 14px; }
   .reading-preferences { grid-template-columns: minmax(0,1fr); gap: 9px; }
   .reading-preferences > div + div { border-left: 0; padding-left: 0; }
 }
@@ -94,7 +94,7 @@ dialog h2 { font: 500 23px/1.4 'SimSun', 'Songti SC', serif; margin-bottom: 15px
   .container { padding-inline: 10px; }
   .tab-bar { gap: 14px; }
   .tab-btn { font-size: 12px; }
-  .model-field .select { font-size: 17px; }
+  .model-field .select { font-size: 13px; }
   .settings-footer { gap: 6px; grid-template-columns: minmax(0,1fr); }
   .save-btn { gap: 6px; padding-inline: 10px; font-size: 12px; }
 }
@@ -102,3 +102,33 @@ dialog h2 { font: 500 23px/1.4 'SimSun', 'Songti SC', serif; margin-bottom: 15px
   button { transition: background .15s, color .15s; }
   .toggle-label input::after { transition: left .15s; }
 }
+
+/* 自绘菜单只作用于设置页；原select保留配置值和change事件。 */
+.lc-select { position: relative; min-width: 0; width: 100%; }
+.lc-select > select.lc-select-native { position: absolute; inset: 0; height: 100%; opacity: 0; pointer-events: none; margin: 0; }
+.lc-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; min-width: 0; }
+.lc-select-value { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lc-select-caret { display: inline-flex; flex: none; color: var(--lc-muted); }
+.lc-select-caret svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.lc-select-trigger[aria-expanded='true'] .lc-select-caret { transform: rotate(180deg); }
+.lc-select-trigger:disabled { cursor: default; opacity: .65; }
+.lc-select-menu {
+  position: fixed; inset: auto; margin: 0; padding: 6px; border: 1px solid var(--lc-rule);
+  border-radius: 10px; background: var(--lc-surface); color: var(--lc-ink);
+  box-shadow: 0 8px 28px #263d3624, 0 1px 4px #263d3610;
+  font: 13px/1.5 var(--lc-body-font); overflow: hidden;
+}
+.lc-select-menu:popover-open { display: flex; flex-direction: column; }
+.lc-select-menu::backdrop { background: transparent; }
+.lc-select-search { flex: none; min-width: 0; width: 100%; min-height: 33px; padding: 6px 10px; margin: 0 0 5px; border: 0; border-bottom: 1px solid var(--lc-rule); border-radius: 4px 4px 0 0; outline: none; background: var(--lc-bg); color: var(--lc-ink); font: inherit; }
+.lc-select-search::placeholder { color: var(--lc-muted); }
+.lc-select-search:focus { border-bottom-color: var(--lc-accent); }
+.lc-select-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--lc-border) transparent; }
+.lc-select-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 35px; padding: 7px 10px; border-radius: 6px; cursor: pointer; overflow-wrap: anywhere; }
+.lc-select-option + .lc-select-option { margin-top: 2px; }
+.lc-select-option[aria-selected='true'] { color: var(--lc-accent); font-weight: 600; }
+.lc-select-option.is-active { background: var(--lc-soft); }
+.lc-select-check { flex: none; display: flex; visibility: hidden; }
+.lc-select-check svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.lc-select-option[aria-selected='true'] .lc-select-check { visibility: visible; }
+.lc-select-empty { padding: 14px 10px; color: var(--lc-muted); font-size: 12px; }
