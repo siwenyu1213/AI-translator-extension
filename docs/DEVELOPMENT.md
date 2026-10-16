@@ -140,6 +140,8 @@ GitHub同步必须核对远程提交和默认分支内容，不能把本地commi
 
 ## 2026-10-16 厂家选择框外观
 
+后续文字微调（基线 `81ead46`，工作区干净）：厂家名称12→14px、字重700，从原居中位置左移2ch（DeepSeek实测约18px），垂直位置保留。Node24.18.1、隔离Edge155.0.4283.45下，三主题/两标签/390、320、260px共18组布局及390/260px合成长名称省略检查通过，菜单点击/Escape正常；56项静态与git diff --check通过。截图已复核，证据 `artifacts/qa/manufacturer-label/report.json` 及同目录 `settings-390.png`、`settings-320.png`、`settings-260.png`。未验证原生工具栏弹出层与真实API；仅本地提交，版本1.0.0。
+
 基线 `codex/ui-reading-redesign@0afcd26`，起始工作区干净。仅调整popup.css：厂家框边框由1px加粗至2px、圆角10px，内部按钮圆角8px；厂家文字相对整个框水平/垂直居中，两侧等宽预留空间，右侧保留箭头，按钮覆盖框内高度。解释与全文翻译共用样式，版本仍1.0.0。
 
 北京时间2026-10-16，Node24.18.1、隔离Edge155.0.4283.45：56项静态检查、git diff --check、7项既有下拉菜单/字体交互回归通过。以合成配置验证三主题×两个标签×390/320/260px共18组布局，2px边框和10px圆角正常，文字中心与框中心横向误差小于1px、纵向误差小于2px，箭头不遮文字且页面无横向溢出；点击打开/Escape关闭正常，无页面脚本错误。证据 `artifacts/qa/manufacturer-box/report.json`、`settings-390.png`、`settings-320.png`、`settings-260.png`、`menu/report.json` 及 `artifacts/qa/static-check.json`，390px截图已目视复核。未验证原生工具栏弹出层或真实供应商API；仅本地提交，重新加载扩展并打开设置页查看。
