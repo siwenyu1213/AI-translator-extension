@@ -55,6 +55,7 @@ button { cursor: pointer; }
 .reading-preferences > div + div { border-left: 1px solid var(--lc-rule); padding-left: 16px; }
 .reading-preferences .section { margin: 0; }
 .reading-preferences .select { padding-left: 0; min-height: 30px; font-size: 12px; }
+.fullpage-preferences { grid-template-columns: minmax(0,1fr); }
 .key-section { margin-top: 8px; margin-bottom: 4px; }
 .key-saved { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; min-height: 30px; font-size: 12px; }
 .key-saved > span, .key-saved .mini-btn { flex-shrink: 0; white-space: nowrap; }

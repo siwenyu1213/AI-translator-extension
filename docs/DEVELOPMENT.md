@@ -58,7 +58,7 @@ GitHub入口为 `https://github.com/siwenyu1213/LingoClarify`。本地目录与�
 
 DeepSeek官方hostname精确匹配后，分别读取 `explainDeepSeekThinkingEnabled` / `translateDeepSeekThinkingEnabled`，显式发送 `thinking.enabled/disabled`。默认关闭；关闭时归一化该用途的深度思考为false、不发送 `reasoning_effort`。打开总开关后，原 `*ThinkingEnabled` 控制是否发送强度。两层开关均纳入请求缓存与配置失效判断；第三方网关不凭模型名套用。
 
-设置页共用“划词触发方式”位于两面板的思考强度区域下方，保存 `triggerMode: auto/contextMenu`；已有网页通过storage变化即时更新。原生选区菜单始终注册，两种模式均可点击。
+“划词触发”仅在“解释”页的语言行显示，保存 `triggerMode: auto/contextMenu`；已有网页通过storage变化即时更新。原生选区菜单始终注册，两种模式均可点击。“全文翻译”页在目标语言下方提示：在页面空白处右键，选择「全文翻译」。
 
 ## 最低检查
 
@@ -137,6 +137,12 @@ git diff --cached
 ```
 
 GitHub同步必须核对远程提交和默认分支内容，不能把本地commit或模拟通过当作上传成功。
+
+## 2026-10-16 全文翻译触发提示
+
+基线 `codex/ui-reading-redesign@ab914e8`，起始工作区干净，fetch后领先上游2个提交、无落后。划词触发控件固定留在“解释”页；“全文翻译”页的目标语言下方显示“在页面空白处右键，选择「全文翻译」。”，语言区域改为单列。同步README、既有主题回归与本地Description，版本保持1.0.0。
+
+北京时间2026-10-16，Node24.18.1、Edge155.0.4283.45：56项静态、19项主题/设置回归及git diff --check通过。隔离Edge实际加载根目录扩展，验证标签切换、划词触发草稿保留及保存/重开；390/320/260px下提示均位于目标语言下方且无横向溢出，截图已复核。证据 `artifacts/qa/fullpage-trigger-hint/report.json`、`hint.json`、`translate-390.png`、`translate-320.png`、`translate-260.png` 和 `artifacts/qa/static-check.json`。采用合成配置及本机接口，未验证真实供应商、原生工具栏弹出窗口与系统右键鼠标操作。本轮仅本地提交；重新加载扩展后重新打开设置页即可查看。
 
 ## 2026-10-16 商店中文语言资源补齐
 

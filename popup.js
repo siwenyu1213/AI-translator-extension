@@ -269,8 +269,6 @@ document.querySelectorAll('.tab-btn').forEach(button => button.addEventListener(
   activeTabIndex = button.dataset.tab === 'translate' ? 1 : 0;
   document.querySelectorAll('.tab-btn').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-selected',String(b===button));});
   document.querySelectorAll('.tab-panel').forEach(p=>{const active=p.id==='panel-'+button.dataset.tab;p.classList.toggle('active',active);p.hidden=!active;});
-  // 两用途共用一个触发配置，将现有控件移入当前面板的语言行，不复制状态。
-  $('panel-'+button.dataset.tab).querySelector('.reading-preferences').append($('trigger-mode-section'));
   showConnection(); renderAllModelOptions();
 }));
 document.querySelector('.tab-bar').addEventListener('keydown', event => {

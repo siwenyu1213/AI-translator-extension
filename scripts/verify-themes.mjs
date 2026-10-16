@@ -208,10 +208,11 @@ try{
     await worker.evaluate(()=>chrome.storage.local.remove('uiTheme'));await popup.reload();await popup.waitForFunction(()=>document.querySelector('#ui-theme').value==='cobalt');
   });
   await check('键盘切换两用途、隐藏面板不可聚焦，主题控件键盘可用',async()=>{
-    await popup.locator('#tab-explain').focus();await popup.keyboard.press('ArrowRight');assert.equal(await popup.locator('#tab-translate').getAttribute('aria-selected'),'true');assert.equal(await popup.locator('#panel-explain').isVisible(),false);
-    assert.equal(await popup.locator('#trigger-mode').isVisible(),true);
-    assert.equal(await popup.locator('#trigger-mode').evaluate(el=>el.closest('.tab-panel').id),'panel-translate');
     await popup.locator('#trigger-mode').selectOption('contextMenu');
+    await popup.locator('#tab-explain').focus();await popup.keyboard.press('ArrowRight');assert.equal(await popup.locator('#tab-translate').getAttribute('aria-selected'),'true');assert.equal(await popup.locator('#panel-explain').isVisible(),false);
+    assert.equal(await popup.locator('#trigger-mode').isVisible(),false);
+    assert.equal(await popup.locator('#trigger-mode').evaluate(el=>el.closest('.tab-panel').id),'panel-explain');
+    assert.equal(await popup.locator('#fullpage-trigger-hint').innerText(),'在页面空白处右键，选择「全文翻译」。');
     await popup.locator('#tab-translate').focus();
     await popup.keyboard.press('Home');assert.equal(await popup.locator('#tab-explain').getAttribute('aria-selected'),'true');await popup.locator('#ui-theme').focus();
     assert.equal(await popup.locator('#trigger-mode').inputValue(),'contextMenu');
