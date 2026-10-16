@@ -9,7 +9,7 @@
 | inter.ttf | [ofl/inter](https://github.com/google/fonts/tree/main/ofl/inter) | 钴蓝纸页、靛蓝手稿正文 | inter-OFL.txt | 29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031 |
 | cormorant-garamond.ttf | [ofl/cormorantgaramond](https://github.com/google/fonts/tree/main/ofl/cormorantgaramond) | 靛蓝手稿英文标题 | cormorant-garamond-OFL.txt | b20b7d9626dd956b2c5e558692ad328b1f19e3275e2782db4fa07670d83f35e0 |
 
-当前中文统一采用本地霞鹜文楷屏幕阅读版；英文正文与菜单采用Space Grotesk，英文标题采用Syne。界面不再显式指定系统宋体或黑体作为字体回退。上表中的Inter与Cormorant是保留的历史资源，当前界面不引用。theme.js在设置页与内容脚本中通过明确的chrome-extension URL注册FontFace，使用时才加载；theme.css只引用独有字体名。Manifest公开字体供扩展注入界面读取。图标是本项目原创的引号轮廓，不来自第三方字体或模板素材。
+当前中文统一采用本地霞鹜文楷屏幕阅读版；英文正文与菜单采用Space Grotesk，英文标题采用Syne，浮层英文字标采用Allura连笔手写体。界面不再显式指定系统宋体或黑体作为字体回退。上表中的Inter与Cormorant是保留的历史资源，当前界面不引用。theme.js在设置页与内容脚本中通过明确的chrome-extension URL注册FontFace，使用时才加载；theme.css只引用独有字体名。Manifest公开字体供扩展注入界面读取。图标是本项目原创的引号轮廓，不来自第三方字体或模板素材。
 
 视觉方向参考 beautiful-html-templates 的 [Playful](https://github.com/zarazhangrui/beautiful-html-templates/tree/main/templates/playful)、[Blue Professional](https://github.com/zarazhangrui/beautiful-html-templates/tree/main/templates/blue-professional)、[Vellum](https://github.com/zarazhangrui/beautiful-html-templates/tree/main/templates/vellum)。本项目自行实现小尺寸控件、主题存储和品牌图标，未复制模板 HTML、装饰资产或导航脚本。
 
@@ -22,3 +22,9 @@
 原始TTF SHA-256：`cd1a6fa39c4ea42fd8f4e289945789b0e510cf7016435640f8893cdad9b220f3`。
 
 分发WOFF2 SHA-256：`46045a9c67d4891f423df1e7110d7009011de32fe3ef84ec9bd31720cf27e2df`。
+
+## 2026-10-16 英文连笔字标
+
+Allura Regular由Robert Leuschke设计，来自[Google Fonts官方元数据](https://raw.githubusercontent.com/google/fonts/main/ofl/allura/METADATA.pb)，上游项目[googlefonts/allura](https://github.com/googlefonts/allura)，元数据记录上游提交38a78b41510a10b1129c50fa5177b642bd2b4a19。取得日期2026-10-16，北京时间。直接取得[Allura-Regular.ttf](https://raw.githubusercontent.com/google/fonts/main/ofl/allura/Allura-Regular.ttf)与[OFL.txt](https://raw.githubusercontent.com/google/fonts/main/ofl/allura/OFL.txt)，分别保存为allura.ttf和allura-OFL.txt；字体字节不变，许可文本仅统一LF行尾并去除行末空白，保留授权全文。SIL OFL 1.1许可随扩展分发，仅用于浮层lingoclarify字标；FontFace名称LC Allura，manifest公开资源，使用时从扩展本地加载。
+
+字体246,632字节，SHA-256：`9c142b2e515832c0dfc4ff8b8ea18f40314943bf937b72e2b23c4661bac14cc6`。许可分发文本SHA-256：`eea1157c41ebcbb7bb6732328f2a804a56b3f2744e456a116311aa2eb8cafce4`；上游原始许可SHA-256：`c8cb4c94a558b6cb82ac5dc981a73a0b8aee35a5c52c8a7832fc0280c289ad49`。

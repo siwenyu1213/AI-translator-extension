@@ -29,7 +29,7 @@
 #deepseek-explain-tooltip.lc-theme .ds-header .lc-brand-icon { display: none; }
 #deepseek-explain-tooltip.lc-theme .ds-brand { display: inline-flex; align-items: baseline; gap: 8px; color: var(--lc-ink); font-weight: 400; white-space: nowrap; }
 #deepseek-explain-tooltip.lc-theme .ds-brand-cn { font: 400 26px/1.1 'LC WenKai', cursive; letter-spacing: 3px; }
-#deepseek-explain-tooltip.lc-theme .ds-brand-en { font: 600 11px/1.2 'LC Syne', 'LC WenKai', cursive; letter-spacing: .6px; }
+#deepseek-explain-tooltip.lc-theme .ds-brand-en { font: 400 24px/1.65 'LC Allura', cursive; letter-spacing: 0; padding: 2px 4px 4px 2px; }
 #deepseek-explain-tooltip.lc-theme .ds-close { color: var(--lc-muted); border-radius: 6px; }
 #deepseek-explain-tooltip.lc-theme .ds-quote {
   margin: 14px 16px 0; padding: 0 0 12px; border: 0; border-bottom: 1px solid var(--lc-rule);

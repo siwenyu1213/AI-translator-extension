@@ -220,3 +220,9 @@ popup.js仅将共用trigger-mode控件移动到当前用途的语言行，保留
 基线f9a127e，按用户截图要求把顶部用途文案换为固定“说文 lingoclarify”字标。content.js首次创建双span品牌，后续普通生成/解释此句只更新region可访问名称以保留用途信息，不覆盖品牌子节点。theme.css用本地文楷26px/3px字距呈现中文书写感、Syne 600/11px呈现英文，按基线对齐；保留拖动抓手与关闭按钮，词条28px和正文14px沿用。无新资源/依赖，版本4.6.0。
 
 北京时间2026-10-16，隔离Edge155.0.4283.45、Node24.18.1、Playwright1.62.1完成18项浮层、18项浏览器行为回归及3项对照、54项静态检查，git diff --check通过。覆盖固定品牌/字体、三配色×260/375/1000px下与关闭按钮无重叠、拖动/关闭、解释此句成功与失败后品牌稳定及用途可访问名称保留；截图已目视复核。证据artifacts/qa/result-wordmark/report.json、header.png、result.png和artifacts/qa/adversarial-fix-2026-10-11/browser/results.json（以本轮报告时间/HEAD识别）。使用合成网页/Key与本机SSE，未验证真实供应商或其他浏览器。公开截图和本地预览已更新；重新加载扩展并刷新网页生效。已有流式源码/文档差异保留，只提交本任务差异，Description继续本地忽略。
+
+## 2026-10-16 英文字标改为连笔手写字体并预留笔画空间
+
+基线104f916，按用户要求将浮层英文字标从Syne 600/11px换成本地Allura 400/24px连笔手写体，行高1.65并增加上下/左右留白，字标仍为说文 lingoclarify；中文、28px词条和14px正文保留。新增vendor/fonts/allura.ttf与allura-OFL.txt，来源/取得日期/哈希见字体README；theme.js注册LC Allura，manifest公开字体资源，不新增运行依赖或远程字体请求，版本4.6.0。
+
+北京时间2026-10-16，隔离Edge155.0.4283.45、Node24.18.1、Playwright1.62.1完成18项浮层检查与55项静态检查，git diff --check通过。CDP实际字形确认Allura-Regular自定义字体；lingoclarify实测墨迹高24px、下伸笔画9px、行高39.6px，文字框底部距header底部12px；截图目视确认g/y下伸完整。覆盖三配色×260/375/1000px、长句、正文/词条原字号、关闭按钮无重叠与定位/拖动。证据artifacts/qa/result-calligraphy/report.json、header.png、result.png及各宽度截图。全部使用合成网页/Key与本机SSE，未验证其他浏览器或特殊宿主样式。公开截图/预览和本地Description同步；重新加载扩展并刷新网页生效，仅保存本任务本地提交，原有流式修改保留。

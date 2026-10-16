@@ -125,10 +125,22 @@ try {
     assert.equal(await page.locator('.ds-drag-handle').evaluate(el => el.tagName), 'SPAN');
     assert.equal(await page.locator('.ds-brand').textContent(), '说文 lingoclarify');
     assert.equal(await page.locator('.ds-brand-cn').evaluate(el => getComputedStyle(el).fontFamily.includes('LC WenKai')), true);
-    assert.equal(await page.locator('.ds-brand-en').evaluate(el => getComputedStyle(el).fontFamily.includes('LC Syne')), true);
+    await page.evaluate(() => document.fonts.ready);
+    assert.equal(await page.locator('.ds-brand-en').evaluate(el => getComputedStyle(el).fontFamily.includes('LC Allura')), true);
+    const lettering = await page.locator('.ds-brand-en').evaluate(el => {
+      const style = getComputedStyle(el), canvas = document.createElement('canvas'), ctx = canvas.getContext('2d'); ctx.font = style.font;
+      const glyphs = ctx.measureText(el.textContent), rect = el.getBoundingClientRect(), header = el.closest('.ds-header').getBoundingClientRect();
+      return { loaded: document.fonts.check('24px "LC Allura"'), font: style.fontFamily, lineHeight: parseFloat(style.lineHeight), inkHeight: glyphs.actualBoundingBoxAscent + glyphs.actualBoundingBoxDescent, descent: glyphs.actualBoundingBoxDescent, bottom: rect.bottom, headerBottom: header.bottom };
+    });
+    assert.equal(lettering.loaded, true); assert.ok(lettering.descent > 0 && lettering.lineHeight > lettering.inkHeight + 4, JSON.stringify(lettering));
+    assert.ok(lettering.bottom < lettering.headerBottom, JSON.stringify(lettering));
+    const client = await context.newCDPSession(page); await client.send('DOM.enable'); await client.send('CSS.enable');
+    const { root: doc } = await client.send('DOM.getDocument'); const { nodeId } = await client.send('DOM.querySelector', { nodeId: doc.nodeId, selector: '.ds-brand-en' });
+    const { fonts } = await client.send('CSS.getPlatformFontsForNode', { nodeId }); await client.detach();
+    assert.ok(fonts.some(font => font.isCustomFont && /Allura/i.test(font.familyName)), JSON.stringify(fonts));
     const after = await geometry(); assert.ok(Math.abs(after.tip.left - initial.tip.left) < 2); assert.ok(Math.abs(after.tip.top - initial.tip.top) < 2);
     await header.screenshot({ path: resolve(output, 'header.png') });
-    return { headerText: (await header.textContent()).trim(), initial, after };
+    return { headerText: (await header.textContent()).trim(), lettering, fonts, initial, after };
   });
   await check('Cursor is normal on hover and grabbing only while left button is held', async () => {
     const cursor = selector => page.locator(selector).evaluate(el => getComputedStyle(el).cursor);
