@@ -32,10 +32,10 @@
 #deepseek-explain-tooltip.lc-theme .ds-quote {
   margin: 14px 16px 0; padding: 0 0 12px; border: 0; border-bottom: 1px solid var(--lc-rule);
   border-radius: 0; background: transparent; color: var(--lc-ink);
-  font: 400 32px/1.3 var(--lc-title-font); letter-spacing: -.4px;
+  font: 400 28px/1.3 var(--lc-title-font); letter-spacing: -.4px;
   max-height: min(124px, 22vh); overflow-wrap: anywhere;
 }
-#deepseek-explain-tooltip.lc-theme .ds-body { padding: 14px 18px 12px; font-size: 18px; line-height: 1.85; }
+#deepseek-explain-tooltip.lc-theme .ds-body { padding: 14px 18px 12px; font-size: 14px; line-height: 1.85; }
 #deepseek-explain-tooltip.lc-theme .ds-markdown { line-height: 1.85; }
 #deepseek-explain-tooltip.lc-theme .ds-markdown h1 { font-size: 29px; font-weight: 500; }
 #deepseek-explain-tooltip.lc-theme .ds-markdown h2 { font-size: 23px; }

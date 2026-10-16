@@ -161,7 +161,7 @@ try {
     await page.evaluate(() => { const el = document.querySelector('#word'), r = document.createRange(); r.setStart(el.firstChild, 9); r.setEnd(el.firstChild, 15); window.qaSourceRange = r.cloneRange(); getSelection().removeAllRanges(); getSelection().addRange(r); el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 })); });
     await done(); await sleep(150); const g = await geometry(); avoids(g); assert.ok(g.tip.left < 200); return g;
   });
-  await check('词条32px/正文18px，三配色与长中英文窄屏换行、按钮可达', async () => {
+  await check('词条28px/正文14px，三配色与长中英文窄屏换行、按钮可达', async () => {
     readingSample = true;
     const states = [];
     for (const theme of ['cobalt', 'playful', 'vellum']) {
@@ -175,7 +175,7 @@ try {
           const bounds = el => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
           return { quote: getComputedStyle(quote).fontSize, body: getComputedStyle(body).fontSize, heading: getComputedStyle(body.querySelector('h2')).fontSize, code: getComputedStyle(body.querySelector('code')).fontSize, quoteFits: quote.scrollWidth <= quote.clientWidth + 1, bodyFits: body.scrollWidth <= body.clientWidth + 1, bounds: bounds(tip), actions: bounds(actions), hostFont: getComputedStyle(document.body).fontFamily };
         });
-        assert.equal(type.quote, '32px'); assert.equal(type.body, '18px'); assert.equal(type.heading, '23px'); assert.equal(type.code, '15px');
+        assert.equal(type.quote, '28px'); assert.equal(type.body, '14px'); assert.equal(type.heading, '23px'); assert.equal(type.code, '15px');
         assert.ok(type.quoteFits && type.bodyFits, JSON.stringify(type)); assert.equal(type.hostFont, 'Arial');
         assert.ok(type.actions.top >= type.bounds.top && type.actions.bottom <= type.bounds.bottom, JSON.stringify(type));
         await page.locator('.ds-body').evaluate(el => el.scrollTo(0, el.scrollHeight));
