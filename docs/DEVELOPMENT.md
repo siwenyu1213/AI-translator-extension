@@ -176,3 +176,9 @@ popup.js仅将共用trigger-mode控件移动到当前用途的语言行，保留
 北京时间2026-10-16，在隔离Edge155.0.4283.45、Node24.18.1、Playwright1.62.1中完成19项主题/布局、9项设置与DeepSeek端口、17项定位拖动、11项全文工具栏及51项静态检查，git diff --check通过。新增断言验证指定文案精简、共用触发控件随Tab移动且保留值；覆盖无Key初始态、两用途保存重开、开关联动、主题草稿隔离、错误、自定义接口dialog、260/320/390px、150/200%实际标签页缩放。200%时长型号曾差0.6px被裁切，已在260px以下调小字号并改为底部单列；复验通过。截图已目视复核，默认已配置状态的保存按钮完整位于510px窗口内；首次配置/展开更多字段仍可内部滚动。
 
 证据为artifacts/qa/lexicon-ui/report.json、cobalt-settings.png、cobalt-result.png、同目录toolbar/report.json，以及artifacts/qa/settings-controls-2026-10-13/report.json和artifacts/qa/tooltip-header-2026-10-13/report.json（按报告内本轮HEAD/运行信息识别）。设置工具的date字符串为旧固定日期，以本段当轮记录为准。静态报告artifacts/qa/static-check.json。全部使用合成Key、本机接口与SSE，不证明真实供应商或模型效果。未操作用户现有file标签页；原生Edge工具栏弹出层视觉与原生右键鼠标仍未验收。测试浏览器和本机服务均已关闭；并行流式修改继续保留、不纳入本次提交，Description同步且本地忽略。
+
+## 2026-10-16 模型下拉框去除重复焦点描边
+
+基线db49d6f，复用codex/ui-reading-redesign。用户指出厂家菜单打开时出现额外绿色框；原因是popup.css通用:focus-visible在厂家容器1px边框外再次添加2px主题色outline。本轮仅对.model-pair内的select取消outline，覆盖解释/翻译两个用途的厂家与型号控件；原有容器边框和其他按钮/输入框焦点样式保留。
+
+北京时间2026-10-16，在隔离Edge155.0.4283.45、Node24.18.1中用合成厂家/型号验证：重加旧规则时复现2px实线，修复后三配色×两用途×厂家/型号共12种状态均无额外outline，厂家原边框仍1px；保存按钮键盘焦点仍为实线。51项静态和git diff --check通过；报告及前后局部截图为artifacts/qa/model-focus/report.json、before.png、after.png，静态报告artifacts/qa/static-check.json。未执行真实供应商或原生工具栏窗口截图，本轮不重复整套功能回归。验收浏览器已关闭；仅本地提交UI小修，并行流式修改未纳入，Description.md同步且继续本地忽略，版本4.6.0。
