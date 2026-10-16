@@ -1,6 +1,6 @@
 # 说文 · LingoClarify 开发、运行与验收
 
-当前扩展版本 **4.6.0**。用户功能和文件职责见 [README](../README.md)。本手册描述现有入口与验收方法；交接材料和逐次任务QA、审查、环境记录仅本地保存，不随GitHub分发。
+当前扩展版本 **1.0.0**。用户功能和文件职责见 [README](../README.md)。本手册描述现有入口与验收方法；交接材料和逐次任务QA、审查、环境记录仅本地保存，不随GitHub分发。
 
 ## 环境与目录
 
@@ -37,14 +37,21 @@ GitHub入口为 `https://github.com/siwenyu1213/LingoClarify`。本地目录与�
 
 用普通HTTP/HTTPS页面测试，浏览器内部页面和受限制商店页不能作为注入验收样本。
 
+设置页首选390px宽，高度随内容自然增减；主页面无可见滚动条，受限视口仍支持滚轮和键盘访问底部操作。自绘菜单长列表独立滚动。
+
 ## 当前调用关系
 
 - 后台加载 `model-catalog.js`、`config.js`、`selection.js`、`selection-prompts.js`；只使用选区模块的无DOM分析。
 - 自动内容注入：`theme.js` → `selection.js` → Marked → DOMPurify → `markdown.js` → `content.js`，样式为 `theme.css`、`content.css`。
-- 设置页加载 `model-catalog.js`、`config.js`、`theme.js`、`popup.js`，共用配置与查询逻辑。外观模块独立保存 `uiTheme`，只更新扩展根元素，默认钴蓝纸页；字体和引号图标本地打包。
+- 设置页加载 `model-catalog.js`、`config.js`、`theme.js`、`popup.js`、`select-menu.js`，共用配置与查询逻辑。外观模块独立保存 `uiTheme`，只更新扩展根元素，默认纸本文笺；cobalt/playful/vellum分别对应纸本文笺、清浅青、冷灰蓝，三配色共用词典布局，字体本地打包。
 - 全文由后台按需注入 `content-fullpage.js`，通过端口取得单条或批量结果。
+- 全文工具栏桌面宽度为视口的约三分之一、水平居中，窄屏最小宽度受视口限制。下方单个 `ds-tb-toggle` 方框箭头控制 `ds-tb-panel` 整体收起/展开，按钮持续保留且焦点不变；收起内容设为inert并从辅助技术隐藏。180ms收起/浮现动画遵从减少动画偏好，任务、进度与主题继续运行。隐藏状态再次注入时只打开当前工具栏；取消移除整个入口，新启动默认展开，不保存全局偏好。
 
 划词本地分类选择单项任务，以统一system要求和JSON材料发送一次生成。外语完整句段用翻译连接，其余解释用解释连接；“解释此句”使用解读任务。所在句及必要材料有预算，回答仍为Markdown正文。全文纯译文和批量ID协议独立。
+
+划词输出链路为 `reader.read()` → TextDecoder/SSE → 同一次读取中相邻同类delta合并 → 最多2048字符的端口消息 → `markdown.js` 共用播放队列 → rAF/`TextNode.appendData`。后台不使用固定时间批量等待，缓存命中也立即分片交给前台播放；思考与正文交替时保留消息顺序。此消息合并同样覆盖全文单条请求，批量仍仅在done返回结构化items。
+
+正文和思考各自每帧最多2048个UTF-16字符，按 `ceil(pending.length / 12)` 自适应追赶，帧边界尽量保留emoji代理对。当前TextNode达到8192字符后接续新节点，避免巨型节点持续重排；旧节点不重写。流式阶段使用pre-wrap显示Markdown原文，完成后保留已显示前缀、只播放剩余队列；最终文本变更已显示前缀时才重置并重新排队。正文播放完成后由Marked/DOMPurify安全排版一次，不按token或定时器反复解析全文；该最终排版仍为一次完整解析/DOM替换，不受流式2048字符上限约束。两队列都空闲后才解除加载态、显示操作按钮。关闭、重新划词或失败取消队列和完成回调，收到done后仍可取消。复制/TXT继续保留完整Markdown原文，不使用cleanMarkdown剥除语义。
 
 设置在 `chrome.storage.local`。Key与账号模型缓存位于 `providerConnections`；`AIConfig.connectionFor`选择实际连接。custom缺地址在请求前停止，改地址清除关联型号与缓存。迁移字段属于兼容实现。
 
@@ -79,6 +86,7 @@ git diff --check
 | 定位、拖动、光标与窗口边界 | `scripts/verify-tooltip-position.mjs` |
 | 焦点、下载错误、缓存和观察器 | `scripts/verify-markdown-fixes.mjs` |
 | 全文Text任务、取消/重启和故障 | `scripts/verify-adversarial-browser.mjs` |
+| 全文进度栏隐藏/打开、继续翻译、动态计数、键盘及主题/窄屏 | `scripts/verify-fullpage-toolbar.mjs --playwright '<已有包目录>'` |
 | 换址、Key草稿、迟到响应和型号过滤 | `scripts/verify-adversarial-config.mjs` |
 | 后台时序与配置读取 | `node scripts/verify-adversarial-background.mjs` |
 
@@ -115,7 +123,7 @@ node scripts/verify-tooltip-position.mjs --playwright '<已安装的 playwright 
 
 生成报告默认仅本机保留。对外截图去除Key、授权头和私有网页，附来源说明；不提交凭据或storage导出。
 
-遵循AGENTS.md：记录工作区和远程，保留已有修改，先审阅diff再按明确文件暂存。使用当前任务分支，授权内正常提交推送；核对保护与rulesets，不强推或绕过。正式发布时同步manifest/popup版本；纯改名和文档整理保持4.6.0。
+遵循AGENTS.md：记录工作区和远程，保留已有修改，先审阅diff再按明确文件暂存。使用当前任务分支，授权内正常提交推送；核对保护与rulesets，不强推或绕过。正式发布时同步manifest/popup版本；纯改名和文档整理不单独调整版本号。
 
 ```powershell
 git status --short --branch
@@ -129,8 +137,126 @@ git diff --cached
 
 GitHub同步必须核对远程提交和默认分支内容，不能把本地commit或模拟通过当作上传成功。
 
+## 2026-10-16 版本号统一为1.0.0
+
+用户要求将目前版本改为1.0.0。基线 `codex/ui-reading-redesign@c01877f`，工作区干净，fetch后与上游0/0；同步manifest.json、popup.html及README/本手册当前版本说明。仅调整版本标识，既有功能与配置格式沿用，历史验收记录中的旧版本保留为当时事实。Description当前版本及维护记录同步，但继续忽略、不提交。
+
+Node24.18.1、隔离Edge155.0.4283.45及已有Playwright1.62.1实际加载根目录扩展，chrome.runtime.getManifest().version为1.0.0，设置页显示v1.0.0且无页面脚本错误；55项静态检查、git diff --check通过。证据 `artifacts/qa/version-1.0.0/browser.json`、`version.png`、`static-check.json`，最终远程SHA见同目录 `remote-verification.json`。未重复执行API、划词/全文交互或原生工具栏弹出窗口验收。更新后在edge://extensions重新加载扩展并刷新网页。
+
+## 2026-10-16 图标同步纸本文笺配色
+
+基线 `codex/ui-reading-redesign@919419f`，工作区干净且fetch后与上游0/0。按用户要求将 `icons/brand.svg` 的底色改为纸本文笺 `--lc-bg` 的 `#f3f0e5`、引号改为 `--lc-ink` 的 `#263d36`；保留原有路径、圆角和尺寸，用已有隔离Edge导出16/32/48/128px PNG。Manifest与工具栏、扩展管理入口继续共用这些PNG，界面品牌资源仍使用同一SVG。版本保持4.6.0。
+
+Node24.18.1、Edge155.0.4283.45及已有Playwright1.62.1验证：SVG除两处颜色外与基线完全一致；实际解压扩展中四张PNG尺寸、Manifest两处映射、米白/墨绿像素、旧色零命中及SVG解码均通过，页面无脚本错误；实际默认主题变量与图标色值一致。55项静态检查与git diff --check通过，已目视复核128px和16/32/48px对比图。证据 `artifacts/qa/paper-icons-2026-10-16/report.json`、`comparison.png`、`static-check.json`，最终推送SHA见同目录 `remote-verification.json`。原生工具栏图标鼠标操作/系统缩放外观未验收，未重复执行无关API或流式功能回归；重新加载扩展即可更新图标。Description同步且继续仅本地，不提交。
+
+## 2026-10-16 当前界面与帧播放更新上传验收
+
+用户授权上传当前项目更新。基线为 `codex/ui-reading-redesign@3646c52`，开始时有9个未暂存文件；fetch后确认当前历史包含origin/main，没有远程同名分支。复用当前分支，将既有界面、字体、全文工具栏历史与工作区中的帧播放更新一起保存和推送，不改main或发布版本，版本仍为4.6.0。已核对仓库push权限、目标分支不存在及规则列表为空；Description、私有材料、生成报告不进入提交。
+
+组合回归发现新增字标与大词条在320×240视口中占用的固定高度增加，词条不收缩使操作按钮越过浮层底边。content.css允许词条区参与flex收缩，沿用内部滚动和现有字号；verify-markdown-fixes失败断言补充实际尺寸。隔离Edge的定向复现与修复后完整25项交互、18项定位/拖动均通过，已查看极矮窗口截图确认复制/下载可见。
+
+北京时间2026-10-16，Node24.18.1、Git2.55.0.windows.3、Edge155.0.4283.45及已有Playwright1.62.1：55项静态、50项后台离线模拟、26项Markdown/流式、25项交互、18项定位/拖动、19项主题、7项菜单/字体、11项全文工具栏、9项设置开关通过，git diff --check通过。浏览器检查使用独立profile、合成页面/Key和本机SSE，覆盖实际扩展消息与后台端口；不是有效供应商凭据验收。快照与上传核验记录留在 `artifacts/qa/github-push-2026-10-16/`，包含各套报告、compact.png及最终本地/远程SHA。未验证真实供应商生成/延迟、原生工具栏弹出窗口与系统右键鼠标操作。更新后在edge://extensions重新加载扩展并刷新网页，沿用已有厂家、Key和模型设置。
+
+## 2026-10-16 浮层帧播放验收
+
+北京时间2026-10-16，基线 `d680413`，起始为干净的 `codex/tooltip-header-cleanup`，fetch后比上游领先5个提交、无落后。范围：`background.js`、`markdown.js`、`content.js`、`content.css`、`scripts/verify-api.mjs`、`scripts/verify-markdown.mjs`、`scripts/verify-markdown-fixes.mjs`、README和本手册；Description同步但忽略、不提交。后台自然读取合并、缓存立即分片，正文/思考共用帧队列；正常done不重播，队列结束后一次Markdown排版并显示操作。保持4.6.0，不发布或推送。
+
+Node v24.18.1、Edge 155.0.4283.45、已有Playwright 1.62.1，在隔离profile中加载根目录解压扩展，使用合成网页、Key和本机SSE，经真实后台端口验证。26项Markdown/流式检查、25项交互回归、17项定位/拖动检查通过；覆盖分割Markdown、安全链接/图片、复制/TXT、缓存、再次解释、故障和重试、阅读位置/键盘焦点/隐藏、拖动和视口约束。126009字符单次正文和24000字符思考测试确认完整尾部、每次append最多2048字符、正文累计append恰等于原文长度、没有清空重播、两队列结束才显示按钮；done后关闭再划词没有旧文本泄漏。超长单节点实验曾超过20秒等待上限，改为接续约8K TextNode后该验收通过；这不是供应商耗时或稳定60fps的基准。流式Markdown原文与最终排版截图已视觉复核。
+
+后台50项离线模拟检查通过，新增同次读取合并/交替类型顺序、下一次read前已转发、跨UTF-8/JSON与无换行EOF；静态50项、diff空白检查通过。可复查证据快照在 `artifacts/qa/smooth-streaming/`，包括 `markdown.json`、`interaction.json`、`position.json`、`api-simulation.json`、`static-check.json`、流式/完成截图；详细本地记录 `.local/materials/smooth-streaming-2026-10-16.md`。浏览器与本机服务已关闭，独立profile保留。未验证真实DeepSeek或其他供应商生成、首字/总体耗时、原生工具栏及系统右键菜单鼠标操作；最终一次Markdown解析/DOM替换仍不分帧，不属于2048流式上限。
+
+并行工作保护：过程中另一任务把共享目录切到 `codex/ui-reading-redesign`，并修改popup/主题及相应工具。本任务没有暂存或提交它们，也不切换共享目录分支；用独立临时Git索引，仅将上述范围保存为 `codex/smooth-tooltip-streaming` 的本地提交，父提交为本轮基线。根目录仍保留本任务源码变更供重新加载使用。仓库工作区因此并非干净，不能将其他修改视为本任务成果。
+
+## 2026-10-16 全文进度栏隐藏/打开验收
+
+北京时间2026-10-16，首版基线 `84ffd62`，完成本地提交 `1c1f242` 后按用户要求改用栏下方的单个方框箭头、取消文字入口，并将进度栏收窄为居中约三分之一。复用干净的 `codex/tooltip-header-cleanup`，fetch后当前分支比上游领先2个提交，没有落后。本次范围为 `content-fullpage.js`、`content.css`、`scripts/verify-fullpage-toolbar.mjs`、README 与本手册；本地 `Description.md` 同步维护但忽略、不提交。版本仍为4.6.0，不发布或推送。
+
+工具为Edge 155.0.4283.45、Node v24.18.1、Playwright 1.62.1。隔离profile加载真实解压扩展，通过扩展消息启动合成网页全文翻译，真实后台端口请求本机SSE：点击栏下方方框箭头，确认整栏收起且焦点保留，只有向下箭头可见；隐藏期间等待完成并新增动态文字，再用点击/Enter/Space展开，确认最新计数、原文切换、取消恢复及新任务默认展开。再次触发隐藏的全文任务仅打开现有进度，不重新发请求。三主题及260px/390px控件边界和实际配色、1000px/1440px/1920px视口居中与精确三分之一宽度、减少动画偏好及收起控件不可聚焦均验证。11项定向检查通过；18项既有对抗浏览器回归及3项对照、50项静态与diff空白检查通过。
+
+本版定向报告与截图为 `artifacts/qa/fullpage-toolbar-arrow/report.json` 及同目录PNG，首版历史证据保留在 `artifacts/qa/fullpage-toolbar/`。既有回归为 `artifacts/qa/adversarial-fix-2026-10-11/browser/results.json`（以报告内2026-10-16时间为准），静态报告为 `artifacts/qa/static-check.json`；详细记录在 `.local/materials/fullpage-toolbar-2026-10-16.md`。已查看展开、隐藏及窄屏截图，测试浏览器和本机服务已关闭，隔离profile保留。未验证真实供应商生成与原生右键菜单的鼠标点击；合成响应不证明模型质量或速度。
+
+2026-10-16 箭头外观微调：基线 `21bdcf9`，用户要求缩小边框；仅将按钮32×32px改为24×20px、SVG18px改为14px，圆角4px，边框按主题减淡，阴影缩为1px/3px。同步既有验证脚本的尺寸与证据目录，真实Edge155.0.4283.45/Node24.18.1/Playwright1.62.1的11项定向检查及50项静态、diff检查通过；已查看局部、窄屏及收起截图。新证据 `artifacts/qa/fullpage-toolbar-compact/report.json`、`toolbar-detail.png`，此前证据保留。本轮仅样式微调，未重复执行上一段的18项广泛回归或真实供应商/原生右键鼠标验收；测试浏览器与服务已关闭。Description同步但不提交，版本保持4.6.0，仅本地保存。
+
+2026-10-16 文字按钮精简：基线 `6610767`，将“显示原文/译文”和“取消翻译”按钮由最小32px高改为26px，水平内边距10→8px，显式内容宽度、禁止flex拉伸、文字水平/垂直居中，清除网页可能施加的最小宽度和缩进。既有定向工具加入合成网页button宽190px、flex拉伸及左对齐干扰，利用真实Range检查文字与按钮中心偏差，三主题均通过。Edge155.0.4283.45、Node24.18.1、Playwright1.62.1下11项定向、50静态和diff检查通过，已查看 `artifacts/qa/fullpage-toolbar-buttons/toolbar-detail.png`；报告为同目录 `report.json`。浏览器及服务已关闭；真实供应商、原生右键鼠标及18项广泛回归本轮未重复执行。仅本地提交，不推送，Description继续本地忽略。
+
 ## 2026-10-13 最小上传整理验收
 
 基线 `16a4992`，当前任务分支与 `origin/main` 一致且工作区干净。停止跟踪27个文件：交接1份、历史任务记录24份、第三方调试source map 2份；原文件仍完整保留在本机。上传清单83→56个文件，运行源码、清单、图标、字体、第三方脚本与许可证、可复用验证工具均未修改，扩展版本保持4.6.0。
 
 使用Node v24.18.1、Git 2.55.0.windows.3核验：本机静态49项通过；仅复制上传清单得到的独立目录静态49项通过；50个保留文件与基线Git内容一致；27个本地材料内容一致且已忽略；公开文档10个本地链接均指向上传文件；diff空白检查通过。详细本机证据为 `artifacts/qa/minimal-upload-2026-10-13/audit.json`，精简目录报告为该目录下的 `upload-snapshot-static.json`。本轮只整理跟踪范围与文档，未重新执行Edge交互或真实供应商请求；静态结果不表示这些功能已重新验收。
+
+## 2026-10-16 三方向 UI 对比
+
+基线为d680413，创建分支codex/ui-reading-redesign；本轮实现澄净阅读、纸本文笺、精密工具三个可切换方案。uiTheme仍使用cobalt/playful/vellum，已有配置沿用原标识；三套新外观均为浅色。设置页采用分段标签、开关控件和更清晰的字段层级，纸本方向使用宋体标题与页签，工具方向使用更紧凑的布局。theme.css统一配色、划词批注、Markdown标题和全文工具栏轮廓；popup.css负责各方向设置布局，沿用390px首选宽度、510px内部滚动及340/260px断点。本轮未改变请求或配置协议，未发布版本，仍为4.6.0。
+
+设计参考用户提供的[Anthropic frontend-design指南](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md)，预览与设计取舍记录仅本地存于.local/materials/ui-reading-redesign/。主题与全文工具栏验证工具新增可选--output以保留各轮证据，并同步当前配色断言；公开README截图更新为默认澄净阅读的合成材料。
+
+北京时间2026-10-16，以Edge155.0.4283.45、Node24.18.1、Playwright1.62.1完成19项主题检查、17项定位拖动检查、11项全文工具栏检查及50项静态检查；git diff --check通过。主题检查涵盖即时同步、保存重开、草稿隔离、文字对比度、本地字体、键盘、实际标签页150/200%缩放、三方向260/320/390px及自定义地址弹窗，确认高度上限与所有关键控件可滚动访问。全部使用隔离profile、合成Key及本机SSE，不代表真实模型效果。报告分别为artifacts/qa/ui-reading-redesign/report.json、artifacts/qa/tooltip-header-2026-10-13/report.json（按报告内本轮时间）、artifacts/qa/ui-reading-redesign/toolbar/report.json、artifacts/qa/static-check.json；对比截图为ui-reading-redesign/compare-settings.png及compare-results.png。
+
+原生Edge中chrome.action.openPopup调用成功，但Computer Use无法可靠识别当前浏览器URL，按策略停止窗口截图检查；因此原生弹出层视觉尺寸、真实供应商、原生右键鼠标操作和其他浏览器仍未验证。验收浏览器与本机服务已关闭，profile保留。工作区中原有及并行产生的流式播放修改继续保留，不纳入本次UI提交；Description.md已同步、继续本地忽略。
+
+## 2026-10-16 第二轮结构排版原型
+
+用户反馈第一轮布局区别不足，因此在codex/ui-reading-redesign的a2e788f上新增可复用的scripts/build-ui-layout-preview.mjs，以原生HTML/CSS/JS生成三种独立结构：侧栏工作台（侧向用途导航与连接主区）、双页词典（题签、词条、边注）、阅读控制台（语言舞台与上下衔接操作区）。这些是使用示例配置的交互原型，尚未替换根目录扩展UI；不读写chrome.storage、不请求模型、不保存Key，不改变扩展版本或运行依赖。
+
+执行 `node scripts/build-ui-layout-preview.mjs`，默认输出到`.local/materials/ui-layout-round2/`，并更新第一轮预览入口`.local/materials/ui-reading-redesign/index.html`。首次更新前将原入口保存为同目录round1.html。可用`--output <目录>`指定单独原型输出目录；固定对比入口仍会更新。独立HTML与内嵌srcdoc对比页不依赖服务器、字体下载或外部库。按钮演示用途切换、键盘左右/Home/End、思考开关、连接dialog、取消/完成与保存提示；复制/下载仅展示反馈，没有实际剪贴板或下载行为。
+
+北京时间2026-10-16，以Node24.18.1、Edge155.0.4283.45将新生成的自包含源字符串渲染到独立空白测试页面，完成对比页切换、三套用途/键盘/开关/弹窗/保存及260/320/390px边界检查；无脚本错误或外部请求。51项静态与git diff --check通过。证据为`artifacts/qa/ui-layout-round2/report.json`、`compare-settings.png`与`compare-results.png`；本轮不是扩展集成或真实API验收，不复用上轮19/17/11项结果作为新原型证据。浏览器工具因file协议限制拒绝读取用户现有标签页，因此没有操作该标签页；用户刷新原入口即可查看新原型。详细设计说明仅本地保存，根目录运行源码、并行流式修改和上轮公开截图保持原样，Description.md同步但不提交。
+
+## 2026-10-16 选用词典式UI并精简说明
+
+基线9b0c32f，复用codex/ui-reading-redesign。用户选定第二轮词典布局，并要求删除“当前用途·解释”“阅读设置”、将“模型连接”改为“当前模型”。本轮将所选布局接入根目录popup.html/popup.css及共享theme.css：大字题签、页签、厂家印记、当前模型、语言/触发行、底部保存；删去宣传语、重复型号/服务说明、Key编辑提示和主题保存成功小字，保留字段可访问标签、失败反馈、DeepSeek必要提示。结果浮层沿用纸页侧边与词条标题，移除底部重复模型/品牌署名。三配色共用词典布局，cobalt默认纸本文笺、playful清浅青、vellum冷灰蓝，存储标识不迁移。
+
+popup.js仅将共用trigger-mode控件移动到当前用途的语言行，保留同一DOM控件和值，切换标签不会重置触发方式；主题保存成功静默，失败继续提示。DeepSeek层级、Key保存、供应商/模型查询与生成协议不变。更新原型生成器中的相关文字，当前本地入口改为所选界面的实际截图，旧三方案原型保留在.local/materials/ui-layout-round2/。扩展版本保持4.6.0。
+
+北京时间2026-10-16，在隔离Edge155.0.4283.45、Node24.18.1、Playwright1.62.1中完成19项主题/布局、9项设置与DeepSeek端口、17项定位拖动、11项全文工具栏及51项静态检查，git diff --check通过。新增断言验证指定文案精简、共用触发控件随Tab移动且保留值；覆盖无Key初始态、两用途保存重开、开关联动、主题草稿隔离、错误、自定义接口dialog、260/320/390px、150/200%实际标签页缩放。200%时长型号曾差0.6px被裁切，已在260px以下调小字号并改为底部单列；复验通过。截图已目视复核，默认已配置状态的保存按钮完整位于510px窗口内；首次配置/展开更多字段仍可内部滚动。
+
+证据为artifacts/qa/lexicon-ui/report.json、cobalt-settings.png、cobalt-result.png、同目录toolbar/report.json，以及artifacts/qa/settings-controls-2026-10-13/report.json和artifacts/qa/tooltip-header-2026-10-13/report.json（按报告内本轮HEAD/运行信息识别）。设置工具的date字符串为旧固定日期，以本段当轮记录为准。静态报告artifacts/qa/static-check.json。全部使用合成Key、本机接口与SSE，不证明真实供应商或模型效果。未操作用户现有file标签页；原生Edge工具栏弹出层视觉与原生右键鼠标仍未验收。测试浏览器和本机服务均已关闭；并行流式修改继续保留、不纳入本次提交，Description同步且本地忽略。
+
+## 2026-10-16 模型下拉框去除重复焦点描边
+
+基线db49d6f，复用codex/ui-reading-redesign。用户指出厂家菜单打开时出现额外绿色框；原因是popup.css通用:focus-visible在厂家容器1px边框外再次添加2px主题色outline。本轮仅对.model-pair内的select取消outline，覆盖解释/翻译两个用途的厂家与型号控件；原有容器边框和其他按钮/输入框焦点样式保留。
+
+北京时间2026-10-16，在隔离Edge155.0.4283.45、Node24.18.1中用合成厂家/型号验证：重加旧规则时复现2px实线，修复后三配色×两用途×厂家/型号共12种状态均无额外outline，厂家原边框仍1px；保存按钮键盘焦点仍为实线。51项静态和git diff --check通过；报告及前后局部截图为artifacts/qa/model-focus/report.json、before.png、after.png，静态报告artifacts/qa/static-check.json。未执行真实供应商或原生工具栏窗口截图，本轮不重复整套功能回归。验收浏览器已关闭；仅本地提交UI小修，并行流式修改未纳入，Description.md同步且继续本地忽略，版本4.6.0。
+
+## 2026-10-16 自绘下拉菜单与本地设计字体
+
+基线3a485a3，复用codex/ui-reading-redesign。按用户要求替换灰色系统下拉列表，并移除界面中宋体/黑体等系统字体的显式指定。新增select-menu.js，在popup.js之后加载：原select继续承载配置与change事件，自绘按钮负责显示，popover列表提供选中勾选、悬停、高度限制、长列表搜索、上下/Home/End/Enter/Escape/Tab和点击外部关闭；原生select不参与鼠标和Tab操作。菜单监听原选项/禁用状态变化，厂家切换、异步列表、无型号、用途切换及主题写入失败继续同步。搜索框blur/change不会触发菜单重绘，避免点击搜索结果时选项被提前移除。新增scripts/verify-select-menu.mjs，可用--playwright和--output复验。
+
+字体改为本地霞鹜文楷屏幕阅读版v1.522处理中文、Space Grotesk处理英文正文与菜单、Syne处理英文标题；设置、结果、全文工具栏共用字体变量。新wenkai-screen.woff2保留完整字库，来源/许可/哈希及机械转换方式见vendor/fonts/README.md和wenkai-OFL.txt；仅用于网页嵌入，无CDN或系统字体安装，不新增扩展运行依赖。制作时使用的fontTools仅在.local/tmp中。压缩资源12,761,284字节，原始TTF与制作工具不纳入提交；清单只新增字体可访问资源。原型生成器的字体也同步更新，版本仍4.6.0。
+
+北京时间2026-10-16，Edge155.0.4283.45、Node24.18.1、Playwright1.62.1隔离配置下7组菜单/字体验收通过，包括实际点击、搜索空结果和过滤选择回写、保存重开、两用途、停用/异步型号、键盘退出、三配色×260/320/390px边界、滚动关闭。CDP实际字形证据确认中文标题与结果正文由LXGW WenKai Screen自定义字体渲染，英文型号由Space Grotesk自定义字体渲染。19主题（含150/200%标签页缩放）、9设置/DeepSeek、17拖动、11全文工具栏及54静态检查、git diff --check通过，测试浏览器/本机服务均已关闭。
+
+本轮菜单报告与截图为artifacts/qa/select-menu/report.json、manufacturer-open.png、settings.png、result.png；主题与全文工具栏报告分别为同目录themes/report.json和toolbar/report.json；设置与拖动报告沿用各工具既有路径，以本轮HEAD/内容识别，设置工具日期字符串仍是旧常量。静态报告artifacts/qa/static-check.json。所有配置/模型及SSE均为合成，不证明真实供应商或模型质量；原生工具栏窗口视觉与其他浏览器仍未验收。当前本地预览与公开截图已更新，并行流式修改继续保留，Description同步且本地忽略。
+
+## 2026-10-16 设置页按内容自适应高度
+
+基线823160c，复用codex/ui-reading-redesign。按用户本轮要求，popup.css移除body的510px高度上限与container的510px最小高度，设置页随当前用途、思考强度和Key编辑内容自然增减。主页面滚动条隐藏；浏览器窗口空间受限时保留根页面滚轮与键盘滚动，底部保存仍可访问。此要求替代前述历史510px内部滚动约束，下拉菜单自己的长列表滚动继续保留。版本仍4.6.0。
+
+北京时间2026-10-16，隔离Edge155.0.4283.45、Node24.18.1、Playwright1.62.1完成19项主题/布局、9项设置与DeepSeek模拟端口、7组菜单/字体、54项静态检查及git diff --check。自适应专项在390px宽度下测得合成配置收起高512.70px、展开思考强度与Key编辑高646.48px，收起恢复原高；420px受限视口验证滚轮、聚焦保存与逐个访问底部操作，260/320/390px及150/200%标签页缩放通过。窄屏断言允许不足1px的滚动坐标舍入差；未改动按钮布局。verify-settings-controls新增--output并使用实际运行时间记录证据。
+
+报告为artifacts/qa/popup-auto-height/themes/report.json、settings/report.json、menus/report.json；截图themes/expanded.png、themes/translate.png和settings/deepseek-off.png，公开设置截图与本地预览已更新。全部使用合成配置/凭据与本机SSE；原生工具栏弹出层的最终尺寸、真实供应商及其他浏览器未验收。原生窗口的可用尺寸由浏览器决定。重新加载扩展后重开设置生效；本轮仅本地保存，已有流式改动不纳入提交，Description继续本地忽略。
+
+## 2026-10-16 放大输出浮层的原文与回答字号
+
+基线aad92fc，复用codex/ui-reading-redesign。用户以词典原型为参考，指出浮层原文字号过小。本轮仅在theme.css调整排版层级：原文由13px次要提示改为32px主题墨色词条标题，正文14→18px，h2为23px、h3为20px、其余小标题18px、代码12→15px；中文继续文楷屏幕版、英文继续本地Space/Syne。原文高度上限扩至min(124px,22vh)，长句换行并可独立滚动。保持原有定位、拖动、复制/下载与请求协议，版本4.6.0。
+
+北京时间2026-10-16，以隔离Edge155.0.4283.45、Node24.18.1、Playwright1.62.1完成18项浮层检查及54项静态检查，git diff --check通过。原有选区避让、流式拖动、滚动/缩窗位置、关闭等17项继续通过；新增专项检查三配色×260/375/1000px，覆盖长中文原文、英文词条、正文/小标题/代码实际字号、内容无横向溢出、底部按钮在窗口内、宿主网页字体保持Arial。全部使用合成网页/Key和本机SSE，未验证真实供应商、其他浏览器与特殊网站样式。
+
+证据artifacts/qa/result-type-scale/report.json、result.png及各配色/宽度截图；公开result截图和本地预览同步更新。verify-tooltip-position新增--output以独立保存证据。重新加载扩展并刷新网页后使用；仅本地保存，本轮不纳入原有流式源码与文档改动，Description同步且继续忽略。
+
+## 2026-10-16 输出字号微调为28/14px
+
+基线6f7c0a7，按用户要求将词条标题设为28px、正文设为14px。工作区已有标题28px及对应断言，本轮沿用并补齐正文14px与断言；其他现有流式修改保留。版本4.6.0。18项隔离Edge浮层检查（含三配色、长句/窄屏和拖动）与54项静态检查、git diff --check通过；合成配置/本机SSE，未验证真实供应商与其他浏览器。报告及截图artifacts/qa/result-type-28-14/，公开截图和本地预览同步，重新加载扩展并刷新网页生效，仅本地保存。
+
+## 2026-10-16 浮层品牌艺术字
+
+基线f9a127e，按用户截图要求把顶部用途文案换为固定“说文 lingoclarify”字标。content.js首次创建双span品牌，后续普通生成/解释此句只更新region可访问名称以保留用途信息，不覆盖品牌子节点。theme.css用本地文楷26px/3px字距呈现中文书写感、Syne 600/11px呈现英文，按基线对齐；保留拖动抓手与关闭按钮，词条28px和正文14px沿用。无新资源/依赖，版本4.6.0。
+
+北京时间2026-10-16，隔离Edge155.0.4283.45、Node24.18.1、Playwright1.62.1完成18项浮层、18项浏览器行为回归及3项对照、54项静态检查，git diff --check通过。覆盖固定品牌/字体、三配色×260/375/1000px下与关闭按钮无重叠、拖动/关闭、解释此句成功与失败后品牌稳定及用途可访问名称保留；截图已目视复核。证据artifacts/qa/result-wordmark/report.json、header.png、result.png和artifacts/qa/adversarial-fix-2026-10-11/browser/results.json（以本轮报告时间/HEAD识别）。使用合成网页/Key与本机SSE，未验证真实供应商或其他浏览器。公开截图和本地预览已更新；重新加载扩展并刷新网页生效。已有流式源码/文档差异保留，只提交本任务差异，Description继续本地忽略。
+
+## 2026-10-16 英文字标改为连笔手写字体并预留笔画空间
+
+基线104f916，按用户要求将浮层英文字标从Syne 600/11px换成本地Allura 400/24px连笔手写体，行高1.65并增加上下/左右留白，字标仍为说文 lingoclarify；中文、28px词条和14px正文保留。新增vendor/fonts/allura.ttf与allura-OFL.txt，来源/取得日期/哈希见字体README；theme.js注册LC Allura，manifest公开字体资源，不新增运行依赖或远程字体请求，版本4.6.0。
+
+北京时间2026-10-16，隔离Edge155.0.4283.45、Node24.18.1、Playwright1.62.1完成18项浮层检查与55项静态检查，git diff --check通过。CDP实际字形确认Allura-Regular自定义字体；lingoclarify实测墨迹高24px、下伸笔画9px、行高39.6px，文字框底部距header底部12px；截图目视确认g/y下伸完整。覆盖三配色×260/375/1000px、长句、正文/词条原字号、关闭按钮无重叠与定位/拖动。证据artifacts/qa/result-calligraphy/report.json、header.png、result.png及各宽度截图。全部使用合成网页/Key与本机SSE，未验证其他浏览器或特殊宿主样式。公开截图/预览和本地Description同步；重新加载扩展并刷新网页生效，仅保存本任务本地提交，原有流式修改保留。

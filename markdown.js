@@ -1,4 +1,4 @@
-// 文件职责：本地 Markdown 解析、HTML 白名单清理、流式节流渲染与阅读位置保持。
+// 文件职责：本地 Markdown 安全排版、rAF 文本播放队列与阅读位置保持。
 // Loaded in the isolated content-script world.
 (() => {
   const parser = new marked.Marked({ gfm: true, breaks: true });
@@ -12,10 +12,13 @@
   const tags = ['p', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em',
     'del', 's', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'hr', 'a',
     'table', 'thead', 'tbody', 'tr', 'th', 'td', 'input'];
+  const MAX_CHARS_PER_FRAME = 2048;
+  const MAX_TEXT_NODE_CHARS = 8192;
 
   function render(container, source) {
     const top = container.scrollTop;
     const atBottom = container.hasChildNodes() && container.scrollHeight - container.clientHeight - top <= 24;
+    container.classList.remove('ds-text-playback');
     const horizontal = [...container.querySelectorAll('pre, .ds-md-table')].map(el => el.scrollLeft);
     const focusable = [...container.querySelectorAll('pre, .ds-md-table, a[href]')];
     const focused = focusable.find(el => el === document.activeElement);
@@ -68,28 +71,91 @@
     container.scrollTop = atBottom ? container.scrollHeight : top;
   }
 
-  function createStreamingRenderer(container) {
-    container.classList.add('ds-markdown');
-    container.textContent = '';
+  function createStreamingTextRenderer(container) {
+    let textNode = document.createTextNode('');
+    container.replaceChildren(textNode);
     container.scrollTop = 0;
-    let source = '', timer = 0, stopped = false;
+    let pending = '', displayed = '', rafId = 0, stopped = false, idleCallback = null;
+    const notifyIdle = () => {
+      if (stopped || pending || !idleCallback) return;
+      const callback = idleCallback;
+      idleCallback = null;
+      callback();
+    };
+    const schedule = () => {
+      if (!stopped && !rafId && pending) rafId = requestAnimationFrame(step);
+    };
+    function step() {
+      rafId = 0;
+      if (stopped) return;
+      if (!pending) { notifyIdle(); return; }
+      // 限制单个 TextNode 的长度，避免超长段落每帧重排同一个巨型文本节点。
+      if (textNode.length >= MAX_TEXT_NODE_CHARS) {
+        textNode = document.createTextNode('');
+        container.appendChild(textNode);
+      }
+      const adaptive = Math.max(1, Math.ceil(pending.length / 12));
+      let take = Math.min(pending.length, MAX_CHARS_PER_FRAME, adaptive);
+      // 尽量不在一帧末尾切开代理对（emoji 等）。
+      if (take < pending.length && /[\uD800-\uDBFF]/.test(pending[take - 1])) {
+        take = take === 1 ? 2 : take - 1;
+      }
+      textNode.appendData(pending.slice(0, take));
+      displayed += pending.slice(0, take);
+      pending = pending.slice(take);
+      schedule();
+      notifyIdle();
+    }
     return {
       push(chunk) {
         if (stopped || !chunk) return;
-        source += chunk;
-        if (!timer) timer = setTimeout(() => {
-          timer = 0;
-          if (!stopped) render(container, source);
-        }, Math.min(600, 150 + Math.floor(source.length / 20000) * 50));
+        pending += chunk;
+        schedule();
       },
       setFinal(text) {
         if (stopped) return;
-        clearTimeout(timer); timer = 0;
-        source = String(text || '');
-        render(container, source);
+        const final = String(text || '');
+        // 正常 done 不清空、不重播；只有最终文本改变已显示前缀时才重新排队。
+        if (final.startsWith(displayed)) pending = final.slice(displayed.length);
+        else {
+          textNode = document.createTextNode('');
+          container.replaceChildren(textNode);
+          displayed = ''; pending = final;
+        }
+        schedule();
+        notifyIdle();
       },
-      cancel() { stopped = true; clearTimeout(timer); timer = 0; source = ''; }
+      onIdle(callback) {
+        if (stopped) return;
+        idleCallback = callback;
+        notifyIdle();
+      },
+      cancel() {
+        stopped = true;
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = 0; pending = ''; displayed = ''; idleCallback = null;
+      }
     };
   }
-  globalThis.AIMarkdown = Object.freeze({ render, createStreamingRenderer });
+
+  function createStreamingRenderer(container) {
+    container.classList.add('ds-markdown', 'ds-text-playback');
+    const playback = createStreamingTextRenderer(container);
+    let finished = false;
+    return {
+      push(chunk) { if (!finished) playback.push(chunk); },
+      setFinal(text, onComplete) {
+        if (finished) return;
+        finished = true;
+        playback.setFinal(text);
+        playback.onIdle(() => {
+          // 仅在播放完成后解析/清理一次，保留现有 Markdown 与复制原文约定。
+          render(container, text);
+          onComplete?.();
+        });
+      },
+      cancel() { finished = true; playback.cancel(); }
+    };
+  }
+  globalThis.AIMarkdown = Object.freeze({ render, createStreamingRenderer, createStreamingTextRenderer });
 })();

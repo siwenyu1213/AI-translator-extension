@@ -7,7 +7,7 @@ import {resolve,relative} from 'node:path';
 import {execFileSync} from 'node:child_process';
 const root=process.cwd(),arg=name=>process.argv[process.argv.indexOf(name)+1];
 const {chromium}=createRequire(import.meta.url)(arg('--playwright'));
-const output=resolve(root,'artifacts/qa/settings-controls-2026-10-13');
+const output=resolve(root,process.argv.includes('--output')?arg('--output'):'artifacts/qa/settings-controls-2026-10-13');
 const profile=resolve(root,'.local/browser-profile/settings-controls',`run-${Date.now()}`);
 mkdirSync(output,{recursive:true});
 const checks=[],requests=[],errors=[];
@@ -123,7 +123,7 @@ try{
     await worker.evaluate(()=>chrome.storage.local.set({explainManufacturer:'custom',providerConnections:{custom:{apiBaseUrl:'https://api.deepseek.com/v1',apiKey:'synthetic-only',availableModels:['deepseek-flash']}}}));await reopen();
     assert.equal(await popup.locator('#explain-deepseek-thinking-section').isVisible(),true);
   });
-  await check('保存失败反馈准确，不写入触发方式和开关草稿；320px 无横向溢出、510px 内部滚动可访问',async()=>{
+  await check('保存失败反馈准确，不写入触发方式和开关草稿；320px 无横向溢出、底部操作可访问',async()=>{
     const before=await worker.evaluate(()=>chrome.storage.local.get(['triggerMode','explainDeepSeekThinkingEnabled']));
     await popup.locator('#trigger-mode').selectOption('contextMenu');await popup.locator('#explain-deepseek-thinking').check();
     await popup.evaluate(()=>{globalThis.qaSet=chrome.storage.local.set;chrome.storage.local.set=()=>Promise.reject(Error('synthetic failure'));});
@@ -131,11 +131,12 @@ try{
     assert.deepEqual(await worker.evaluate(()=>chrome.storage.local.get(['triggerMode','explainDeepSeekThinkingEnabled'])),before);
     await popup.evaluate(()=>{chrome.storage.local.set=qaSet;});
     await popup.setViewportSize({width:320,height:600});assert.equal(await popup.evaluate(()=>document.body.scrollWidth<=innerWidth),true);
-    for(const selector of['#explain-deepseek-thinking','#explain-thinking','#trigger-mode','#save-btn']){await popup.locator(selector).scrollIntoViewIfNeeded();const r=await popup.locator(selector).boundingBox();assert.ok(r.y>=0&&r.y+r.height<=510);}
+    // 滚动偏移取整、控件保留小数CSS像素，边界允许不足1px的舍入差。
+    for(const selector of['#explain-deepseek-thinking','#explain-thinking','#trigger-mode-trigger','#save-btn']){await popup.locator(selector).scrollIntoViewIfNeeded();const r=await popup.locator(selector).boundingBox();assert.ok(r.y>=-1&&r.y+r.height<=601,JSON.stringify({selector,r,viewport:await popup.evaluate(()=>({height:innerHeight,scrollY}))}));}
   });
   assert.deepEqual(errors,[]);
 }finally{
-  const report={date:'2026-10-13 Asia/Shanghai',head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),node:process.version,browser:browserVersion,profile:relative(root,profile),kind:'actual isolated Edge; synthetic provider',passed:checks.filter(check=>check.status==='passed').length,failed:checks.filter(check=>check.status==='failed').length,checks,errors,unverified:['Real provider credentials/generation/latency','Native OS context menu mouse click','Native toolbar popup']};
+  const report={date:new Date().toISOString(),head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),node:process.version,browser:browserVersion,profile:relative(root,profile),kind:'actual isolated Edge; synthetic provider',passed:checks.filter(check=>check.status==='passed').length,failed:checks.filter(check=>check.status==='failed').length,checks,errors,unverified:['Real provider credentials/generation/latency','Native OS context menu mouse click','Native toolbar popup']};
   writeFileSync(resolve(output,'report.json'),JSON.stringify(report,null,2)+'\n');
   if(context)await context.close();await new Promise(resolve=>server.close(resolve));
 }

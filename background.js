@@ -274,24 +274,14 @@ async function performStreamRequest(port, { promptType, text, context, batchId, 
   const postChunk = (type, token) => {
     if (batchItems) return;
     for (let i = 0; i < token.length; i += MAX_STREAM_CHARS) {
-      port.postMessage({ type, token: token.slice(i, i + MAX_STREAM_CHARS), batchId });
+      if (!port.postMessage({ type, token: token.slice(i, i + MAX_STREAM_CHARS), batchId })) return;
     }
   };
   if (CACHE.has(cacheKey)) {
-    // 模拟流式：分 chunk 发送缓存结果
+    // 缓存也交给前端播放，不在后台人为延迟。
     const cached = CACHE.get(cacheKey);
-    const chunks = batchItems ? [] : splitIntoChunks(cached, Math.ceil(cached.length / MAX_STREAM_CHARS));
-    for (const chunk of chunks) {
-      controller.signal.throwIfAborted();
-      // 端口可能已被页面断开（用户关闭弹窗），发送失败即中止
-      try {
-        if (!port.postMessage({ type: 'token', token: chunk, batchId })) return;
-        await sleep(16);
-      } catch {
-        port.disconnect();
-        return;
-      }
-    }
+    controller.signal.throwIfAborted();
+    postChunk('token', cached);
     port.postMessage(doneMessage(cached));
     port.disconnect();
     return;
@@ -339,6 +329,16 @@ async function performStreamRequest(port, { promptType, text, context, batchId, 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '', fullText = '', finished = false, sawFinish = false;
+    let chunks = [];
+    const enqueue = (type, token) => {
+      const last = chunks[chunks.length - 1];
+      if (last?.type === type) last.token += token;
+      else chunks.push({ type, token });
+    };
+    const flush = () => {
+      for (const { type, token } of chunks) postChunk(type, token);
+      chunks = [];
+    };
     function consume(line) {
       if (!line.startsWith('data:')) return;
       const data = line.slice(5).trim();
@@ -350,11 +350,11 @@ async function performStreamRequest(port, { promptType, text, context, batchId, 
       if (parsed.error) throw new Error(parsed.error.message || '接口流式响应报错');
       const choice = parsed?.choices?.[0];
       const reasoning = choice?.delta?.reasoning_content;
-      if (typeof reasoning === 'string' && reasoning) postChunk('reasoning-token', reasoning);
+      if (typeof reasoning === 'string' && reasoning) enqueue('reasoning-token', reasoning);
       const token = choice?.delta?.content;
       if (typeof token === 'string' && token) {
         fullText += token;
-        postChunk('token', token);
+        enqueue('token', token);
       }
       if (choice?.finish_reason === 'length') throw new Error('模型输出达到长度上限，请缩短待翻译文本');
       if (choice?.finish_reason === 'content_filter') throw new Error('接口过滤了模型输出');
@@ -368,11 +368,15 @@ async function performStreamRequest(port, { promptType, text, context, batchId, 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
-        for (const line of lines) { consume(line); if (finished) break; }
+        try {
+          for (const line of lines) { consume(line); if (finished) break; }
+        } finally { flush(); }
       }
       if (!finished) {
         buffer += decoder.decode();
-        for (const line of buffer.split('\n')) { consume(line); if (finished) break; }
+        try {
+          for (const line of buffer.split('\n')) { consume(line); if (finished) break; }
+        } finally { flush(); }
       }
     } finally { await reader.cancel().catch(() => {}); }
     if (!fullText) throw new Error('模型没有返回文本，请确认该模型支持流式 Chat Completions');
@@ -604,25 +608,6 @@ async function validateModel(inputModel, connection) {
   if (!result.ok) return result;
   if (!result.models.includes(model)) return { ok: false, error: `接口模型列表中未找到：${model}` };
   return { ok: true, model: { id: model } };
-}
-
-// ═══════════════════════════════════════════
-// 工具函数
-// ═══════════════════════════════════════════
-
-function splitIntoChunks(text, count) {
-  if (!text || count <= 1) return [text || ''];
-  const len = text.length;
-  const size = Math.ceil(len / count);
-  const chunks = [];
-  for (let i = 0; i < len; i += size) {
-    chunks.push(text.slice(i, i + size));
-  }
-  return chunks.length ? chunks : [''];
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // ═══════════════════════════════════════════

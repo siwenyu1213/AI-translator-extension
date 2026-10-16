@@ -8,13 +8,14 @@ import { execFileSync } from 'node:child_process';
 const root = process.cwd();
 const arg = name => process.argv[process.argv.indexOf(name) + 1];
 const { chromium } = createRequire(import.meta.url)(process.argv.includes('--playwright') ? arg('--playwright') : 'playwright');
-const output = resolve(root, 'artifacts/qa/tooltip-header-2026-10-13');
+const output = resolve(root, process.argv.includes('--output') ? arg('--output') : 'artifacts/qa/tooltip-header-2026-10-13');
 const profile = resolve(root, '.local/browser-profile/tooltip-position', `run-${Date.now()}`);
 mkdirSync(output, { recursive: true }); mkdirSync(profile, { recursive: true });
 const checks = [], errors = [];
-let context, worker, page, version, sequence = 0, slow = false;
+let context, worker, page, version, sequence = 0, slow = false, readingSample = false;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const long = '## Answer\n\n' + Array.from({ length: 30 }, (_, i) => `Paragraph ${i} explains the synthetic selection in detail.\n\n`).join('');
+const readingAnswer = '意外发现美好事物的机缘。\n\n## 在这句话中\n\n指不经意间获得有价值的发现。\n\n- **词义**：偶然遇见美好。\n- 使用 `serendipity` 描述这种机缘。\n\n| 词语 | 含义 |\n| --- | --- |\n| discovery | 发现 |';
 const server = createServer(async (req, res) => {
   if (req.url.startsWith('/sample/')) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -25,26 +26,27 @@ const server = createServer(async (req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8' });
   const send = content => res.write('data: ' + JSON.stringify({ choices: [{ delta: { content } }] }) + '\n\n');
   const streaming = slow;
-  send(streaming ? 'First response.\n\n' : long);
+  send(streaming ? 'First response.\n\n' : readingSample ? readingAnswer : long);
   if (streaming) { await sleep(900); if (!res.destroyed) send(long); await sleep(600); }
   if (!res.destroyed) res.end('data: [DONE]\n\n');
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
-async function fresh({ width = 1000, height = 600, top = 300, left = 40, textWidth = 600, multiline = false, stream = false } = {}) {
+async function fresh({ width = 1000, height = 600, top = 300, left = 40, textWidth = 600, multiline = false, stream = false, text = '' } = {}) {
   slow = stream;
   await worker.evaluate(() => CACHE.clear());
   if (page) await page.close();
   page = await context.newPage(); page.on('pageerror', e => errors.push(e.message));
   await page.setViewportSize({ width, height }); await page.goto(`${base}/sample/${sequence++}`);
   await page.waitForFunction(() => typeof chrome !== 'undefined' && !!document.querySelector('#word'));
-  await page.evaluate(({ top, left, textWidth, multiline }) => {
+  await page.evaluate(({ top, left, textWidth, multiline, text }) => {
     const el = document.querySelector('#word'); Object.assign(el.style, { top: `${top}px`, left: `${left}px`, width: `${textWidth}px` });
+    if (text) el.textContent = text;
     const range = document.createRange(); range.setStart(el.firstChild, multiline ? 0 : 4); range.setEnd(el.firstChild, multiline ? el.textContent.length : 8);
     window.qaSourceRange = range.cloneRange();
     getSelection().removeAllRanges(); getSelection().addRange(range);
     el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
-  }, { top, left, textWidth, multiline });
+  }, { top, left, textWidth, multiline, text });
   await page.locator('#deepseek-explain-tooltip.ds-visible').waitFor();
   if (!stream) await done();
   await sleep(120);
@@ -121,9 +123,24 @@ try {
     assert.equal((await header.textContent()).includes('拖动'), false);
     assert.equal(await header.locator('button').count(), 1);
     assert.equal(await page.locator('.ds-drag-handle').evaluate(el => el.tagName), 'SPAN');
+    assert.equal(await page.locator('.ds-brand').textContent(), '说文 lingoclarify');
+    assert.equal(await page.locator('.ds-brand-cn').evaluate(el => getComputedStyle(el).fontFamily.includes('LC WenKai')), true);
+    await page.evaluate(() => document.fonts.ready);
+    assert.equal(await page.locator('.ds-brand-en').evaluate(el => getComputedStyle(el).fontFamily.includes('LC Allura')), true);
+    const lettering = await page.locator('.ds-brand-en').evaluate(el => {
+      const style = getComputedStyle(el), canvas = document.createElement('canvas'), ctx = canvas.getContext('2d'); ctx.font = style.font;
+      const glyphs = ctx.measureText(el.textContent), rect = el.getBoundingClientRect(), header = el.closest('.ds-header').getBoundingClientRect();
+      return { loaded: document.fonts.check('24px "LC Allura"'), font: style.fontFamily, lineHeight: parseFloat(style.lineHeight), inkHeight: glyphs.actualBoundingBoxAscent + glyphs.actualBoundingBoxDescent, descent: glyphs.actualBoundingBoxDescent, bottom: rect.bottom, headerBottom: header.bottom };
+    });
+    assert.equal(lettering.loaded, true); assert.ok(lettering.descent > 0 && lettering.lineHeight > lettering.inkHeight + 4, JSON.stringify(lettering));
+    assert.ok(lettering.bottom < lettering.headerBottom, JSON.stringify(lettering));
+    const client = await context.newCDPSession(page); await client.send('DOM.enable'); await client.send('CSS.enable');
+    const { root: doc } = await client.send('DOM.getDocument'); const { nodeId } = await client.send('DOM.querySelector', { nodeId: doc.nodeId, selector: '.ds-brand-en' });
+    const { fonts } = await client.send('CSS.getPlatformFontsForNode', { nodeId }); await client.detach();
+    assert.ok(fonts.some(font => font.isCustomFont && /Allura/i.test(font.familyName)), JSON.stringify(fonts));
     const after = await geometry(); assert.ok(Math.abs(after.tip.left - initial.tip.left) < 2); assert.ok(Math.abs(after.tip.top - initial.tip.top) < 2);
     await header.screenshot({ path: resolve(output, 'header.png') });
-    return { headerText: (await header.textContent()).trim(), initial, after };
+    return { headerText: (await header.textContent()).trim(), lettering, fonts, initial, after };
   });
   await check('Cursor is normal on hover and grabbing only while left button is held', async () => {
     const cursor = selector => page.locator(selector).evaluate(el => getComputedStyle(el).cursor);
@@ -158,6 +175,37 @@ try {
     await fresh({ top: 30 }); await drag(200, 20); await page.keyboard.press('Escape'); await sleep(320);
     await page.evaluate(() => { const el = document.querySelector('#word'), r = document.createRange(); r.setStart(el.firstChild, 9); r.setEnd(el.firstChild, 15); window.qaSourceRange = r.cloneRange(); getSelection().removeAllRanges(); getSelection().addRange(r); el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 })); });
     await done(); await sleep(150); const g = await geometry(); avoids(g); assert.ok(g.tip.left < 200); return g;
+  });
+  await check('词条28px/正文14px，三配色与长中英文窄屏换行、按钮可达', async () => {
+    readingSample = true;
+    const states = [];
+    for (const theme of ['cobalt', 'playful', 'vellum']) {
+      await worker.evaluate(theme => chrome.storage.local.set({ uiTheme: theme }), theme);
+      for (const width of [260, 375, 1000]) {
+        await fresh({ width, height: 850, top: 30, left: 15, textWidth: Math.min(width - 30, 600), multiline: true, text: width === 1000 ? 'serendipity' : '在不经意间发现美好事物，也是一种难得的机缘。'.repeat(3) });
+        await page.evaluate(() => document.fonts.ready);
+        const g = await geometry(); fits(g);
+        assert.equal(await page.locator('.ds-brand').textContent(), '说文 lingoclarify');
+        const header = await page.locator('.ds-header').evaluate(el => { const brand = el.querySelector('.ds-brand').getBoundingClientRect(), close = el.querySelector('.ds-close').getBoundingClientRect(); return { brandRight: brand.right, closeLeft: close.left }; });
+        assert.ok(header.brandRight <= header.closeLeft, JSON.stringify({ width, header }));
+        const type = await page.evaluate(() => {
+          const tip = document.querySelector('#deepseek-explain-tooltip'), quote = tip.querySelector('.ds-quote'), body = tip.querySelector('.ds-body'), actions = tip.querySelector('.ds-actions');
+          const bounds = el => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
+          return { quote: getComputedStyle(quote).fontSize, body: getComputedStyle(body).fontSize, heading: getComputedStyle(body.querySelector('h2')).fontSize, code: getComputedStyle(body.querySelector('code')).fontSize, quoteFits: quote.scrollWidth <= quote.clientWidth + 1, bodyFits: body.scrollWidth <= body.clientWidth + 1, bounds: bounds(tip), actions: bounds(actions), hostFont: getComputedStyle(document.body).fontFamily };
+        });
+        assert.equal(type.quote, '28px'); assert.equal(type.body, '14px'); assert.equal(type.heading, '23px'); assert.equal(type.code, '15px');
+        assert.ok(type.quoteFits && type.bodyFits, JSON.stringify(type)); assert.equal(type.hostFont, 'Arial');
+        assert.ok(type.actions.top >= type.bounds.top && type.actions.bottom <= type.bounds.bottom, JSON.stringify(type));
+        await page.locator('.ds-body').evaluate(el => el.scrollTo(0, el.scrollHeight));
+        await page.locator('#deepseek-explain-tooltip').screenshot({ path: resolve(output, `${theme}-${width}.png`) });
+        states.push({ theme, width, ...type });
+      }
+    }
+    await worker.evaluate(() => chrome.storage.local.set({ uiTheme: 'cobalt' }));
+    await fresh({ top: 30, height: 850, multiline: true, text: 'serendipity' }); await page.evaluate(() => document.fonts.ready);
+    await page.locator('#deepseek-explain-tooltip').screenshot({ path: resolve(output, 'result.png') });
+    readingSample = false;
+    return states;
   });
   await check('Close button and outside click still dismiss', async () => {
     await page.locator('.ds-close').click(); await page.locator('#deepseek-explain-tooltip.ds-hidden').waitFor();

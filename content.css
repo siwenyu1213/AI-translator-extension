@@ -133,6 +133,8 @@
   word-break: normal;
   line-height: 1.75;
 }
+
+#deepseek-explain-tooltip .ds-markdown.ds-text-playback { white-space: pre-wrap; overflow-anchor: none; }
 #deepseek-explain-tooltip .ds-markdown * { box-sizing: border-box; }
 #deepseek-explain-tooltip .ds-markdown p { margin: 0 0 10px; font: inherit; color: inherit; }
 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6) {
@@ -280,9 +282,12 @@
 
 #ds-translate-toolbar {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 33.333vw;
+  min-width: min(320px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
   z-index: 2147483646;
   display: flex;
   align-items: center;
@@ -358,7 +363,7 @@
 
 /* 卡片整体受视口约束，正文与思考可收缩，操作按钮保持可见。 */
 #deepseek-explain-tooltip :is(.ds-header,.ds-actions,.ds-footer,.ds-quote) { flex-shrink: 0; }
-#deepseek-explain-tooltip .ds-quote { max-height: min(72px, 12vh); overflow-y: auto; }
+#deepseek-explain-tooltip .ds-quote { max-height: min(72px, 12vh); overflow-y: auto; flex-shrink: 1; }
 #deepseek-explain-tooltip .ds-reasoning { min-height: 0; flex: 0 1 auto; overflow-y: auto; }
 #deepseek-explain-tooltip :is(.ds-close,.ds-btn):focus-visible {
   outline: 2px solid #2563eb; outline-offset: 2px;
@@ -401,11 +406,83 @@
 #deepseek-explain-tooltip .ds-reasoning { background: var(--lc-surface); border-color: var(--lc-border); }
 #deepseek-explain-tooltip :is(.ds-reasoning-title,.ds-reasoning-body) { color: var(--lc-muted); }
 #deepseek-explain-tooltip :is(.ds-close,.ds-btn,a,pre,.ds-md-table):focus-visible { outline-color: var(--lc-accent); }
-#ds-translate-toolbar { flex-wrap: wrap; gap: 10px; background: var(--lc-bg); color: var(--lc-ink); border-bottom: 1px solid var(--lc-border); font-family: var(--lc-body-font); }
+#ds-translate-toolbar { flex-direction: column; gap: 4px; padding: 0; background: transparent; color: var(--lc-ink); font-family: var(--lc-body-font); box-shadow: none; pointer-events: none; }
 #ds-translate-toolbar .lc-brand-icon { width: 24px; height: 24px; }
 #ds-translate-toolbar .ds-tb-progress { color: var(--lc-muted); font-size: 12px; }
-#ds-translate-toolbar .ds-tb-btn { display: inline-flex; align-items: center; min-height: 32px; border-color: var(--lc-border); color: var(--lc-ink); background: var(--lc-surface); font-family: inherit; }
+#ds-translate-toolbar .ds-tb-btn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  height: 26px;
+  min-height: 26px;
+  margin: 0;
+  padding: 3px 8px;
+  box-sizing: border-box;
+  border-color: var(--lc-border);
+  color: var(--lc-ink);
+  background: var(--lc-surface);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+  text-indent: 0;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
 #ds-translate-toolbar .ds-tb-btn:hover { background: var(--lc-soft); }
 #ds-translate-toolbar .ds-tb-danger { border-color: var(--lc-error); color: var(--lc-error); }
 #ds-translate-toolbar .ds-tb-danger:hover { background: var(--lc-error-bg); }
 #ds-translate-toolbar .ds-tb-btn:focus-visible { outline: 2px solid var(--lc-accent); outline-offset: 2px; }
+#ds-translate-toolbar #ds-tb-panel {
+  display: grid;
+  grid-template-rows: 1fr;
+  width: 100%;
+  opacity: 1;
+  visibility: visible;
+  transition: grid-template-rows 180ms ease, opacity 180ms ease, transform 180ms ease, visibility 0s;
+}
+#ds-translate-toolbar .ds-tb-panel-clip { min-height: 0; overflow: hidden; border-radius: 8px; }
+#ds-translate-toolbar .ds-tb-panel-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--lc-bg);
+  border: 1px solid var(--lc-border);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px var(--lc-shadow);
+  pointer-events: auto;
+}
+#ds-translate-toolbar.ds-tb-collapsed #ds-tb-panel {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-12px);
+  visibility: hidden;
+  transition: grid-template-rows 180ms ease, opacity 180ms ease, transform 180ms ease, visibility 0s 180ms;
+}
+#ds-translate-toolbar #ds-tb-toggle {
+  flex: none;
+  justify-content: center;
+  width: 24px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: 4px;
+  border-color: color-mix(in srgb, var(--lc-border) 60%, var(--lc-surface));
+  box-shadow: 0 1px 3px var(--lc-shadow);
+  pointer-events: auto;
+}
+#ds-translate-toolbar #ds-tb-toggle svg { width: 14px; height: 14px; transition: transform 180ms ease; }
+#ds-translate-toolbar.ds-tb-collapsed #ds-tb-toggle svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  #ds-translate-toolbar #ds-tb-panel,
+  #ds-translate-toolbar.ds-tb-collapsed #ds-tb-panel,
+  #ds-translate-toolbar #ds-tb-toggle svg { transition: none; }
+}

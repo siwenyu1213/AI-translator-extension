@@ -1,30 +1,60 @@
-/* 文件职责：钴蓝纸页、蜜桃涂鸦、靛蓝手稿三主题的颜色、字体和共用界面样式。 */
-/* theme.js通过扩展绝对地址注册本地字体；中文使用系统字体。 */
-
-/* 变量只落到扩展自有根元素，不改宿主网页的主题或字体。 */
+/* 词典式界面共用三套配色；保留uiTheme标识，现有配置无需迁移。 */
+/* 变量和组件均限定在扩展根元素；字体由theme.js从本地加载。 */
 .lc-theme {
-  --lc-bg: #fdfae7; --lc-surface: #fdfae7; --lc-soft: #f1efd7;
-  --lc-ink: #111111; --lc-muted: #5c5b60; --lc-accent: #1e2bfa; --lc-on: #fdfae7;
-  --lc-border: #9293bd; --lc-rule: #d4d1c3; --lc-error: #b42318; --lc-error-bg: #fff0e8;
-  --lc-success: #25633e; --lc-shadow: #11111112;
-  --lc-body-font: 'LC Inter', 'Segoe UI', 'Microsoft YaHei', sans-serif;
-  --lc-title-font: 'LC Space', 'Microsoft YaHei', sans-serif;
+  --lc-bg: #f3f0e5; --lc-surface: #faf8f0; --lc-soft: #e7e5d6;
+  --lc-ink: #263d36; --lc-muted: #5d695f; --lc-accent: #36594b; --lc-on: #ffffff;
+  --lc-border: #8b9685; --lc-rule: #c8cbbb; --lc-error: #b42318; --lc-error-bg: #fff0ed;
+  --lc-success: #246a48; --lc-shadow: #20374414;
+  --lc-body-font: 'LC Space', 'LC WenKai', cursive;
+  --lc-title-font: 'LC Syne', 'LC WenKai', cursive;
   color-scheme: light;
 }
 .lc-theme[data-lc-theme='playful'] {
-  --lc-bg: #f0c8a0; --lc-surface: #f7dec6; --lc-soft: #e8b88e;
-  --lc-ink: #1a1a1a; --lc-muted: #55402f; --lc-accent: #1a1a1a; --lc-on: #f7dec6;
-  --lc-border: #1a1a1a; --lc-rule: #ac7c54;
-  --lc-body-font: 'LC Space', 'Segoe UI', 'Microsoft YaHei', sans-serif;
-  --lc-title-font: 'LC Syne', 'Microsoft YaHei', sans-serif;
+  --lc-bg: #f5f8f8; --lc-surface: #ffffff; --lc-soft: #e8f0f0;
+  --lc-ink: #203744; --lc-muted: #526973; --lc-accent: #126b63; --lc-on: #ffffff;
+  --lc-border: #93a9ad; --lc-rule: #d8e3e5; --lc-shadow: #20374414;
 }
 .lc-theme[data-lc-theme='vellum'] {
-  --lc-bg: #2a3870; --lc-surface: #343f80; --lc-soft: #3b4787;
-  --lc-ink: #e8d85c; --lc-muted: #ebdfab; --lc-accent: #e8d85c; --lc-on: #2a3870;
-  --lc-border: #a79f76; --lc-rule: #737c9c; --lc-error: #ffb8b2; --lc-error-bg: #483859;
-  --lc-success: #b5ecbf; --lc-shadow: #00000024;
-  --lc-body-font: 'LC Inter', 'Segoe UI', 'Microsoft YaHei', sans-serif;
-  --lc-title-font: 'LC Cormorant', 'SimSun', Georgia, serif;
-  color-scheme: dark;
+  --lc-bg: #f0f3f8; --lc-surface: #ffffff; --lc-soft: #e4eaf4;
+  --lc-ink: #213047; --lc-muted: #52627a; --lc-accent: #2456b8; --lc-on: #ffffff;
+  --lc-border: #94a3bd; --lc-rule: #d4dce9; --lc-shadow: #21304718;
 }
 .lc-brand-icon { display: inline-block; flex: none; width: 40px; height: 40px; background: var(--lc-brand-image) center / contain no-repeat; }
+/* 主题层统一阅读组件外观；content.css负责定位、滚动约束和操作尺寸。 */
+#deepseek-explain-tooltip.lc-theme {
+  background: var(--lc-bg); border: 1px solid var(--lc-border); border-left: 6px solid var(--lc-accent);
+  border-radius: 4px; box-shadow: 0 8px 32px var(--lc-shadow);
+}
+#deepseek-explain-tooltip.lc-theme .ds-header { padding: 10px 16px; background: var(--lc-bg); border-bottom: 2px solid var(--lc-ink); }
+#deepseek-explain-tooltip.lc-theme .ds-header .lc-brand-icon { display: none; }
+#deepseek-explain-tooltip.lc-theme .ds-brand { display: inline-flex; align-items: baseline; gap: 8px; color: var(--lc-ink); font-weight: 400; white-space: nowrap; }
+#deepseek-explain-tooltip.lc-theme .ds-brand-cn { font: 400 26px/1.1 'LC WenKai', cursive; letter-spacing: 3px; }
+#deepseek-explain-tooltip.lc-theme .ds-brand-en { font: 400 24px/1.65 'LC Allura', cursive; letter-spacing: 0; padding: 2px 4px 4px 2px; }
+#deepseek-explain-tooltip.lc-theme .ds-close { color: var(--lc-muted); border-radius: 6px; }
+#deepseek-explain-tooltip.lc-theme .ds-quote {
+  margin: 14px 16px 0; padding: 0 0 12px; border: 0; border-bottom: 1px solid var(--lc-rule);
+  border-radius: 0; background: transparent; color: var(--lc-ink);
+  font: 400 28px/1.3 var(--lc-title-font); letter-spacing: -.4px;
+  max-height: min(124px, 22vh); overflow-wrap: anywhere;
+}
+#deepseek-explain-tooltip.lc-theme .ds-body { padding: 14px 18px 12px; font-size: 14px; line-height: 1.85; }
+#deepseek-explain-tooltip.lc-theme .ds-markdown { line-height: 1.85; }
+#deepseek-explain-tooltip.lc-theme .ds-markdown h1 { font-size: 29px; font-weight: 500; }
+#deepseek-explain-tooltip.lc-theme .ds-markdown h2 { font-size: 23px; }
+#deepseek-explain-tooltip.lc-theme .ds-markdown h3 { font-size: 20px; }
+#deepseek-explain-tooltip.lc-theme .ds-markdown :is(h4,h5,h6) { font-size: 18px; }
+#deepseek-explain-tooltip.lc-theme .ds-markdown :is(code,pre,th,blockquote) { background: var(--lc-bg); }
+#deepseek-explain-tooltip.lc-theme .ds-markdown pre code { background: transparent; }
+#deepseek-explain-tooltip.lc-theme .ds-actions { padding: 4px 16px 12px; gap: 8px; }
+#deepseek-explain-tooltip.lc-theme .ds-btn { border-radius: 6px; background: var(--lc-surface); }
+#deepseek-explain-tooltip.lc-theme .ds-footer { display: none; }
+#deepseek-explain-tooltip.lc-theme .ds-reasoning { border: 1px solid var(--lc-rule); border-radius: 6px; background: var(--lc-bg); }
+#deepseek-explain-tooltip.lc-theme[data-lc-theme='playful'] { border-radius: 4px; }
+#deepseek-explain-tooltip.lc-theme[data-lc-theme='playful'] .ds-header { border-bottom: 2px solid var(--lc-ink); }
+#deepseek-explain-tooltip.lc-theme .ds-markdown code { font-family: 'LC Space', 'LC WenKai', monospace; font-size: 15px; }
+#deepseek-explain-tooltip.lc-theme[data-lc-theme='vellum'] { border-radius: 6px; }
+#deepseek-explain-tooltip.lc-theme[data-lc-theme='vellum'] .ds-body { padding: 10px 16px; line-height: 1.75; }
+#deepseek-explain-tooltip.lc-theme[data-lc-theme='vellum'] .ds-markdown { line-height: 1.75; }
+#ds-translate-toolbar.lc-theme .ds-tb-panel-content { background: var(--lc-surface); border-radius: 8px; box-shadow: 0 3px 12px var(--lc-shadow); }
+#ds-translate-toolbar.lc-theme[data-lc-theme='playful'] .ds-tb-panel-content { border-radius: 3px; }
+#ds-translate-toolbar.lc-theme[data-lc-theme='vellum'] .ds-tb-panel-content { border-radius: 5px; }

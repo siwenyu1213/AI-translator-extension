@@ -7,7 +7,7 @@ import { resolve, relative } from 'node:path';
 import { execFileSync } from 'node:child_process';
 const root = process.cwd(), arg = name => process.argv[process.argv.indexOf(name)+1];
 const {chromium} = createRequire(import.meta.url)(arg('--playwright'));
-const output = resolve(root,'artifacts/qa/themes-2026-10-13');
+const output = resolve(root,process.argv.includes('--output') ? arg('--output') : 'artifacts/qa/themes-2026-10-13');
 const profile = resolve(root,'.local/browser-profile/themes',`run-${Date.now()}`);
 mkdirSync(output,{recursive:true}); mkdirSync(profile,{recursive:true});
 const checks=[],errors=[],requests=[];
@@ -52,11 +52,13 @@ try{
   const url=`chrome-extension://${new URL(worker.url()).host}/popup.html`;
   popup=await context.newPage();popup.on('pageerror',e=>errors.push(e.message));await popup.setViewportSize({width:390,height:600});await popup.goto(url);
   await popup.waitForFunction(()=>document.querySelector('#explain-manufacturer').options.length===11);
-  await check('旧配置和首次使用默认钴蓝纸页，三主题可选，删除 DeepSeek 提示',async()=>{
+  await check('首次使用词典纸页，三配色可选，无重复小字',async()=>{
     await popup.evaluate(()=>LingoTheme.ready);
     assert.equal(await popup.locator('body').getAttribute('data-lc-theme'),'cobalt');
     assert.deepEqual(await popup.locator('#ui-theme option').evaluateAll(options=>options.map(o=>o.value)),['cobalt','playful','vellum']);
     assert.equal((await popup.locator('body').textContent()).includes('固定关闭思考'),false);
+    for(const text of ['当前用途','阅读设置','所用型号','模型服务','读懂一个词']) assert.equal((await popup.locator('body').innerText()).includes(text),false,text);
+    assert.equal(await popup.locator('#panel-explain .model-heading').textContent(),'当前模型');
     assert.equal(await popup.locator('#api-key').isVisible(),true);
     await settingsShot('first-run.png');
   });
@@ -75,23 +77,26 @@ try{
   await page.locator('#ds-tb-show-original').click();
   await selectWord();
   const before=await snapshot();
-  for(const [theme,color]of[['cobalt','rgb(253, 250, 231)'],['playful','rgb(240, 200, 160)'],['vellum','rgb(42, 56, 112)']]){
+  for(const [theme,color,surface]of[['cobalt','rgb(243, 240, 229)','rgb(250, 248, 240)'],['playful','rgb(245, 248, 248)','rgb(255, 255, 255)'],['vellum','rgb(240, 243, 248)','rgb(255, 255, 255)']]){
     await check(`${theme} 即时同步设置/已打开结果/全文工具栏，连接和模型保持`,async()=>{
       await setTheme(theme);
       await page.waitForFunction(theme=>['deepseek-explain-tooltip','ds-translate-toolbar'].every(id=>document.getElementById(id)?.dataset.lcTheme===theme),theme);
       assert.deepEqual(await snapshot(),before);
       assert.equal(await popup.evaluate(()=>getComputedStyle(document.body).backgroundColor),color);
       assert.equal(await page.locator('#deepseek-explain-tooltip').evaluate(el=>getComputedStyle(el).backgroundColor),color);
+      assert.equal(await page.locator('.ds-tb-panel-content').evaluate(el=>getComputedStyle(el).backgroundColor),surface);
       await popup.evaluate(()=>document.fonts.ready);await page.evaluate(()=>document.fonts.ready);
       await settingsShot(`${theme}-settings.png`);
+      await popup.locator('#ui-theme').scrollIntoViewIfNeeded();
+      await popup.locator('body').screenshot({path:resolve(output,`${theme}-settings-bottom.png`)});
       await page.locator('#deepseek-explain-tooltip').screenshot({path:resolve(output,`${theme}-result.png`)});
       await page.screenshot({path:resolve(output,`${theme}-result-toolbar.png`)});
-      return{color};
+      return{color,surface};
     });
     await check(`${theme} 正文/提示/按钮文本对比度与本地字体`,async()=>{
       const colors=await popup.evaluate(()=>{const body=getComputedStyle(document.body),hint=getComputedStyle(document.querySelector('#theme-status')),button=getComputedStyle(document.querySelector('#save-btn'));return{bg:body.backgroundColor,ink:body.color,muted:hint.color,button:button.backgroundColor,on:button.color};});
       for(const value of[ratio(colors.bg,colors.ink),ratio(colors.bg,colors.muted),ratio(colors.button,colors.on)])assert.ok(value>=4.5,String(value));
-      const family=theme==='playful'?'LC Space':'LC Inter';
+      const family='LC Space';
       for(const surface of[popup,page]){
         const faces=await surface.evaluate(()=>[...document.fonts].map(face=>({family:face.family,status:face.status})));
         assert.equal(faces.some(face=>face.family.replaceAll('"','')===family&&face.status==='loaded'),true,JSON.stringify({surface:surface===popup?'popup':'page',faces}));
@@ -99,6 +104,25 @@ try{
       return colors;
     });
   }
+  await check('三方向自定义接口弹窗、键盘关闭和260/320/390px边界',async()=>{
+    const layouts=[];
+    for(const theme of ['cobalt','playful','vellum']){
+      await setTheme(theme);
+      for(const width of [260,320,390]){
+        await popup.setViewportSize({width,height:600});
+        assert.equal(await popup.evaluate(()=>document.body.scrollWidth<=innerWidth),true,`${theme}/${width}`);
+        await popup.locator('#custom-connection-button').click();
+        const bounds=await popup.locator('dialog').evaluate(el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,width:innerWidth,scroll:el.scrollWidth,client:el.clientWidth};});
+        assert.ok(bounds.left>=0&&bounds.right<=bounds.width&&bounds.scroll<=bounds.client,JSON.stringify(bounds));
+        await popup.locator('dialog').screenshot({path:resolve(output,`${theme}-dialog-${width}.png`)});
+        await popup.keyboard.press('Escape');
+        assert.equal(await popup.locator('dialog').isVisible(),false);
+        layouts.push({theme,width,...bounds});
+      }
+    }
+    await popup.setViewportSize({width:390,height:600});
+    return layouts;
+  });
   await check('390px弹窗与150%/200%浏览器缩放，操作不拆字、长厂家/型号可读',async()=>{
     const labels=await popup.evaluate(()=>{
       const provider=document.querySelector('#explain-manufacturer').selectedOptions[0],model=document.querySelector('#explain-model').selectedOptions[0];
@@ -125,26 +149,45 @@ try{
     }
     return{layouts,boundary:'Actual Edge tab zoom and synthetic display labels; native toolbar popup sizing not captured'};
   });
-  await check('高度上限510px，思考强度/Key编辑/保存/主题可滚动访问',async()=>{
+  await check('内容决定高度，展开收起/切换用途自适应；无主滚动条且受限视口可访问底部',async()=>{
     const thinking=await popup.locator('#explain-thinking').isChecked(),states=[];
-    const geometry=()=>popup.evaluate(()=>{const body=document.body,r=body.getBoundingClientRect();return{width:r.width,height:r.height,rootHeight:document.documentElement.getBoundingClientRect().height,scrollHeight:body.scrollHeight,overflow:getComputedStyle(body).overflowY};});
+    const geometry=()=>popup.evaluate(()=>{const r=document.body.getBoundingClientRect(),root=document.documentElement;return{width:r.width,height:r.height,containerHeight:document.querySelector('.container').getBoundingClientRect().height,rootScrollbar:getComputedStyle(root).scrollbarWidth,bodyScrollbar:getComputedStyle(document.body).scrollbarWidth,viewport:innerHeight,scrollY};});
     try{
+      await popup.setViewportSize({width:390,height:1200});
+      await popup.locator('#explain-thinking').uncheck();
+      const collapsed=await geometry();states.push({state:'collapsed',...collapsed});
       await popup.locator('#explain-thinking').check();await popup.locator('#explain-effort-section').waitFor({state:'visible'});
       await popup.locator('#rewrite-key').click();
-      const expanded=await geometry();assert.equal(expanded.width,390);assert.ok(expanded.height<=510&&expanded.rootHeight<=510,JSON.stringify(expanded));assert.equal(expanded.overflow,'auto');assert.ok(expanded.scrollHeight>expanded.height,JSON.stringify(expanded));states.push({state:'expanded',...expanded});
-      for(const selector of['#explain-effort','#api-key','#cancel-key','#save-btn','#ui-theme']){
-        await popup.locator(selector).scrollIntoViewIfNeeded();
-        const accessible=await popup.locator(selector).evaluate(el=>{const r=el.getBoundingClientRect(),body=document.body.getBoundingClientRect();return{top:r.top,bottom:r.bottom,frameTop:body.top,frameBottom:body.bottom};});
-        assert.ok(accessible.top>=accessible.frameTop-1&&accessible.bottom<=accessible.frameBottom+1,JSON.stringify({selector,...accessible}));
+      const expanded=await geometry();assert.equal(expanded.width,390);assert.ok(expanded.height>collapsed.height&&expanded.height>510,JSON.stringify({collapsed,expanded}));assert.equal(expanded.height,expanded.containerHeight);assert.equal(expanded.rootScrollbar,'none');assert.equal(expanded.bodyScrollbar,'none');states.push({state:'expanded',...expanded});
+      for(const selector of['#explain-effort-trigger','#api-key','#cancel-key','#save-btn','#ui-theme-trigger']){
+        const r=await popup.locator(selector).boundingBox();assert.ok(r.y>=0&&r.y+r.height<=expanded.height,JSON.stringify({selector,r,expanded}));
       }
+      await settingsShot('expanded.png');
+      await popup.setViewportSize({width:390,height:420});
+      await popup.evaluate(()=>window.scrollTo(0,0));await popup.mouse.move(375,350);await popup.mouse.wheel(0,1000);
+      await popup.waitForFunction(()=>scrollY>0);
+      for(const selector of['#explain-effort-trigger','#api-key','#cancel-key','#save-btn','#ui-theme-trigger']){
+        await popup.locator(selector).scrollIntoViewIfNeeded();
+        const r=await popup.locator(selector).boundingBox();assert.ok(r.y>=0&&r.y+r.height<=420,JSON.stringify({selector,r}));
+      }
+      assert.ok((await geometry()).scrollY>0,'受限视口保留页面滚动');
+      await popup.evaluate(()=>window.scrollTo(0,0));await popup.locator('#save-btn').focus();
+      const focused=await popup.locator('#save-btn').boundingBox();assert.ok(focused.y>=0&&focused.y+focused.height<=421,JSON.stringify(focused));
       await popup.locator('#cancel-key').click();await popup.locator('#explain-thinking').setChecked(thinking);
-      await popup.evaluate(()=>document.body.scrollTop=0);states.push({state:'restored',...await geometry()});
-      await settingsShot('popup-height-510.png');
+      await popup.setViewportSize({width:390,height:1200});await popup.evaluate(()=>window.scrollTo(0,0));
+      await popup.locator('#explain-thinking').uncheck();
+      assert.equal((await geometry()).height,collapsed.height);
+      await popup.locator('#tab-translate').click();const translate=await geometry();assert.equal(translate.height,translate.containerHeight);states.push({state:'translate',...translate});
+      await settingsShot('translate.png');await popup.locator('#tab-explain').click();
+      await popup.locator('#explain-thinking').setChecked(thinking);states.push({state:'restored',...await geometry()});
+      await settingsShot('settings.png');
     }finally{
+      await popup.locator('#tab-explain').click();
       if(await popup.locator('#cancel-key').isVisible())await popup.locator('#cancel-key').click();
       await popup.locator('#explain-thinking').setChecked(thinking);
+      await popup.setViewportSize({width:390,height:600});
     }
-    return{states,boundary:'Actual Edge extension DOM scroll frame; native toolbar popup requires manual reload acceptance'};
+    return{states,boundary:'Actual Edge extension document with tall and constrained viewports; native toolbar popup shell unverified'};
   });
   await check('切主题不保存模型/语言/Key 草稿，保存设置不回退主题',async()=>{
     await popup.locator('#explain-language').selectOption('en');await popup.locator('#rewrite-key').click();await popup.locator('#api-key').fill('unsaved-synthetic-draft');
@@ -159,14 +202,20 @@ try{
     assert.equal(await popup.locator('#ui-theme').inputValue(),'playful');assert.equal(await popup.locator('body').getAttribute('data-lc-theme'),'playful');
     await popup.evaluate(()=>{chrome.storage.local.set=qaThemeStorageSet;delete globalThis.qaThemeStorageSet;});
   });
-  await check('损坏或已删除的主题值回退钴蓝，现有网页同步',async()=>{
+  await check('损坏或已删除的主题值回退词典纸页，现有网页同步',async()=>{
     await worker.evaluate(()=>chrome.storage.local.set({uiTheme:'unknown-theme'}));await popup.waitForFunction(()=>document.body.dataset.lcTheme==='cobalt');
     await page.waitForFunction(()=>document.querySelector('#deepseek-explain-tooltip').dataset.lcTheme==='cobalt');
     await worker.evaluate(()=>chrome.storage.local.remove('uiTheme'));await popup.reload();await popup.waitForFunction(()=>document.querySelector('#ui-theme').value==='cobalt');
   });
   await check('键盘切换两用途、隐藏面板不可聚焦，主题控件键盘可用',async()=>{
     await popup.locator('#tab-explain').focus();await popup.keyboard.press('ArrowRight');assert.equal(await popup.locator('#tab-translate').getAttribute('aria-selected'),'true');assert.equal(await popup.locator('#panel-explain').isVisible(),false);
+    assert.equal(await popup.locator('#trigger-mode').isVisible(),true);
+    assert.equal(await popup.locator('#trigger-mode').evaluate(el=>el.closest('.tab-panel').id),'panel-translate');
+    await popup.locator('#trigger-mode').selectOption('contextMenu');
+    await popup.locator('#tab-translate').focus();
     await popup.keyboard.press('Home');assert.equal(await popup.locator('#tab-explain').getAttribute('aria-selected'),'true');await popup.locator('#ui-theme').focus();
+    assert.equal(await popup.locator('#trigger-mode').inputValue(),'contextMenu');
+    assert.equal(await popup.locator('#trigger-mode').evaluate(el=>el.closest('.tab-panel').id),'panel-explain');
     assert.equal(await popup.evaluate(()=>document.activeElement.id),'ui-theme');
   });
   await check('320px 设置页与375px结果/工具栏无横向溢出，网页本身样式不变',async()=>{
@@ -176,9 +225,9 @@ try{
     const pageColors=await page.evaluate(()=>({bg:getComputedStyle(document.body).backgroundColor,font:getComputedStyle(document.body).fontFamily}));assert.equal(pageColors.bg,'rgb(255, 255, 255)');assert.equal(pageColors.font,'Arial');
     await popup.setViewportSize({width:390,height:600});
   });
-  await check('本地品牌PNG尺寸与清单一致、界面/工具栏使用同一引号图标',async()=>{
+  await check('设置题签与本地品牌资源有效，PNG尺寸和清单一致',async()=>{
     for(const size of[16,32,48,128]){const data=readFileSync(resolve(root,`icons/icon${size}.png`));assert.equal(data.readUInt32BE(16),size);assert.equal(data.readUInt32BE(20),size);}
-    const brand=await popup.locator('.lc-brand-icon').evaluate(el=>getComputedStyle(el).backgroundImage);assert.ok(brand.includes('/icons/brand.svg'));
+    assert.equal(await popup.locator('.title').textContent(),'说文');
     const contentBrand=await page.locator('#deepseek-explain-tooltip .lc-brand-icon').evaluate(el=>getComputedStyle(el).backgroundImage);assert.ok(contentBrand.startsWith('url("chrome-extension://'));
     assert.equal(await page.evaluate(url=>new Promise(resolve=>{const image=new Image();image.onload=()=>resolve(image.naturalWidth===128);image.onerror=()=>resolve(false);image.src=url;}),contentBrand.slice(5,-2)),true);
     assert.equal(await page.locator('.lc-brand-icon').count(),2);return{sizes:[16,32,48,128]};
@@ -193,6 +242,6 @@ try{
   });
 }catch(error){console.error(error);process.exitCode=1;}
 finally{
-  writeFileSync(resolve(output,'report.json'),JSON.stringify({date:'2026-10-13 Asia/Shanghai',head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),browserVersion,profile:relative(root,profile),checks,errors,requests,scope:'Actual Edge extension DOM/storage with localhost synthetic SSE; native toolbar popup and real provider APIs unverified'},null,2)+'\n');
+  writeFileSync(resolve(output,'report.json'),JSON.stringify({date:new Date().toISOString(),head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),browserVersion,profile:relative(root,profile),checks,errors,requests,scope:'Actual Edge extension DOM/storage with localhost synthetic SSE; native toolbar popup and real provider APIs unverified'},null,2)+'\n');
   await context?.close();await new Promise(resolve=>server.close(resolve));
 }

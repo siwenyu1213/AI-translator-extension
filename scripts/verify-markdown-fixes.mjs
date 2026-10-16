@@ -59,6 +59,7 @@ async function op(name, args = null) {
     const [result] = await chrome.scripting.executeScript({ target: { tabId: id }, func: async (name, args) => {
       if (name === 'ready') return typeof AIMarkdown !== 'undefined' && typeof triggerWithStream === 'function';
       if (name === 'render') { AIMarkdown.render(document.querySelector('.ds-body'), args); return true; }
+      if (name === 'anchor') return { saved: tooltipAnchor, original: getSelectionDocCoords(currentSelection.range) };
       if (name === 'fallback') {
         getSelection().removeAllRanges(); lastContextMenuPos = { x: innerWidth - 3 + scrollX, y: innerHeight - 3 + scrollY };
         await triggerWithStream({ text: 'saved word', snapshot: { text: 'saved word', range: null, analysis: AISelection.analyze('saved word'), context: null } }); return true;
@@ -136,16 +137,27 @@ try {
   await check('Original anchor survives selecting result text and scrolling', async () => {
     await fresh({ chunks: [long], delay: 30 }); await select(); await done(); await sleep(120);
     await page.evaluate(() => { const n = document.querySelector('.ds-body p').firstChild, r = document.createRange(); r.setStart(n, 0); r.setEnd(n, 11); getSelection().removeAllRanges(); getSelection().addRange(r); });
-    const before = await rects(); await page.evaluate(() => scrollTo(0, 100)); await sleep(150); const after = await rects();
-    assert.equal(Math.abs(after.top - (before.top - 100)) < 2, !vulnerable); return { before, after };
+    const before = await rects(), beforeAnchor = await op('anchor');
+    await page.evaluate(() => scrollTo(0, 100)); await sleep(150);
+    const after = await rects(), afterAnchor = await op('anchor');
+    // 视口空间改变可合法切换选区右侧/下方；锚点必须仍是原文 Range。
+    if (vulnerable) assert.equal(Math.abs(after.top - (before.top - 100)) < 2, false);
+    else { assert.deepEqual(afterAnchor, beforeAnchor); assert.equal(fits(after), true); }
+    return { before, after, beforeAnchor, afterAnchor };
   });
   const reading = '## Reading\n\n```js\n' + 'identifier'.repeat(100) + '\n```\n\n| First | Second |\n| --- | --- |\n| ' + 'wide'.repeat(80) + ' | Other |\n\n[Reference](https://example.com/docs)';
-  for (const selector of ['pre', '.ds-md-table', 'a[href]']) await check(`Keyboard focus survives stream and final flush: ${selector}`, async () => {
+  for (const selector of ['pre', '.ds-md-table', 'a[href]']) await check(`Keyboard focus survives Markdown replacement: ${selector}`, async () => {
     await fresh({ chunks: [reading, '\n\nPhase two.', '\n\nPhase three.'], delay: 700 }); await select();
+    if (!vulnerable) await done(); // 流式阶段现在只追加 TextNode，完成后才有可聚焦 Markdown。
     const target = page.locator('.ds-body ' + selector); await target.waitFor(); await target.focus();
     const focused = () => target.evaluate(el => el === document.activeElement);
-    assert.equal(await focused(), true); await page.waitForFunction(() => document.querySelector('.ds-body').textContent.includes('Phase two.'));
-    const incremental = await focused(); await done(); const final = await focused();
+    assert.equal(await focused(), true);
+    if (vulnerable) await page.waitForFunction(() => document.querySelector('.ds-body').textContent.includes('Phase two.'));
+    else await op('render', reading + '\n\nPhase two.');
+    const incremental = await focused();
+    if (vulnerable) await done();
+    else await op('render', reading + '\n\nPhase two.\n\nPhase three.');
+    const final = await focused();
     assert.equal(incremental, !vulnerable); assert.equal(final, !vulnerable); return { incremental, final };
   });
   await check('First complete answer starts at top', async () => {
@@ -184,7 +196,7 @@ try {
       await fresh({ chunks: [long], delay: 30, reasoning: '思考说明。'.repeat(300) }); await select(); await done(); await sleep(100);
       const layouts = [];
       for (const viewport of [{ width: 1000, height: 600 }, { width: 320, height: 360 }, { width: 320, height: 240 }]) {
-        await page.setViewportSize(viewport); await sleep(150); const r = await rects(); assert.equal(fits(r), true); layouts.push(r);
+        await page.setViewportSize(viewport); await sleep(150); const r = await rects(); assert.equal(fits(r), true, JSON.stringify({ viewport, rects: r })); layouts.push(r);
       }
       await page.screenshot({ path: resolve(output, 'compact.png') }); return layouts;
     });

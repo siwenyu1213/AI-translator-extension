@@ -8,7 +8,8 @@
   // 注入CSS中的相对URL会落到宿主页面；FontFace与图标使用明确的扩展URL。
   for (const [name, file, weight] of [
     ['LC Syne','syne.ttf','400 800'], ['LC Space','space-grotesk.ttf','300 700'],
-    ['LC Inter','inter.ttf','100 900'], ['LC Cormorant','cormorant-garamond.ttf','300 700']
+    ['LC Inter','inter.ttf','100 900'], ['LC Cormorant','cormorant-garamond.ttf','300 700'],
+    ['LC WenKai','wenkai-screen.woff2','400'], ['LC Allura','allura.ttf','400']
   ]) document.fonts.add(new FontFace(name, `url("${chrome.runtime.getURL('vendor/fonts/' + file)}")`, {weight, display:'swap'}));
   function apply(value) {
     current = normalize(value);

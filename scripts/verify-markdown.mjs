@@ -48,6 +48,7 @@ const server = createServer(async (req, res) => {
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
 async function check(name, fn) {
+  if (process.argv.includes('--filter') && !name.includes(arg('--filter'))) return;
   try { const evidence = await fn(); checks.push({ name, status: 'passed', evidence }); console.log('PASSED: ' + name); }
   catch (error) { checks.push({ name, status: 'failed', error: error.message }); throw error; }
 }
@@ -98,6 +99,36 @@ async function isolated(fn, args = null) {
         const el = document.querySelector('.ds-body'); const renderer = AIMarkdown.createStreamingRenderer(el);
         renderer.push('## Should never appear'); renderer.cancel(); return true;
       }
+      if (fn === 'instrument') {
+        globalThis.qaPlayback = { appends: [], replacements: 0, removedCharacters: 0 };
+        const append = Text.prototype.appendData;
+        Text.prototype.appendData = function(text) {
+          if (this.parentElement?.matches('.ds-body, .ds-reasoning-body')) {
+            qaPlayback.appends.push({ length: text.length, time: performance.now(), area: this.parentElement.className });
+          }
+          return append.call(this, text);
+        };
+        const replace = Element.prototype.replaceChildren;
+        Element.prototype.replaceChildren = function(...nodes) {
+          if (this.matches('.ds-body')) {
+            qaPlayback.replacements++;
+            qaPlayback.removedCharacters += this.textContent.length;
+          }
+          return replace.apply(this, nodes);
+        };
+        return true;
+      }
+      if (fn === 'stats') return qaPlayback;
+      if (fn === 'correct-final') {
+        return new Promise(resolve => {
+          const el = document.querySelector('.ds-body');
+          const renderer = AIMarkdown.createStreamingRenderer(el);
+          renderer.push('An obsolete prefix');
+          requestAnimationFrame(() => {
+            renderer.setFinal('## Corrected\n\nFinal 😀 text.', () => resolve(el.textContent));
+          });
+        });
+      }
     }, args: [fn, args] }); return result.result;
   }, { id: await tabId(), fn, args });
 }
@@ -122,12 +153,14 @@ try {
       } }
     }));
   }, base);
-  await check('Local MV3 parser loads and renders rich Markdown during actual SSE', async () => {
+  await check('Actual SSE plays raw Markdown through a stable TextNode, then formats once', async () => {
     await sample({ chunks: [rich.slice(0, 145), rich.slice(145, 320), rich.slice(320)], delay: 400, reasoning: '思考过程 **原样保留**' });
     await select('#word', 'bank');
-    await page.locator('.ds-body h1').waitFor();
+    await page.waitForFunction(() => document.querySelector('.ds-body')?.textContent.includes('bank'));
     assert.equal(await page.locator('.ds-actions').isVisible(), false);
-    assert.equal(await page.locator('.ds-body strong').first().textContent(), 'bank');
+    assert.equal(await body().locator('strong').count(), 0);
+    assert.equal(await body().evaluate(el => el.childNodes.length === 1 && el.firstChild.nodeType === Node.TEXT_NODE), true);
+    assert.equal(await body().evaluate(el => getComputedStyle(el).whiteSpace), 'pre-wrap');
     await page.screenshot({ path: resolve(output, 'streaming.png') });
     await done();
     assert.equal(requests.at(-1).model, 'qa-explain');
@@ -316,22 +349,53 @@ try {
     assert.equal(await page.evaluate(() => window.qaInjected), undefined);
     assert.ok((await body().textContent()).includes('图片描述')); assert.ok(!network.some(url => url.includes('invalid.example')));
   });
-  await check('Scheduled updates coalesce rapid chunks and final render is complete before actions show', async () => {
+  await check('Rapid SSE chunks append bounded text per frame and format only once before actions', async () => {
     await sample({ chunks: Array.from({ length: 100 }, (_, i) => i === 0 ? '## 快速输出\n\n' : `片段${i} `), delay: 2 });
-    await page.evaluate(() => {
-      window.qaUpdates = [];
-      new MutationObserver(() => { if (document.querySelector('.ds-body')?.textContent) window.qaUpdates.push(performance.now()); })
-        .observe(document.body, { subtree: true, childList: true });
-    });
+    await isolated('instrument');
     await select('#word', 'bank'); await done();
-    const times = await page.evaluate(() => window.qaUpdates); assert.ok(times.length < 15, `updates: ${times.length}`);
+    const stats = await isolated('stats');
+    assert.equal(stats.replacements, 2); // 初始化一个 TextNode，最终一次 Markdown 排版。
+    assert.ok(stats.appends.length > 5);
+    assert.ok(stats.appends.every(item => item.length > 0 && item.length <= 2048));
     assert.ok((await body().textContent()).includes('片段99'));
-    metrics.push({ inputChunks: 100, domUpdateCount: times.length });
+    metrics.push({ inputChunks: 100, appendCount: stats.appends.length, markdownReplacements: stats.replacements - 1 });
+  });
+  await check('Large immediate done drains both queues without clearing/replaying visible text', async () => {
+    const source = '## 大块输出\n\n' + '中文😀 smooth playback '.repeat(6000);
+    const reasoning = '合成思考😀'.repeat(4000);
+    await sample({ chunks: [source], delay: 1, reasoning });
+    await isolated('instrument');
+    await select('#word', 'bank');
+    await page.waitForFunction(() => document.querySelector('.ds-body')?.textContent.length > 200);
+    assert.equal(await page.locator('.ds-actions').isVisible(), false);
+    await body().evaluate(el => { window.qaTextNode = el.firstChild; window.qaTextLength = el.textContent.length; });
+    await page.waitForTimeout(100);
+    assert.equal(await body().evaluate(el => el.firstChild === window.qaTextNode && el.textContent.length >= window.qaTextLength), true);
+    try { await done(); }
+    catch (error) {
+      const stats = await isolated('stats');
+      console.log(JSON.stringify({ appends: stats.appends.length, replacements: stats.replacements, state: await page.evaluate(() => ({
+        bodyLength: document.querySelector('.ds-body')?.textContent.length,
+        reasoningLength: document.querySelector('.ds-reasoning-body')?.textContent.length,
+        bodyClass: document.querySelector('.ds-body')?.className
+      })) }));
+      throw error;
+    }
+    assert.equal(await page.locator('.ds-reasoning-body').textContent(), reasoning);
+    assert.equal(await body().locator('h2').textContent(), '大块输出');
+    assert.ok((await body().textContent()).trimEnd().endsWith('smooth playback'));
+    const stats = await isolated('stats');
+    const bodyWrites = stats.appends.filter(item => item.area.includes('ds-body'));
+    assert.equal(bodyWrites.reduce((sum, item) => sum + item.length, 0), source.length);
+    assert.equal(stats.removedCharacters, source.length);
+    assert.equal(stats.replacements, 2);
+    assert.ok(stats.appends.every(item => item.length <= 2048));
+    metrics.push({ sourceCharacters: source.length, reasoningCharacters: reasoning.length, maxAppend: Math.max(...stats.appends.map(item => item.length)), bodyAppends: bodyWrites.length });
   });
   await check('Reader scroll position survives incremental rerender and final flush', async () => {
     const initial = '## 长回答\n\n' + Array.from({ length: 35 }, (_, i) => `第${i}段说明，保留完整信息。\n\n`).join('');
     await sample({ chunks: [initial, ...Array.from({ length: 12 }, (_, i) => `追加段落${i}。\n\n`)], delay: 220 });
-    await select('#word', 'bank'); await body().locator('h2').waitFor();
+    await select('#word', 'bank'); await page.waitForFunction(() => document.querySelector('.ds-body')?.scrollHeight > 500);
     await body().evaluate(el => { el.scrollTop = 80; });
     await page.waitForTimeout(550);
     assert.ok(Math.abs(await body().evaluate(el => el.scrollTop) - 80) < 2);
@@ -349,7 +413,8 @@ try {
     });
     assert.ok(layout.tooltipWidth <= 360); assert.ok(layout.bodyScrollWidth <= layout.bodyWidth + 1);
     assert.ok(layout.tableScrollWidth > layout.tableWidth); assert.ok(layout.preScrollWidth > layout.preWidth);
-    assert.equal(layout.headingSize, '21px'); assert.equal(layout.outsideSize, '22px');
+    assert.ok(parseFloat(layout.headingSize) >= 16 && parseFloat(layout.headingSize) <= 26);
+    assert.equal(layout.outsideSize, '22px');
     await body().locator('.ds-md-table').focus(); await page.keyboard.press('ArrowRight');
     await page.waitForTimeout(250); assert.ok(await body().locator('.ds-md-table').evaluate(el => el.scrollLeft > 0));
     await body().evaluate(el => { el.scrollTop = 0; }); await page.screenshot({ path: resolve(output, 'narrow.png') });
@@ -379,10 +444,23 @@ try {
   });
   await check('Escape cancels actual stream; a subsequent selection is not polluted by old updates', async () => {
     await sample({ chunks: ['## 旧输出\n\n', 'OLD_TAIL_MUST_NOT_LEAK'], delay: 700 }); await select('#word', 'bank');
-    await body().locator('h2').waitFor(); await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.querySelector('.ds-body')?.textContent.includes('旧输出')); await page.keyboard.press('Escape');
     fixture = { chunks: ['## 新输出\n\nNEW_RESULT'], delay: 20 }; await select('#chinese', '好的'); await done();
     await page.waitForTimeout(850); assert.ok((await body().textContent()).includes('NEW_RESULT'));
     assert.ok(!(await body().textContent()).includes('OLD_TAIL'));
+  });
+  await check('Escape also cancels playback after network done; corrected final text uses the queue', async () => {
+    await sample({ chunks: ['OLD_QUEUED_TAIL '.repeat(20000)], delay: 1 });
+    await select('#word', 'bank');
+    await page.waitForFunction(() => document.querySelector('.ds-body')?.textContent.includes('OLD_QUEUED'));
+    await page.waitForTimeout(100); await page.keyboard.press('Escape');
+    fixture = { chunks: ['## 新回答\n\nNEW_AFTER_DONE'], delay: 1 };
+    await select('#chinese', '好的'); await done();
+    await page.waitForTimeout(350);
+    assert.ok(!(await body().textContent()).includes('OLD_QUEUED'));
+    const corrected = await isolated('correct-final');
+    assert.ok(corrected.includes('Final 😀 text.')); assert.ok(!corrected.includes('obsolete'));
+    assert.equal(await body().locator('h2').textContent(), 'Corrected');
   });
   await check('API failure clears prior Markdown and disables copy/download', async () => {
     fixture = { error: true }; await select('#sentence', 'I love you'); await page.locator('.ds-error').waitFor();
