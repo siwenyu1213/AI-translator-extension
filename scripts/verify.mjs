@@ -57,6 +57,22 @@ check('Manifest JSON and MV3 entry fields', () => {
   assert(Array.isArray(manifest.content_scripts) && manifest.content_scripts.length > 0, 'Missing content_scripts');
 });
 if (manifest) {
+  if (manifest.default_locale) check('Localized manifest messages and store locales', () => {
+    const locales = readdirSync(resolve(root, '_locales'), { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => entry.name);
+    assert(locales.includes(manifest.default_locale), 'Default locale has no message catalog');
+    const fields = [manifest.name, manifest.description, manifest.action?.default_title].filter(Boolean);
+    assert(/^__MSG_.+__$/.test(manifest.name) && /^__MSG_.+__$/.test(manifest.description), 'Store name and description must reference localized messages');
+    for (const locale of locales) {
+      const messages = JSON.parse(readFileSync(resolve(root, '_locales', locale, 'messages.json'), 'utf8'));
+      const localized = fields.map(field => field.replace(/__MSG_(\w+)__/g, (_, key) => {
+        const entry = Object.entries(messages).find(([name]) => name.toLowerCase() === key.toLowerCase())?.[1];
+        assert(typeof entry?.message === 'string' && entry.message.trim(), `Missing ${key} in ${locale}`);
+        return entry.message;
+      }));
+      assert(localized[0].length <= 75, `Extension name exceeds 75 characters in ${locale}`);
+      assert(localized[1].length <= 132, `Extension description exceeds 132 characters in ${locale}`);
+    }
+  });
   const paths = [manifest.background?.service_worker, manifest.action?.default_popup,
     ...(manifest.content_scripts || []).flatMap(script => [...(script.js || []), ...(script.css || [])]),
     ...Object.values(manifest.icons || {}), ...Object.values(manifest.action?.default_icon || {})];

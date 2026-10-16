@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "说文 · LingoClarify"
+  },
+  "extensionDescription": {
+    "message": "Translate selected text and web pages, explain words in context, and save notes. Bring your own API key."
+  }
+}

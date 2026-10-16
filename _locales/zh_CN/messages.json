@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "说文 · LingoClarify"
+  },
+  "extensionDescription": {
+    "message": "说文（LingoClarify）：自动或右键划词翻译与语境解释、全文翻译、可拖动的 Markdown 结果浮层。自备 API Key，支持独立解释/翻译配置、DeepSeek 思考控制与自定义兼容接口。"
+  }
+}

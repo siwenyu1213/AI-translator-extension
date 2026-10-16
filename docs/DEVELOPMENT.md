@@ -11,6 +11,7 @@
 | 路径 | 用途 |
 | --- | --- |
 | 根目录、`vendor/` | 运行源码、本地依赖与许可证 |
+| `_locales/zh_CN/`、`_locales/en/` | 商店名称/简介的语言资源，默认简体中文；不代表设置界面已英文翻译 |
 | `scripts/` | 可复用验证工具 |
 | `docs/DEVELOPMENT.md` | 公开开发说明与必要验收摘要 |
 | `docs/materials/` | 有来源说明的公开、合成材料 |
@@ -137,7 +138,15 @@ git diff --cached
 
 GitHub同步必须核对远程提交和默认分支内容，不能把本地commit或模拟通过当作上传成功。
 
-## 2026-10-16 Edge商店提交包
+## 2026-10-16 商店中文语言资源补齐
+
+基线 `codex/ui-reading-redesign@b8182ec`，起始工作区干净，fetch后领先上游1个提交且无落后。manifest的name、description和action.default_title改用消息引用，default_locale为zh_CN；新增 `_locales/zh_CN/messages.json` 与 `_locales/en/messages.json`，保留中英文商店元数据，界面文案沿用中文。verify.mjs增加语言目录、默认语言、消息引用与名称/简介长度检查。README与本手册同步目录说明，Description仅本地维护。
+
+沿用草稿版本1.0.0和原包文件名 `LingoClarify-Edge-v1.0.0-20261016-212308.zip`。新ZIP为41个文件（原39个运行/第三方文件加两份messages.json），manifest位于根目录；除manifest外的原运行资源逐一与旧包清单SHA-256核对一致。新包SHA-256为 `b9a9a26e60170da6d19469bac14a5d265aa6647a2ffb63cbc9ebf5ae74fd4bbb`，验证完成后复制至桌面并更新artifacts/releases同名包。旧包备份在 `artifacts/releases/backups/store-locales-20261016/`，SHA-256仍为 `48afd28141b0f03d55d65331fcb4bc075bff1b47e5bbf0a5e7f367a0f7b11ff7`。ZIP不含开发文档、验证工具、私有文件或浏览器配置。
+
+Node24.18.1、Edge155.0.4283.45：根目录56项静态、成品解压40项静态和git diff --check通过；隔离Edge分别以zh-CN/en-US实际加载成品，i18n与getManifest解析出对应简介，默认语言zh_CN、action标题正常，设置页v1.0.0且无pageerror。证据：`artifacts/qa/store-locales-20261016/package.json`、`browser.json`、`extracted-static.json`、中英文设置截图及桌面复制哈希记录。本轮未请求真实模型API、未上传Partner Center，也未验证后台语言识别结果；上传后应在Store listings复核简体中文条目。仅本地提交，不推送GitHub。
+
+## 2026-10-16 Edge商店提交包（首次打包，语言资源由上节补齐）
 
 从干净的 `codex/ui-reading-redesign@090150f` 打包当前1.0.0运行文件，未修改运行源码或版本。产物为 `artifacts/releases/LingoClarify-Edge-v1.0.0-20261016-212308.zip`，39个文件、13,947,400字节；manifest.json直接位于ZIP根目录，保留根目录JS/HTML/CSS、图标、第三方脚本、本地字体、许可证与第三方来源说明。开发文档、验证工具、Git历史、Description.md、私有材料、浏览器配置、日志和source map不进入提交包。
 
