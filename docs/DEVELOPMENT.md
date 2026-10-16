@@ -49,6 +49,10 @@ GitHub入口为 `https://github.com/siwenyu1213/LingoClarify`。本地目录与�
 
 划词本地分类选择单项任务，以统一system要求和JSON材料发送一次生成。外语完整句段用翻译连接，其余解释用解释连接；“解释此句”使用解读任务。所在句及必要材料有预算，回答仍为Markdown正文。全文纯译文和批量ID协议独立。
 
+划词输出链路为 `reader.read()` → TextDecoder/SSE → 同一次读取中相邻同类delta合并 → 最多2048字符的端口消息 → `markdown.js` 共用播放队列 → rAF/`TextNode.appendData`。后台不使用固定时间批量等待，缓存命中也立即分片交给前台播放；思考与正文交替时保留消息顺序。此消息合并同样覆盖全文单条请求，批量仍仅在done返回结构化items。
+
+正文和思考各自每帧最多2048个UTF-16字符，按 `ceil(pending.length / 12)` 自适应追赶，帧边界尽量保留emoji代理对。当前TextNode达到8192字符后接续新节点，避免巨型节点持续重排；旧节点不重写。流式阶段使用pre-wrap显示Markdown原文，完成后保留已显示前缀、只播放剩余队列；最终文本变更已显示前缀时才重置并重新排队。正文播放完成后由Marked/DOMPurify安全排版一次，不按token或定时器反复解析全文；该最终排版仍为一次完整解析/DOM替换，不受流式2048字符上限约束。两队列都空闲后才解除加载态、显示操作按钮。关闭、重新划词或失败取消队列和完成回调，收到done后仍可取消。复制/TXT继续保留完整Markdown原文，不使用cleanMarkdown剥除语义。
+
 设置在 `chrome.storage.local`。Key与账号模型缓存位于 `providerConnections`；`AIConfig.connectionFor`选择实际连接。custom缺地址在请求前停止，改地址清除关联型号与缓存。迁移字段属于兼容实现。
 
 DeepSeek官方hostname精确匹配后，分别读取 `explainDeepSeekThinkingEnabled` / `translateDeepSeekThinkingEnabled`，显式发送 `thinking.enabled/disabled`。默认关闭；关闭时归一化该用途的深度思考为false、不发送 `reasoning_effort`。打开总开关后，原 `*ThinkingEnabled` 控制是否发送强度。两层开关均纳入请求缓存与配置失效判断；第三方网关不凭模型名套用。
@@ -132,6 +136,24 @@ git diff --cached
 ```
 
 GitHub同步必须核对远程提交和默认分支内容，不能把本地commit或模拟通过当作上传成功。
+
+## 2026-10-16 当前界面与帧播放更新上传验收
+
+用户授权上传当前项目更新。基线为 `codex/ui-reading-redesign@3646c52`，开始时有9个未暂存文件；fetch后确认当前历史包含origin/main，没有远程同名分支。复用当前分支，将既有界面、字体、全文工具栏历史与工作区中的帧播放更新一起保存和推送，不改main或发布版本，版本仍为4.6.0。已核对仓库push权限、目标分支不存在及规则列表为空；Description、私有材料、生成报告不进入提交。
+
+组合回归发现新增字标与大词条在320×240视口中占用的固定高度增加，词条不收缩使操作按钮越过浮层底边。content.css允许词条区参与flex收缩，沿用内部滚动和现有字号；verify-markdown-fixes失败断言补充实际尺寸。隔离Edge的定向复现与修复后完整25项交互、18项定位/拖动均通过，已查看极矮窗口截图确认复制/下载可见。
+
+北京时间2026-10-16，Node24.18.1、Git2.55.0.windows.3、Edge155.0.4283.45及已有Playwright1.62.1：55项静态、50项后台离线模拟、26项Markdown/流式、25项交互、18项定位/拖动、19项主题、7项菜单/字体、11项全文工具栏、9项设置开关通过，git diff --check通过。浏览器检查使用独立profile、合成页面/Key和本机SSE，覆盖实际扩展消息与后台端口；不是有效供应商凭据验收。快照与上传核验记录留在 `artifacts/qa/github-push-2026-10-16/`，包含各套报告、compact.png及最终本地/远程SHA。未验证真实供应商生成/延迟、原生工具栏弹出窗口与系统右键鼠标操作。更新后在edge://extensions重新加载扩展并刷新网页，沿用已有厂家、Key和模型设置。
+
+## 2026-10-16 浮层帧播放验收
+
+北京时间2026-10-16，基线 `d680413`，起始为干净的 `codex/tooltip-header-cleanup`，fetch后比上游领先5个提交、无落后。范围：`background.js`、`markdown.js`、`content.js`、`content.css`、`scripts/verify-api.mjs`、`scripts/verify-markdown.mjs`、`scripts/verify-markdown-fixes.mjs`、README和本手册；Description同步但忽略、不提交。后台自然读取合并、缓存立即分片，正文/思考共用帧队列；正常done不重播，队列结束后一次Markdown排版并显示操作。保持4.6.0，不发布或推送。
+
+Node v24.18.1、Edge 155.0.4283.45、已有Playwright 1.62.1，在隔离profile中加载根目录解压扩展，使用合成网页、Key和本机SSE，经真实后台端口验证。26项Markdown/流式检查、25项交互回归、17项定位/拖动检查通过；覆盖分割Markdown、安全链接/图片、复制/TXT、缓存、再次解释、故障和重试、阅读位置/键盘焦点/隐藏、拖动和视口约束。126009字符单次正文和24000字符思考测试确认完整尾部、每次append最多2048字符、正文累计append恰等于原文长度、没有清空重播、两队列结束才显示按钮；done后关闭再划词没有旧文本泄漏。超长单节点实验曾超过20秒等待上限，改为接续约8K TextNode后该验收通过；这不是供应商耗时或稳定60fps的基准。流式Markdown原文与最终排版截图已视觉复核。
+
+后台50项离线模拟检查通过，新增同次读取合并/交替类型顺序、下一次read前已转发、跨UTF-8/JSON与无换行EOF；静态50项、diff空白检查通过。可复查证据快照在 `artifacts/qa/smooth-streaming/`，包括 `markdown.json`、`interaction.json`、`position.json`、`api-simulation.json`、`static-check.json`、流式/完成截图；详细本地记录 `.local/materials/smooth-streaming-2026-10-16.md`。浏览器与本机服务已关闭，独立profile保留。未验证真实DeepSeek或其他供应商生成、首字/总体耗时、原生工具栏及系统右键菜单鼠标操作；最终一次Markdown解析/DOM替换仍不分帧，不属于2048流式上限。
+
+并行工作保护：过程中另一任务把共享目录切到 `codex/ui-reading-redesign`，并修改popup/主题及相应工具。本任务没有暂存或提交它们，也不切换共享目录分支；用独立临时Git索引，仅将上述范围保存为 `codex/smooth-tooltip-streaming` 的本地提交，父提交为本轮基线。根目录仍保留本任务源码变更供重新加载使用。仓库工作区因此并非干净，不能将其他修改视为本任务成果。
 
 ## 2026-10-16 全文进度栏隐藏/打开验收
 

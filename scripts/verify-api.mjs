@@ -425,6 +425,38 @@ await check('长内容与思考输出分成最多 2048 字符消息，完整文�
   assert.equal(messages.filter(m=>m.type==='reasoning-token').map(m=>m.token).join(''),reasoning);
   assert.ok(messages.filter(m=>m.token).every(m=>m.token.length<=2048));assert.equal(messages.at(-1).type,'done');
 });
+await check('同一次 reader.read 合并相邻同类事件，保留思考/正文顺序（模拟）', async () => {
+  await config();
+  const eventLine = delta => `data: ${JSON.stringify({ choices: [{ delta }] })}\r\n\r\n`;
+  const data = eventLine({ reasoning_content: '思考一' }) + eventLine({ reasoning_content: '思考二' }) +
+    eventLine({ content: '正文一' }) + eventLine({ content: '正文二' }) +
+    eventLine({ reasoning_content: '补充思考' }) + eventLine({ content: '尾部' }) + 'data: [DONE]\n\n';
+  const messages = await stream(data);
+  assert.deepEqual(messages.filter(m => m.token).map(m => [m.type, m.token]), [
+    ['reasoning-token', '思考一思考二'], ['token', '正文一正文二'],
+    ['reasoning-token', '补充思考'], ['token', '尾部']
+  ]);
+});
+await check('网络读取即转发、跨 UTF-8/JSON 边界与 EOF 无换行尾事件完整（模拟）', async () => {
+  await config();
+  const messages = [], encoder = new TextEncoder();
+  const prefix = encoder.encode('data: {"choices":[{"delta":{"content":"你');
+  const suffix = encoder.encode('好😀"}}]}\r\n\r\n');
+  let reads = 0;
+  const parts = [prefix.slice(0, -1), prefix.slice(-1), suffix,
+    encoder.encode('data: {"choices":[{"delta":{"content":"尾"},"finish_reason":"stop"}]}')];
+  responder = () => ({ ok: true, status: 200, body: { getReader() { return {
+    async read() {
+      // 开始下一次读取之前，上一次读出的完整事件已经发给 content。
+      if (reads === 3) assert.equal(messages.filter(m => m.type === 'token').map(m => m.token).join(''), '你好😀');
+      return reads < parts.length ? { done: false, value: parts[reads++] } : { done: true };
+    }, async cancel() {}
+  }; } } });
+  context.testPort = { onDisconnect: event(), postMessage(msg) { messages.push(msg); }, disconnect() {} };
+  await run("handleStreamRequest(testPort,{mode:'C',text:'网络读取边界'})");
+  assert.equal(messages.filter(m => m.type === 'token').map(m => m.token).join(''), '你好😀尾');
+  assert.equal(messages.at(-1).type, 'done');
+});
 await check('生成短暂 503 退避后恢复；退避期间取消立即停止，不继续请求（模拟）',async()=>{
   await config();let attempts=0;
   responder=()=>++attempts===1 ? new Response('{}',{status:503}) : new Response(sse);

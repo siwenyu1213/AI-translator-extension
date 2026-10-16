@@ -133,6 +133,8 @@
   word-break: normal;
   line-height: 1.75;
 }
+
+#deepseek-explain-tooltip .ds-markdown.ds-text-playback { white-space: pre-wrap; overflow-anchor: none; }
 #deepseek-explain-tooltip .ds-markdown * { box-sizing: border-box; }
 #deepseek-explain-tooltip .ds-markdown p { margin: 0 0 10px; font: inherit; color: inherit; }
 #deepseek-explain-tooltip .ds-markdown :is(h1,h2,h3,h4,h5,h6) {
@@ -361,7 +363,7 @@
 
 /* 卡片整体受视口约束，正文与思考可收缩，操作按钮保持可见。 */
 #deepseek-explain-tooltip :is(.ds-header,.ds-actions,.ds-footer,.ds-quote) { flex-shrink: 0; }
-#deepseek-explain-tooltip .ds-quote { max-height: min(72px, 12vh); overflow-y: auto; }
+#deepseek-explain-tooltip .ds-quote { max-height: min(72px, 12vh); overflow-y: auto; flex-shrink: 1; }
 #deepseek-explain-tooltip .ds-reasoning { min-height: 0; flex: 0 1 auto; overflow-y: auto; }
 #deepseek-explain-tooltip :is(.ds-close,.ds-btn):focus-visible {
   outline: 2px solid #2563eb; outline-offset: 2px;

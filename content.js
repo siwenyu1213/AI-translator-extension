@@ -265,49 +265,12 @@ function showStreamFailure(el, error) {
   el.querySelector('.ds-model-tag').textContent = '';
 }
 
-// 真流式文本渲染器：网络 chunk 先进入播放队列，再每帧定量追加。
-// 这样既不会“一口气全显示”，也不会把超长文本一次性塞进 DOM 造成卡死/闪退。
-const MAX_CHARS_PER_FRAME = 2048;
-
-function createStreamingTextRenderer(container) {
-  const textNode = document.createTextNode('');
-  container.textContent = '';
-  container.appendChild(textNode);
-
-  let pending = '';
-  let rafId = 0;
-
-  const schedule = () => {
-    if (!rafId && pending) rafId = requestAnimationFrame(step);
-  };
-
-  function step() {
-    rafId = 0;
-    if (!pending) {
-      return;
-    }
-
-    // 自适应追赶：小段慢慢吐，大段拆成多帧，但单帧最多 2048 字符
-    const adaptive = Math.max(1, Math.ceil(pending.length / 12));
-    const take = Math.min(pending.length, MAX_CHARS_PER_FRAME, adaptive);
-    textNode.appendData(pending.slice(0, take));
-    pending = pending.slice(take);
-
-    if (pending) schedule();
-  }
-
-  return {
-    push(chunk) {
-      if (!chunk) return;
-      pending += chunk;
-      schedule();
-    },
-    cancel() {
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = 0;
-      pending = '';
-    }
-  };
+// 正文和思考共用帧播放内核；网络完成后，两条队列都播完再开放操作。
+function finishStreaming(bodyRenderer, reasoningRenderer, text, onComplete) {
+  let remaining = 2;
+  const ready = () => { if (--remaining === 0) onComplete(); };
+  bodyRenderer.setFinal(text, ready);
+  reasoningRenderer.onIdle(ready);
 }
 
 // ═══════════════════════════════════════════
@@ -355,7 +318,7 @@ async function triggerWithStream({ text, mode, popupTitle, snapshot }) {
   el.querySelector('.ds-model-tag').textContent = '';
 
   const bodyRenderer = AIMarkdown.createStreamingRenderer(bodyEl);
-  const reasoningRenderer = createStreamingTextRenderer(reasoningBodyEl);
+  const reasoningRenderer = AIMarkdown.createStreamingTextRenderer(reasoningBodyEl);
   currentRenderers = [bodyRenderer, reasoningRenderer];
   let buffer = '';
   let hasReasoning = false;
@@ -388,16 +351,16 @@ async function triggerWithStream({ text, mode, popupTitle, snapshot }) {
       buffer += msg.token;
       bodyRenderer.push(msg.token);
     } else if (msg.type === 'done') {
-      isLoading = false;
-      currentExplanation = buffer;
-      bodyRenderer.setFinal(buffer);
-      bodyEl.classList.remove('ds-streaming');
-      el.querySelector('.ds-actions').style.display = 'flex';
-      el.querySelector('.ds-model-tag').textContent = msg.model || '';
-      // 🆕 模式 B：翻译完成后显示“解释此句”按钮
-      updateExtraActions(mode);
       currentStreamPort = null;
       try { port.disconnect(); } catch {}
+      finishStreaming(bodyRenderer, reasoningRenderer, buffer, () => {
+        isLoading = false;
+        currentExplanation = buffer;
+        bodyEl.classList.remove('ds-streaming');
+        el.querySelector('.ds-actions').style.display = 'flex';
+        el.querySelector('.ds-model-tag').textContent = msg.model || '';
+        updateExtraActions(mode);
+      });
     } else if (msg.type === 'error') {
       showStreamFailure(el, msg.error);
     }
@@ -579,7 +542,7 @@ async function handleExplainThis(e) {
   reasoningEl.style.display = 'none';
   reasoningTitleEl.textContent = '思考中…';
   const bodyRenderer = AIMarkdown.createStreamingRenderer(bodyEl);
-  const reasoningRenderer = createStreamingTextRenderer(reasoningBodyEl);
+  const reasoningRenderer = AIMarkdown.createStreamingTextRenderer(reasoningBodyEl);
   currentRenderers = [bodyRenderer, reasoningRenderer];
   let buffer = '';
   let hasReasoning = false;
@@ -603,11 +566,14 @@ async function handleExplainThis(e) {
       buffer += msg.token;
       bodyRenderer.push(msg.token);
     } else if (msg.type === 'done') {
-      currentExplanation = buffer;
-      bodyRenderer.setFinal(currentExplanation);
-      el.querySelector('.ds-actions').style.display = 'flex';
-      el.querySelector('.ds-model-tag').textContent = msg.model || '';
-      cleanup();
+      currentStreamPort = null;
+      try { port.disconnect(); } catch {}
+      finishStreaming(bodyRenderer, reasoningRenderer, buffer, () => {
+        currentExplanation = buffer;
+        el.querySelector('.ds-actions').style.display = 'flex';
+        el.querySelector('.ds-model-tag').textContent = msg.model || '';
+        cleanup();
+      });
     } else if (msg.type === 'error') {
       showStreamFailure(el, msg.error);
       cleanup();
