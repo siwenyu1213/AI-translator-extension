@@ -138,11 +138,23 @@ git diff --cached
 
 GitHub同步必须核对远程提交和默认分支内容，不能把本地commit或模拟通过当作上传成功。
 
+## 2026-10-16 隐私政策PR冲突修复
+
+PR #14的隐私政策分支3c4e8ce与main首页更新c0c6f3d同时改动README隐私摘要及本手册相邻记录，产生两处文档冲突。将origin/main合入codex/privacy-policy，保留main新版首页结构、公开截图与来源、首页验收记录，同时保留完整隐私摘要、PRIVACY入口及此前政策记录。相对main的最终差异仅为PRIVACY.md、README.md及本手册；运行源码、权限及1.0.0版本一致，其他分支的本地语言包和界面提交未带入。
+
+Node24.18.1下55项静态检查、文档相对链接及图片引用、冲突标记扫描和git diff --check通过；核对PRIVACY.md与原3c4e8ce内容一致，main的公开材料和截图不变。证据保存在本工作树artifacts/qa/privacy-policy-conflict-2026-10-16/。本轮仅解决文档合并，未重复Edge交互或真实API验收，无需重新加载扩展；推送后核验远程SHA及GitHub PR可合并状态。
+
 ## 2026-10-16 隐私政策与源码核对
 
 源码核对基线 `codex/ui-reading-redesign@b8182ec`，起始工作区干净；其运行源码与已发布的 `090150f` 一致。并行任务在原分支保存商店语言资源本地提交后，本任务以远程任务分支 `090150f` 为起点建立独立 `codex/privacy-policy` 分支，避免上传其他本地成果。新增根目录 [PRIVACY.md](../PRIVACY.md)，并同步 README 隐私摘要与入口；原工作目录的本地 Description 维护记录同步但不提交。逐项核对 manifest、配置迁移、选区采集及提示词、后台请求/缓存、全文任务、设置页模型查询、公开目录刷新、Markdown、复制和下载。政策披露默认自动划词、上下文及标题、全文持续任务、接口 Key 和 OpenRouter 目录请求、本地未额外加密的 Key、内存缓存、网页 DOM 可读性、HTTP 自定义连接和实际删除控制；不宣称完全离线、第三方零留存或已经具备独立同意弹窗。公开联系渠道使用现有 GitHub Issues，不杜撰邮箱。
 
 本轮仅修改公开文档，不改变运行源码、权限或 1.0.0 版本，不重打已有商店 ZIP。已执行55项独立分支静态检查、56项共享工作区静态检查、50项后台API离线模拟、36项提示词检查、文档相对链接检查及git diff --check，均通过。工作期间其他任务新增商店语言资源，未纳入本次提交；以已发布基线建立独立工作树，仅加入本次三份文档进行检查，避免将共享工作区结果等同于本次交付。验证步骤、工具版本、源码条目映射与检查结果保存在 `artifacts/qa/privacy-policy-2026-10-16/`。源码与文档核对及离线模拟不代表实际网络抓包、真实供应商留存审计或商店审核通过；本轮未重复 Edge 交互或使用真实凭据。政策编写参考 [Edge 开发者政策的数据与隐私要求](https://learn.microsoft.com/en-us/legal/microsoft-edge/extensions/developer-policies#15-personal-information)，未将政策文本等同于运行时合规认证。
+
+## 2026-10-16 GitHub首页README更新
+
+用户明确选择更新main仓库首页。fetch确认PR #13已合入main，基线55f781d，运行文件与090150f一致；共享开发分支同时新增独立打包记录，因此使用专用工作树处理本次README，不上传对方提交。README按功能/预览/安装配置/使用/接口/隐私/常见问题/开发组织，加入1.0.0版本和纸本文笺图标、main源码ZIP入口，压缩模块说明；同步公开材料来源，两张截图从实际1.0.0扩展重新生成。扩展运行源码与版本未改。
+
+Node24.18.1、Edge155.0.4283.45和已有Playwright1.62.1，在独立profile中打开实际设置页与合成网页，确认v1.0.0、合成Key编辑区收起、无错误提示、固定字标及Markdown操作按钮后截图，截图已视觉复核；供应商请求只转本机SSE，无真实账号验收。55项静态与git diff --check通过，README及材料说明的相对文件/图片和目录锚点全部核对，GitHub Markdown渲染预览见本轮证据。报告与预览位于本工作树 `artifacts/qa/readme-1.0.0/`，最终main SHA及远程文件核验见 `remote-verification.json`。未重跑无关API/完整交互或原生工具栏弹窗验收。Description只在原工作目录更新，不进入提交。
 
 ## 2026-10-16 版本号统一为1.0.0
 
