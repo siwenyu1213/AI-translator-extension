@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "说文 · LingoClarify",
-  "version": "4.6.0",
+  "version": "1.0.0",
   "description": "说文（LingoClarify）：自动或右键划词翻译与语境解释、全文翻译、可拖动的 Markdown 结果浮层。自备 API Key，支持独立解释/翻译配置、DeepSeek 思考控制与自定义兼容接口。",
   "permissions": ["storage", "downloads", "contextMenus", "scripting"],
   "host_permissions": ["<all_urls>"],

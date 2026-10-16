@@ -1,6 +1,6 @@
 # 说文 · LingoClarify 开发、运行与验收
 
-当前扩展版本 **4.6.0**。用户功能和文件职责见 [README](../README.md)。本手册描述现有入口与验收方法；交接材料和逐次任务QA、审查、环境记录仅本地保存，不随GitHub分发。
+当前扩展版本 **1.0.0**。用户功能和文件职责见 [README](../README.md)。本手册描述现有入口与验收方法；交接材料和逐次任务QA、审查、环境记录仅本地保存，不随GitHub分发。
 
 ## 环境与目录
 
@@ -123,7 +123,7 @@ node scripts/verify-tooltip-position.mjs --playwright '<已安装的 playwright 
 
 生成报告默认仅本机保留。对外截图去除Key、授权头和私有网页，附来源说明；不提交凭据或storage导出。
 
-遵循AGENTS.md：记录工作区和远程，保留已有修改，先审阅diff再按明确文件暂存。使用当前任务分支，授权内正常提交推送；核对保护与rulesets，不强推或绕过。正式发布时同步manifest/popup版本；纯改名和文档整理保持4.6.0。
+遵循AGENTS.md：记录工作区和远程，保留已有修改，先审阅diff再按明确文件暂存。使用当前任务分支，授权内正常提交推送；核对保护与rulesets，不强推或绕过。正式发布时同步manifest/popup版本；纯改名和文档整理不单独调整版本号。
 
 ```powershell
 git status --short --branch
@@ -136,6 +136,12 @@ git diff --cached
 ```
 
 GitHub同步必须核对远程提交和默认分支内容，不能把本地commit或模拟通过当作上传成功。
+
+## 2026-10-16 版本号统一为1.0.0
+
+用户要求将目前版本改为1.0.0。基线 `codex/ui-reading-redesign@c01877f`，工作区干净，fetch后与上游0/0；同步manifest.json、popup.html及README/本手册当前版本说明。仅调整版本标识，既有功能与配置格式沿用，历史验收记录中的旧版本保留为当时事实。Description当前版本及维护记录同步，但继续忽略、不提交。
+
+Node24.18.1、隔离Edge155.0.4283.45及已有Playwright1.62.1实际加载根目录扩展，chrome.runtime.getManifest().version为1.0.0，设置页显示v1.0.0且无页面脚本错误；55项静态检查、git diff --check通过。证据 `artifacts/qa/version-1.0.0/browser.json`、`version.png`、`static-check.json`，最终远程SHA见同目录 `remote-verification.json`。未重复执行API、划词/全文交互或原生工具栏弹出窗口验收。更新后在edge://extensions重新加载扩展并刷新网页。
 
 ## 2026-10-16 图标同步纸本文笺配色
 

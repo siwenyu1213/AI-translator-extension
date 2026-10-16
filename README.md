@@ -6,7 +6,7 @@ AI Translation & Contextual Explanation for the Web
 
 说文是一款使用自备 API Key 的 Manifest V3 浏览器扩展。选中网页上的词语、句子或其他内容，即可在当前页面查看流式回答；也可以翻译整页并随时切回原文。
 
-当前版本：**4.6.0**。源码可直接在 Edge 中加载，无需构建或安装 npm 依赖。
+当前版本：**1.0.0**。源码可直接在 Edge 中加载，无需构建或安装 npm 依赖。
 
 ## 能做什么
 
