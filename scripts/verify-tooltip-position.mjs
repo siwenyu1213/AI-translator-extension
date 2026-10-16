@@ -123,6 +123,9 @@ try {
     assert.equal((await header.textContent()).includes('拖动'), false);
     assert.equal(await header.locator('button').count(), 1);
     assert.equal(await page.locator('.ds-drag-handle').evaluate(el => el.tagName), 'SPAN');
+    assert.equal(await page.locator('.ds-brand').textContent(), '说文 lingoclarify');
+    assert.equal(await page.locator('.ds-brand-cn').evaluate(el => getComputedStyle(el).fontFamily.includes('LC WenKai')), true);
+    assert.equal(await page.locator('.ds-brand-en').evaluate(el => getComputedStyle(el).fontFamily.includes('LC Syne')), true);
     const after = await geometry(); assert.ok(Math.abs(after.tip.left - initial.tip.left) < 2); assert.ok(Math.abs(after.tip.top - initial.tip.top) < 2);
     await header.screenshot({ path: resolve(output, 'header.png') });
     return { headerText: (await header.textContent()).trim(), initial, after };
@@ -170,6 +173,9 @@ try {
         await fresh({ width, height: 850, top: 30, left: 15, textWidth: Math.min(width - 30, 600), multiline: true, text: width === 1000 ? 'serendipity' : '在不经意间发现美好事物，也是一种难得的机缘。'.repeat(3) });
         await page.evaluate(() => document.fonts.ready);
         const g = await geometry(); fits(g);
+        assert.equal(await page.locator('.ds-brand').textContent(), '说文 lingoclarify');
+        const header = await page.locator('.ds-header').evaluate(el => { const brand = el.querySelector('.ds-brand').getBoundingClientRect(), close = el.querySelector('.ds-close').getBoundingClientRect(); return { brandRight: brand.right, closeLeft: close.left }; });
+        assert.ok(header.brandRight <= header.closeLeft, JSON.stringify({ width, header }));
         const type = await page.evaluate(() => {
           const tip = document.querySelector('#deepseek-explain-tooltip'), quote = tip.querySelector('.ds-quote'), body = tip.querySelector('.ds-body'), actions = tip.querySelector('.ds-actions');
           const bounds = el => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };

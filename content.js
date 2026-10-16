@@ -48,6 +48,7 @@ function getTooltip() {
   if (!tooltip) {
     tooltip = document.createElement('div');
     tooltip.id = 'deepseek-explain-tooltip';
+    tooltip.setAttribute('role', 'region');
     LingoTheme.attach(tooltip);
     tooltip.inert = true;
     tooltip.setAttribute('aria-hidden', 'true');
@@ -56,7 +57,7 @@ function getTooltip() {
         <span class="ds-drag-handle">
           <span class="lc-brand-icon" aria-hidden="true"></span>
           <svg aria-hidden="true" width="12" height="16" viewBox="0 0 12 16" fill="currentColor"><circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/><circle cx="3" cy="8" r="1.2"/><circle cx="9" cy="8" r="1.2"/><circle cx="3" cy="13" r="1.2"/><circle cx="9" cy="13" r="1.2"/></svg>
-          <span class="ds-brand">说文 · 解释</span>
+          <span class="ds-brand"><span class="ds-brand-cn">说文</span> <span class="ds-brand-en">lingoclarify</span></span>
         </span>
         <button class="ds-close" title="关闭" aria-label="关闭结果">×</button>
       </div>
@@ -345,7 +346,7 @@ async function triggerWithStream({ text, mode, popupTitle, snapshot }) {
   const reasoningTitleEl = el.querySelector('.ds-reasoning-title');
   const reasoningBodyEl = el.querySelector('.ds-reasoning-body');
 
-  el.querySelector('.ds-brand').textContent = popupTitle;
+  el.setAttribute('aria-label', popupTitle);
   el.querySelector('.ds-quote').textContent = truncate(text, 80);
   bodyEl.classList.add('ds-streaming');
   reasoningEl.style.display = 'none';
@@ -552,7 +553,7 @@ async function handleExplainThis(e) {
 
   // 确保 tooltip 可见
   const el = getTooltip();
-  el.querySelector('.ds-brand').textContent = `说文 · ${modeLabel('D')}`;
+  el.setAttribute('aria-label', `说文 · ${modeLabel('D')}`);
   el.classList.add('ds-visible');
   el.classList.remove('ds-hidden');
   el.style.display = 'flex';
