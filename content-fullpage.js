@@ -4,7 +4,8 @@
   'use strict';
   if (window.__dsFullPageTranslatorActive) {
     const api = window.__dsFullPageTranslator;
-    if (!api?.busy && api?.progress.completed === api?.progress.total) api?.start();
+    if (api?.toolbarHidden) api.showToolbar();
+    else if (!api?.busy && api?.progress.completed === api?.progress.total) api?.start();
     return;
   }
   window.__dsFullPageTranslatorActive = true;
@@ -205,6 +206,15 @@
       else if (task.status === 'done') write(task, task.translated);
     }
   }
+  function setToolbarCollapsed(collapsed, moveFocus = false) {
+    if (!toolbar) return;
+    toolbar.classList.toggle('ds-tb-collapsed', collapsed);
+    toolbar.querySelector('#ds-tb-panel').hidden = collapsed;
+    const reopen = toolbar.querySelector('#ds-tb-reopen');
+    reopen.hidden = !collapsed;
+    reopen.setAttribute('aria-expanded', String(!collapsed));
+    if (moveFocus) (collapsed ? reopen : toolbar.querySelector('#ds-tb-hide')).focus({preventScroll: true});
+  }
   function stop() {
     aborted = true; session++;
     viewportObserver?.disconnect(); mutations?.disconnect();
@@ -227,11 +237,14 @@
       if (!toolbar) {
         toolbar = document.createElement('div'); toolbar.id = 'ds-translate-toolbar';
         LingoTheme.attach(toolbar);
-        toolbar.innerHTML = '<span class="lc-brand-icon" aria-hidden="true"></span><span class="ds-tb-status">翻译中…</span><span class="ds-tb-progress" id="ds-tb-progress">0 / 0</span><button type="button" class="ds-tb-btn" id="ds-tb-show-original">显示原文</button><button type="button" class="ds-tb-btn ds-tb-danger" id="ds-tb-cancel">取消翻译</button>';
+        toolbar.innerHTML = '<div id="ds-tb-panel"><span class="lc-brand-icon" aria-hidden="true"></span><span class="ds-tb-status">翻译中…</span><span class="ds-tb-progress" id="ds-tb-progress">0 / 0</span><button type="button" class="ds-tb-btn" id="ds-tb-show-original">显示原文</button><button type="button" class="ds-tb-btn ds-tb-danger" id="ds-tb-cancel">取消翻译</button><button type="button" class="ds-tb-btn" id="ds-tb-hide" title="隐藏进度栏，翻译继续运行">隐藏</button></div><button type="button" class="ds-tb-btn" id="ds-tb-reopen" aria-controls="ds-tb-panel" aria-expanded="true" hidden>显示翻译进度</button>';
         document.body.prepend(toolbar);
         toolbar.querySelector('#ds-tb-show-original').addEventListener('click', toggleOriginal);
         toolbar.querySelector('#ds-tb-cancel').addEventListener('click', cancel);
+        toolbar.querySelector('#ds-tb-hide').addEventListener('click', () => setToolbarCollapsed(true, true));
+        toolbar.querySelector('#ds-tb-reopen').addEventListener('click', () => setToolbarCollapsed(false, true));
       }
+      setToolbarCollapsed(false);
       toolbar.querySelector('#ds-tb-show-original').textContent = '显示原文';
       viewportObserver = new IntersectionObserver(entries => {
         if (aborted) return;
@@ -272,6 +285,8 @@
     } finally { starting = false; }
   }
   window.__dsFullPageTranslator = {start, cancel, toggleOriginal,
+    showToolbar() { setToolbarCollapsed(false); },
+    get toolbarHidden() { return toolbar?.classList.contains('ds-tb-collapsed') || false; },
     get busy() { return starting || activeRequests > 0 || waiting.length > 0; },
     get progress() { return progress(); }};
   start().catch(console.error);

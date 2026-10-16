@@ -409,3 +409,15 @@
 #ds-translate-toolbar .ds-tb-danger { border-color: var(--lc-error); color: var(--lc-error); }
 #ds-translate-toolbar .ds-tb-danger:hover { background: var(--lc-error-bg); }
 #ds-translate-toolbar .ds-tb-btn:focus-visible { outline: 2px solid var(--lc-accent); outline-offset: 2px; }
+#ds-translate-toolbar #ds-tb-panel { display: contents; }
+#ds-translate-toolbar [hidden] { display: none !important; }
+#ds-translate-toolbar.ds-tb-collapsed {
+  top: 12px;
+  right: 12px;
+  left: auto;
+  max-width: calc(100vw - 24px);
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+}
+#ds-translate-toolbar #ds-tb-reopen { min-height: 44px; justify-content: center; }
