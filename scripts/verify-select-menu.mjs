@@ -95,7 +95,9 @@ try{
       }
     }
     await popup.setViewportSize({width:390,height:600});await popup.locator('#ui-theme').selectOption('cobalt');
-    await popup.locator('#explain-model-trigger').click();await popup.evaluate(()=>document.body.scrollTop+=25);await popup.waitForFunction(()=>!document.querySelector('.lc-select-menu:popover-open'));
+    await popup.setViewportSize({width:390,height:320});await popup.evaluate(()=>window.scrollTo(0,0));
+    await popup.locator('#explain-model-trigger').click();await popup.evaluate(()=>window.scrollBy(0,25));await popup.waitForFunction(()=>!document.querySelector('.lc-select-menu:popover-open'));
+    await popup.setViewportSize({width:390,height:600});
     return bounds;
   });
   await check('结果浮层中文也使用文楷，未改宿主网页字体',async()=>{
@@ -104,7 +106,7 @@ try{
     await page.waitForFunction(()=>document.querySelector('.ds-actions')?.style.display==='flex');await page.evaluate(()=>document.fonts.ready);
     const fonts=await fontsFor(page,'.ds-body p');assert.ok(fonts.some(f=>f.isCustomFont&&/WenKai/i.test(f.familyName)),JSON.stringify(fonts));
     await page.locator('#deepseek-explain-tooltip').screenshot({path:resolve(output,'result.png')});
-    await popup.locator('#tab-explain').click();await popup.evaluate(()=>document.body.scrollTop=0);await popup.locator('body').screenshot({path:resolve(output,'settings.png')});
+    await popup.locator('#tab-explain').click();await popup.evaluate(()=>window.scrollTo(0,0));await popup.locator('body').screenshot({path:resolve(output,'settings.png')});
     return fonts;
   });
   assert.deepEqual(errors,[]);

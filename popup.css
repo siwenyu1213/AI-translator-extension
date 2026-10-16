@@ -1,9 +1,11 @@
-/* 词典式设置页：题签、厂家印记、当前模型及语言/触发行；390×510px内滚动。 */
+/* 词典式设置页：390px首选宽度，高度随内容展开。 */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
-html { width: 390px; overflow-x: hidden; }
-body { width: 390px; max-width: 100vw; max-height: 510px; overflow-y: auto; font: 13px/1.55 var(--lc-body-font); color: var(--lc-ink); background: var(--lc-bg); scrollbar-color: var(--lc-border) var(--lc-bg); }
-.container { display: flex; flex-direction: column; min-height: 510px; padding: 20px 22px 14px; border-left: 6px solid var(--lc-accent); }
+html { width: 390px; overflow-x: hidden; scrollbar-width: none; }
+/* 浏览器限制窗口高度时仍可滚轮/键盘访问底部，仅隐藏主页面滚动条。 */
+html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+body { width: 390px; max-width: 100vw; scrollbar-width: none; font: 13px/1.55 var(--lc-body-font); color: var(--lc-ink); background: var(--lc-bg); }
+.container { display: flex; flex-direction: column; padding: 20px 22px 14px; border-left: 6px solid var(--lc-accent); }
 .brand-header { border-bottom: 2px solid var(--lc-ink); padding-bottom: 12px; }
 .title { font: 400 40px/1.1 var(--lc-title-font); letter-spacing: 6px; }
 .brand-subtitle { margin-top: 4px; font: 13px/1.4 var(--lc-title-font); letter-spacing: .6px; }

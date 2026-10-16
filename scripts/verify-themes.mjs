@@ -149,26 +149,45 @@ try{
     }
     return{layouts,boundary:'Actual Edge tab zoom and synthetic display labels; native toolbar popup sizing not captured'};
   });
-  await check('高度上限510px，思考强度/Key编辑/保存/主题可滚动访问',async()=>{
+  await check('内容决定高度，展开收起/切换用途自适应；无主滚动条且受限视口可访问底部',async()=>{
     const thinking=await popup.locator('#explain-thinking').isChecked(),states=[];
-    const geometry=()=>popup.evaluate(()=>{const body=document.body,r=body.getBoundingClientRect();return{width:r.width,height:r.height,rootHeight:document.documentElement.getBoundingClientRect().height,scrollHeight:body.scrollHeight,overflow:getComputedStyle(body).overflowY};});
+    const geometry=()=>popup.evaluate(()=>{const r=document.body.getBoundingClientRect(),root=document.documentElement;return{width:r.width,height:r.height,containerHeight:document.querySelector('.container').getBoundingClientRect().height,rootScrollbar:getComputedStyle(root).scrollbarWidth,bodyScrollbar:getComputedStyle(document.body).scrollbarWidth,viewport:innerHeight,scrollY};});
     try{
+      await popup.setViewportSize({width:390,height:1200});
+      await popup.locator('#explain-thinking').uncheck();
+      const collapsed=await geometry();states.push({state:'collapsed',...collapsed});
       await popup.locator('#explain-thinking').check();await popup.locator('#explain-effort-section').waitFor({state:'visible'});
       await popup.locator('#rewrite-key').click();
-      const expanded=await geometry();assert.equal(expanded.width,390);assert.ok(expanded.height<=510&&expanded.rootHeight<=510,JSON.stringify(expanded));assert.equal(expanded.overflow,'auto');assert.ok(expanded.scrollHeight>expanded.height,JSON.stringify(expanded));states.push({state:'expanded',...expanded});
-      for(const selector of['#explain-effort','#api-key','#cancel-key','#save-btn','#ui-theme']){
-        await popup.locator(selector).scrollIntoViewIfNeeded();
-        const accessible=await popup.locator(selector).evaluate(el=>{const r=el.getBoundingClientRect(),body=document.body.getBoundingClientRect();return{top:r.top,bottom:r.bottom,frameTop:body.top,frameBottom:body.bottom};});
-        assert.ok(accessible.top>=accessible.frameTop-1&&accessible.bottom<=accessible.frameBottom+1,JSON.stringify({selector,...accessible}));
+      const expanded=await geometry();assert.equal(expanded.width,390);assert.ok(expanded.height>collapsed.height&&expanded.height>510,JSON.stringify({collapsed,expanded}));assert.equal(expanded.height,expanded.containerHeight);assert.equal(expanded.rootScrollbar,'none');assert.equal(expanded.bodyScrollbar,'none');states.push({state:'expanded',...expanded});
+      for(const selector of['#explain-effort-trigger','#api-key','#cancel-key','#save-btn','#ui-theme-trigger']){
+        const r=await popup.locator(selector).boundingBox();assert.ok(r.y>=0&&r.y+r.height<=expanded.height,JSON.stringify({selector,r,expanded}));
       }
+      await settingsShot('expanded.png');
+      await popup.setViewportSize({width:390,height:420});
+      await popup.evaluate(()=>window.scrollTo(0,0));await popup.mouse.move(375,350);await popup.mouse.wheel(0,1000);
+      await popup.waitForFunction(()=>scrollY>0);
+      for(const selector of['#explain-effort-trigger','#api-key','#cancel-key','#save-btn','#ui-theme-trigger']){
+        await popup.locator(selector).scrollIntoViewIfNeeded();
+        const r=await popup.locator(selector).boundingBox();assert.ok(r.y>=0&&r.y+r.height<=420,JSON.stringify({selector,r}));
+      }
+      assert.ok((await geometry()).scrollY>0,'受限视口保留页面滚动');
+      await popup.evaluate(()=>window.scrollTo(0,0));await popup.locator('#save-btn').focus();
+      const focused=await popup.locator('#save-btn').boundingBox();assert.ok(focused.y>=0&&focused.y+focused.height<=421,JSON.stringify(focused));
       await popup.locator('#cancel-key').click();await popup.locator('#explain-thinking').setChecked(thinking);
-      await popup.evaluate(()=>document.body.scrollTop=0);states.push({state:'restored',...await geometry()});
-      await settingsShot('popup-height-510.png');
+      await popup.setViewportSize({width:390,height:1200});await popup.evaluate(()=>window.scrollTo(0,0));
+      await popup.locator('#explain-thinking').uncheck();
+      assert.equal((await geometry()).height,collapsed.height);
+      await popup.locator('#tab-translate').click();const translate=await geometry();assert.equal(translate.height,translate.containerHeight);states.push({state:'translate',...translate});
+      await settingsShot('translate.png');await popup.locator('#tab-explain').click();
+      await popup.locator('#explain-thinking').setChecked(thinking);states.push({state:'restored',...await geometry()});
+      await settingsShot('settings.png');
     }finally{
+      await popup.locator('#tab-explain').click();
       if(await popup.locator('#cancel-key').isVisible())await popup.locator('#cancel-key').click();
       await popup.locator('#explain-thinking').setChecked(thinking);
+      await popup.setViewportSize({width:390,height:600});
     }
-    return{states,boundary:'Actual Edge extension DOM scroll frame; native toolbar popup requires manual reload acceptance'};
+    return{states,boundary:'Actual Edge extension document with tall and constrained viewports; native toolbar popup shell unverified'};
   });
   await check('切主题不保存模型/语言/Key 草稿，保存设置不回退主题',async()=>{
     await popup.locator('#explain-language').selectOption('en');await popup.locator('#rewrite-key').click();await popup.locator('#api-key').fill('unsaved-synthetic-draft');

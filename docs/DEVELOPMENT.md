@@ -37,6 +37,8 @@ GitHub入口为 `https://github.com/siwenyu1213/LingoClarify`。本地目录与�
 
 用普通HTTP/HTTPS页面测试，浏览器内部页面和受限制商店页不能作为注入验收样本。
 
+设置页首选390px宽，高度随内容自然增减；主页面无可见滚动条，受限视口仍支持滚轮和键盘访问底部操作。自绘菜单长列表独立滚动。
+
 ## 当前调用关系
 
 - 后台加载 `model-catalog.js`、`config.js`、`selection.js`、`selection-prompts.js`；只使用选区模块的无DOM分析。
@@ -192,3 +194,11 @@ popup.js仅将共用trigger-mode控件移动到当前用途的语言行，保留
 北京时间2026-10-16，Edge155.0.4283.45、Node24.18.1、Playwright1.62.1隔离配置下7组菜单/字体验收通过，包括实际点击、搜索空结果和过滤选择回写、保存重开、两用途、停用/异步型号、键盘退出、三配色×260/320/390px边界、滚动关闭。CDP实际字形证据确认中文标题与结果正文由LXGW WenKai Screen自定义字体渲染，英文型号由Space Grotesk自定义字体渲染。19主题（含150/200%标签页缩放）、9设置/DeepSeek、17拖动、11全文工具栏及54静态检查、git diff --check通过，测试浏览器/本机服务均已关闭。
 
 本轮菜单报告与截图为artifacts/qa/select-menu/report.json、manufacturer-open.png、settings.png、result.png；主题与全文工具栏报告分别为同目录themes/report.json和toolbar/report.json；设置与拖动报告沿用各工具既有路径，以本轮HEAD/内容识别，设置工具日期字符串仍是旧常量。静态报告artifacts/qa/static-check.json。所有配置/模型及SSE均为合成，不证明真实供应商或模型质量；原生工具栏窗口视觉与其他浏览器仍未验收。当前本地预览与公开截图已更新，并行流式修改继续保留，Description同步且本地忽略。
+
+## 2026-10-16 设置页按内容自适应高度
+
+基线823160c，复用codex/ui-reading-redesign。按用户本轮要求，popup.css移除body的510px高度上限与container的510px最小高度，设置页随当前用途、思考强度和Key编辑内容自然增减。主页面滚动条隐藏；浏览器窗口空间受限时保留根页面滚轮与键盘滚动，底部保存仍可访问。此要求替代前述历史510px内部滚动约束，下拉菜单自己的长列表滚动继续保留。版本仍4.6.0。
+
+北京时间2026-10-16，隔离Edge155.0.4283.45、Node24.18.1、Playwright1.62.1完成19项主题/布局、9项设置与DeepSeek模拟端口、7组菜单/字体、54项静态检查及git diff --check。自适应专项在390px宽度下测得合成配置收起高512.70px、展开思考强度与Key编辑高646.48px，收起恢复原高；420px受限视口验证滚轮、聚焦保存与逐个访问底部操作，260/320/390px及150/200%标签页缩放通过。窄屏断言允许不足1px的滚动坐标舍入差；未改动按钮布局。verify-settings-controls新增--output并使用实际运行时间记录证据。
+
+报告为artifacts/qa/popup-auto-height/themes/report.json、settings/report.json、menus/report.json；截图themes/expanded.png、themes/translate.png和settings/deepseek-off.png，公开设置截图与本地预览已更新。全部使用合成配置/凭据与本机SSE；原生工具栏弹出层的最终尺寸、真实供应商及其他浏览器未验收。原生窗口的可用尺寸由浏览器决定。重新加载扩展后重开设置生效；本轮仅本地保存，已有流式改动不纳入提交，Description继续本地忽略。
