@@ -7,7 +7,7 @@ import { resolve, relative } from 'node:path';
 import { execFileSync } from 'node:child_process';
 const root = process.cwd(), arg = name => process.argv[process.argv.indexOf(name)+1];
 const {chromium} = createRequire(import.meta.url)(arg('--playwright'));
-const output = resolve(root,'artifacts/qa/themes-2026-10-13');
+const output = resolve(root,process.argv.includes('--output') ? arg('--output') : 'artifacts/qa/themes-2026-10-13');
 const profile = resolve(root,'.local/browser-profile/themes',`run-${Date.now()}`);
 mkdirSync(output,{recursive:true}); mkdirSync(profile,{recursive:true});
 const checks=[],errors=[],requests=[];
@@ -52,7 +52,7 @@ try{
   const url=`chrome-extension://${new URL(worker.url()).host}/popup.html`;
   popup=await context.newPage();popup.on('pageerror',e=>errors.push(e.message));await popup.setViewportSize({width:390,height:600});await popup.goto(url);
   await popup.waitForFunction(()=>document.querySelector('#explain-manufacturer').options.length===11);
-  await check('旧配置和首次使用默认钴蓝纸页，三主题可选，删除 DeepSeek 提示',async()=>{
+  await check('旧配置和首次使用默认澄净阅读，三方向可选，无失效思考提示',async()=>{
     await popup.evaluate(()=>LingoTheme.ready);
     assert.equal(await popup.locator('body').getAttribute('data-lc-theme'),'cobalt');
     assert.deepEqual(await popup.locator('#ui-theme option').evaluateAll(options=>options.map(o=>o.value)),['cobalt','playful','vellum']);
@@ -75,18 +75,21 @@ try{
   await page.locator('#ds-tb-show-original').click();
   await selectWord();
   const before=await snapshot();
-  for(const [theme,color]of[['cobalt','rgb(253, 250, 231)'],['playful','rgb(240, 200, 160)'],['vellum','rgb(42, 56, 112)']]){
+  for(const [theme,color,surface]of[['cobalt','rgb(245, 248, 248)','rgb(255, 255, 255)'],['playful','rgb(247, 242, 232)','rgb(255, 252, 245)'],['vellum','rgb(240, 243, 248)','rgb(255, 255, 255)']]){
     await check(`${theme} 即时同步设置/已打开结果/全文工具栏，连接和模型保持`,async()=>{
       await setTheme(theme);
       await page.waitForFunction(theme=>['deepseek-explain-tooltip','ds-translate-toolbar'].every(id=>document.getElementById(id)?.dataset.lcTheme===theme),theme);
       assert.deepEqual(await snapshot(),before);
       assert.equal(await popup.evaluate(()=>getComputedStyle(document.body).backgroundColor),color);
-      assert.equal(await page.locator('#deepseek-explain-tooltip').evaluate(el=>getComputedStyle(el).backgroundColor),color);
+      assert.equal(await page.locator('#deepseek-explain-tooltip').evaluate(el=>getComputedStyle(el).backgroundColor),surface);
+      assert.equal(await page.locator('.ds-tb-panel-content').evaluate(el=>getComputedStyle(el).backgroundColor),surface);
       await popup.evaluate(()=>document.fonts.ready);await page.evaluate(()=>document.fonts.ready);
       await settingsShot(`${theme}-settings.png`);
+      await popup.locator('#ui-theme').scrollIntoViewIfNeeded();
+      await popup.locator('body').screenshot({path:resolve(output,`${theme}-settings-bottom.png`)});
       await page.locator('#deepseek-explain-tooltip').screenshot({path:resolve(output,`${theme}-result.png`)});
       await page.screenshot({path:resolve(output,`${theme}-result-toolbar.png`)});
-      return{color};
+      return{color,surface};
     });
     await check(`${theme} 正文/提示/按钮文本对比度与本地字体`,async()=>{
       const colors=await popup.evaluate(()=>{const body=getComputedStyle(document.body),hint=getComputedStyle(document.querySelector('#theme-status')),button=getComputedStyle(document.querySelector('#save-btn'));return{bg:body.backgroundColor,ink:body.color,muted:hint.color,button:button.backgroundColor,on:button.color};});
@@ -99,6 +102,25 @@ try{
       return colors;
     });
   }
+  await check('三方向自定义接口弹窗、键盘关闭和260/320/390px边界',async()=>{
+    const layouts=[];
+    for(const theme of ['cobalt','playful','vellum']){
+      await setTheme(theme);
+      for(const width of [260,320,390]){
+        await popup.setViewportSize({width,height:600});
+        assert.equal(await popup.evaluate(()=>document.body.scrollWidth<=innerWidth),true,`${theme}/${width}`);
+        await popup.locator('#custom-connection-button').click();
+        const bounds=await popup.locator('dialog').evaluate(el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,width:innerWidth,scroll:el.scrollWidth,client:el.clientWidth};});
+        assert.ok(bounds.left>=0&&bounds.right<=bounds.width&&bounds.scroll<=bounds.client,JSON.stringify(bounds));
+        await popup.locator('dialog').screenshot({path:resolve(output,`${theme}-dialog-${width}.png`)});
+        await popup.keyboard.press('Escape');
+        assert.equal(await popup.locator('dialog').isVisible(),false);
+        layouts.push({theme,width,...bounds});
+      }
+    }
+    await popup.setViewportSize({width:390,height:600});
+    return layouts;
+  });
   await check('390px弹窗与150%/200%浏览器缩放，操作不拆字、长厂家/型号可读',async()=>{
     const labels=await popup.evaluate(()=>{
       const provider=document.querySelector('#explain-manufacturer').selectedOptions[0],model=document.querySelector('#explain-model').selectedOptions[0];
@@ -159,7 +181,7 @@ try{
     assert.equal(await popup.locator('#ui-theme').inputValue(),'playful');assert.equal(await popup.locator('body').getAttribute('data-lc-theme'),'playful');
     await popup.evaluate(()=>{chrome.storage.local.set=qaThemeStorageSet;delete globalThis.qaThemeStorageSet;});
   });
-  await check('损坏或已删除的主题值回退钴蓝，现有网页同步',async()=>{
+  await check('损坏或已删除的主题值回退澄净阅读，现有网页同步',async()=>{
     await worker.evaluate(()=>chrome.storage.local.set({uiTheme:'unknown-theme'}));await popup.waitForFunction(()=>document.body.dataset.lcTheme==='cobalt');
     await page.waitForFunction(()=>document.querySelector('#deepseek-explain-tooltip').dataset.lcTheme==='cobalt');
     await worker.evaluate(()=>chrome.storage.local.remove('uiTheme'));await popup.reload();await popup.waitForFunction(()=>document.querySelector('#ui-theme').value==='cobalt');
@@ -193,6 +215,6 @@ try{
   });
 }catch(error){console.error(error);process.exitCode=1;}
 finally{
-  writeFileSync(resolve(output,'report.json'),JSON.stringify({date:'2026-10-13 Asia/Shanghai',head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),browserVersion,profile:relative(root,profile),checks,errors,requests,scope:'Actual Edge extension DOM/storage with localhost synthetic SSE; native toolbar popup and real provider APIs unverified'},null,2)+'\n');
+  writeFileSync(resolve(output,'report.json'),JSON.stringify({date:new Date().toISOString(),head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),browserVersion,profile:relative(root,profile),checks,errors,requests,scope:'Actual Edge extension DOM/storage with localhost synthetic SSE; native toolbar popup and real provider APIs unverified'},null,2)+'\n');
   await context?.close();await new Promise(resolve=>server.close(resolve));
 }

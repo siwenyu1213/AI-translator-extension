@@ -41,7 +41,7 @@ GitHub入口为 `https://github.com/siwenyu1213/LingoClarify`。本地目录与�
 
 - 后台加载 `model-catalog.js`、`config.js`、`selection.js`、`selection-prompts.js`；只使用选区模块的无DOM分析。
 - 自动内容注入：`theme.js` → `selection.js` → Marked → DOMPurify → `markdown.js` → `content.js`，样式为 `theme.css`、`content.css`。
-- 设置页加载 `model-catalog.js`、`config.js`、`theme.js`、`popup.js`，共用配置与查询逻辑。外观模块独立保存 `uiTheme`，只更新扩展根元素，默认钴蓝纸页；字体和引号图标本地打包。
+- 设置页加载 `model-catalog.js`、`config.js`、`theme.js`、`popup.js`，共用配置与查询逻辑。外观模块独立保存 `uiTheme`，只更新扩展根元素，默认澄净阅读；cobalt/playful/vellum分别对应澄净阅读、纸本文笺、精密工具，字体和引号图标本地打包。
 - 全文由后台按需注入 `content-fullpage.js`，通过端口取得单条或批量结果。
 - 全文工具栏桌面宽度为视口的约三分之一、水平居中，窄屏最小宽度受视口限制。下方单个 `ds-tb-toggle` 方框箭头控制 `ds-tb-panel` 整体收起/展开，按钮持续保留且焦点不变；收起内容设为inert并从辅助技术隐藏。180ms收起/浮现动画遵从减少动画偏好，任务、进度与主题继续运行。隐藏状态再次注入时只打开当前工具栏；取消移除整个入口，新启动默认展开，不保存全局偏好。
 
@@ -148,3 +148,13 @@ GitHub同步必须核对远程提交和默认分支内容，不能把本地commi
 基线 `16a4992`，当前任务分支与 `origin/main` 一致且工作区干净。停止跟踪27个文件：交接1份、历史任务记录24份、第三方调试source map 2份；原文件仍完整保留在本机。上传清单83→56个文件，运行源码、清单、图标、字体、第三方脚本与许可证、可复用验证工具均未修改，扩展版本保持4.6.0。
 
 使用Node v24.18.1、Git 2.55.0.windows.3核验：本机静态49项通过；仅复制上传清单得到的独立目录静态49项通过；50个保留文件与基线Git内容一致；27个本地材料内容一致且已忽略；公开文档10个本地链接均指向上传文件；diff空白检查通过。详细本机证据为 `artifacts/qa/minimal-upload-2026-10-13/audit.json`，精简目录报告为该目录下的 `upload-snapshot-static.json`。本轮只整理跟踪范围与文档，未重新执行Edge交互或真实供应商请求；静态结果不表示这些功能已重新验收。
+
+## 2026-10-16 三方向 UI 对比
+
+基线为d680413，创建分支codex/ui-reading-redesign；本轮实现澄净阅读、纸本文笺、精密工具三个可切换方案。uiTheme仍使用cobalt/playful/vellum，已有配置沿用原标识；三套新外观均为浅色。设置页采用分段标签、开关控件和更清晰的字段层级，纸本方向使用宋体标题与页签，工具方向使用更紧凑的布局。theme.css统一配色、划词批注、Markdown标题和全文工具栏轮廓；popup.css负责各方向设置布局，沿用390px首选宽度、510px内部滚动及340/260px断点。本轮未改变请求或配置协议，未发布版本，仍为4.6.0。
+
+设计参考用户提供的[Anthropic frontend-design指南](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md)，预览与设计取舍记录仅本地存于.local/materials/ui-reading-redesign/。主题与全文工具栏验证工具新增可选--output以保留各轮证据，并同步当前配色断言；公开README截图更新为默认澄净阅读的合成材料。
+
+北京时间2026-10-16，以Edge155.0.4283.45、Node24.18.1、Playwright1.62.1完成19项主题检查、17项定位拖动检查、11项全文工具栏检查及50项静态检查；git diff --check通过。主题检查涵盖即时同步、保存重开、草稿隔离、文字对比度、本地字体、键盘、实际标签页150/200%缩放、三方向260/320/390px及自定义地址弹窗，确认高度上限与所有关键控件可滚动访问。全部使用隔离profile、合成Key及本机SSE，不代表真实模型效果。报告分别为artifacts/qa/ui-reading-redesign/report.json、artifacts/qa/tooltip-header-2026-10-13/report.json（按报告内本轮时间）、artifacts/qa/ui-reading-redesign/toolbar/report.json、artifacts/qa/static-check.json；对比截图为ui-reading-redesign/compare-settings.png及compare-results.png。
+
+原生Edge中chrome.action.openPopup调用成功，但Computer Use无法可靠识别当前浏览器URL，按策略停止窗口截图检查；因此原生弹出层视觉尺寸、真实供应商、原生右键鼠标操作和其他浏览器仍未验证。验收浏览器与本机服务已关闭，profile保留。工作区中原有及并行产生的流式播放修改继续保留，不纳入本次UI提交；Description.md已同步、继续本地忽略。

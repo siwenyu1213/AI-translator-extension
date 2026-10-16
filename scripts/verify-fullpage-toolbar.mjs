@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const arg = name => process.argv[process.argv.indexOf(name) + 1];
 const { chromium } = createRequire(import.meta.url)(arg('--playwright'));
-const output = resolve(root, 'artifacts/qa/fullpage-toolbar-buttons');
+const output = resolve(root, process.argv.includes('--output') ? arg('--output') : 'artifacts/qa/fullpage-toolbar-buttons');
 const profile = resolve(root, '.local/browser-profile/fullpage-toolbar', `run-${Date.now()}`);
 mkdirSync(output, {recursive: true});
 const checks = [], errors = [], pending = [];
@@ -172,9 +172,9 @@ try {
       await page.screenshot({path: resolve(output, `${theme}-hidden-narrow.png`), animations: 'disabled'});
       const colors = await page.locator('#ds-tb-toggle').evaluate(el => ({ink: getComputedStyle(el).color, surface: getComputedStyle(el).backgroundColor}));
       assert.deepEqual(colors, {
-        cobalt: {ink: 'rgb(17, 17, 17)', surface: 'rgb(253, 250, 231)'},
-        playful: {ink: 'rgb(26, 26, 26)', surface: 'rgb(247, 222, 198)'},
-        vellum: {ink: 'rgb(232, 216, 92)', surface: 'rgb(52, 63, 128)'}
+        cobalt: {ink: 'rgb(32, 55, 68)', surface: 'rgb(255, 255, 255)'},
+        playful: {ink: 'rgb(54, 59, 48)', surface: 'rgb(255, 252, 245)'},
+        vellum: {ink: 'rgb(33, 48, 71)', surface: 'rgb(255, 255, 255)'}
       }[theme]);
       await page.locator('#ds-tb-toggle').click();
       for (const width of [260, 390]) {
