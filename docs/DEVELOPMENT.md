@@ -43,7 +43,7 @@ GitHub入口为 `https://github.com/siwenyu1213/LingoClarify`。本地目录与�
 - 自动内容注入：`theme.js` → `selection.js` → Marked → DOMPurify → `markdown.js` → `content.js`，样式为 `theme.css`、`content.css`。
 - 设置页加载 `model-catalog.js`、`config.js`、`theme.js`、`popup.js`，共用配置与查询逻辑。外观模块独立保存 `uiTheme`，只更新扩展根元素，默认钴蓝纸页；字体和引号图标本地打包。
 - 全文由后台按需注入 `content-fullpage.js`，通过端口取得单条或批量结果。
-- 全文工具栏内部的 `ds-tb-panel` 可隐藏，右上角 `ds-tb-reopen` 提供恢复入口；仅切换 DOM 可见性并转移按钮焦点，任务、进度与主题同步继续运行。隐藏状态再次注入时只打开当前工具栏；取消移除整个入口，新启动默认展开，不保存全局偏好。
+- 全文工具栏桌面宽度为视口的约三分之一、水平居中，窄屏最小宽度受视口限制。下方单个 `ds-tb-toggle` 方框箭头控制 `ds-tb-panel` 整体收起/展开，按钮持续保留且焦点不变；收起内容设为inert并从辅助技术隐藏。180ms收起/浮现动画遵从减少动画偏好，任务、进度与主题继续运行。隐藏状态再次注入时只打开当前工具栏；取消移除整个入口，新启动默认展开，不保存全局偏好。
 
 划词本地分类选择单项任务，以统一system要求和JSON材料发送一次生成。外语完整句段用翻译连接，其余解释用解释连接；“解释此句”使用解读任务。所在句及必要材料有预算，回答仍为Markdown正文。全文纯译文和批量ID协议独立。
 
@@ -133,11 +133,11 @@ GitHub同步必须核对远程提交和默认分支内容，不能把本地commi
 
 ## 2026-10-16 全文进度栏隐藏/打开验收
 
-北京时间2026-10-16，基线 `84ffd62`，复用干净的 `codex/tooltip-header-cleanup`；fetch 后当前分支比上游领先1个本地回退提交，没有落后。待提交范围为 `content-fullpage.js`、`content.css`、`scripts/verify-fullpage-toolbar.mjs`、README 与本手册；本地 `Description.md` 同步维护但忽略、不提交。版本仍为4.6.0，本次不发布或推送。
+北京时间2026-10-16，首版基线 `84ffd62`，完成本地提交 `1c1f242` 后按用户要求改用栏下方的单个方框箭头、取消文字入口，并将进度栏收窄为居中约三分之一。复用干净的 `codex/tooltip-header-cleanup`，fetch后当前分支比上游领先2个提交，没有落后。本次范围为 `content-fullpage.js`、`content.css`、`scripts/verify-fullpage-toolbar.mjs`、README 与本手册；本地 `Description.md` 同步维护但忽略、不提交。版本仍为4.6.0，不发布或推送。
 
-工具为Edge 155.0.4283.45、Node v24.18.1、Playwright 1.62.1。隔离profile加载真实解压扩展，通过扩展消息启动合成网页全文翻译，真实后台端口请求本机SSE：进行中点击“隐藏”，确认顶部栏收起且焦点移至右上角恢复按钮；隐藏期间等待完成并新增动态文字，再用点击/Enter/Space重新打开，确认最新计数、原文切换、取消恢复及新任务默认展开。再次触发隐藏的全文任务仅打开现有进度，不重新发请求。三主题及260px/390px控件边界和实际配色均验证，10项定向检查通过；18项既有对抗浏览器回归及3项对照、50项静态与diff空白检查通过。
+工具为Edge 155.0.4283.45、Node v24.18.1、Playwright 1.62.1。隔离profile加载真实解压扩展，通过扩展消息启动合成网页全文翻译，真实后台端口请求本机SSE：点击栏下方方框箭头，确认整栏收起且焦点保留，只有向下箭头可见；隐藏期间等待完成并新增动态文字，再用点击/Enter/Space展开，确认最新计数、原文切换、取消恢复及新任务默认展开。再次触发隐藏的全文任务仅打开现有进度，不重新发请求。三主题及260px/390px控件边界和实际配色、1000px/1440px/1920px视口居中与精确三分之一宽度、减少动画偏好及收起控件不可聚焦均验证。11项定向检查通过；18项既有对抗浏览器回归及3项对照、50项静态与diff空白检查通过。
 
-定向报告与截图为 `artifacts/qa/fullpage-toolbar/report.json` 及同目录PNG，既有回归为 `artifacts/qa/adversarial-fix-2026-10-11/browser/results.json`（以报告内2026-10-16时间为准），静态报告为 `artifacts/qa/static-check.json`；详细记录在 `.local/materials/fullpage-toolbar-2026-10-16.md`。已查看展开、隐藏及窄屏截图，测试浏览器和本机服务已关闭，隔离profile保留。未验证真实供应商生成与原生右键菜单的鼠标点击；合成响应不证明模型质量或速度。
+本版定向报告与截图为 `artifacts/qa/fullpage-toolbar-arrow/report.json` 及同目录PNG，首版历史证据保留在 `artifacts/qa/fullpage-toolbar/`。既有回归为 `artifacts/qa/adversarial-fix-2026-10-11/browser/results.json`（以报告内2026-10-16时间为准），静态报告为 `artifacts/qa/static-check.json`；详细记录在 `.local/materials/fullpage-toolbar-2026-10-16.md`。已查看展开、隐藏及窄屏截图，测试浏览器和本机服务已关闭，隔离profile保留。未验证真实供应商生成与原生右键菜单的鼠标点击；合成响应不证明模型质量或速度。
 
 ## 2026-10-13 最小上传整理验收
 

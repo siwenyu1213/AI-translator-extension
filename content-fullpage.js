@@ -206,14 +206,16 @@
       else if (task.status === 'done') write(task, task.translated);
     }
   }
-  function setToolbarCollapsed(collapsed, moveFocus = false) {
+  function setToolbarCollapsed(collapsed) {
     if (!toolbar) return;
     toolbar.classList.toggle('ds-tb-collapsed', collapsed);
-    toolbar.querySelector('#ds-tb-panel').hidden = collapsed;
-    const reopen = toolbar.querySelector('#ds-tb-reopen');
-    reopen.hidden = !collapsed;
-    reopen.setAttribute('aria-expanded', String(!collapsed));
-    if (moveFocus) (collapsed ? reopen : toolbar.querySelector('#ds-tb-hide')).focus({preventScroll: true});
+    const panel = toolbar.querySelector('#ds-tb-panel');
+    panel.inert = collapsed;
+    panel.setAttribute('aria-hidden', String(collapsed));
+    const toggle = toolbar.querySelector('#ds-tb-toggle');
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    toggle.setAttribute('aria-label', collapsed ? '展开翻译进度栏' : '收起翻译进度栏');
+    toggle.title = collapsed ? '展开翻译进度栏' : '收起翻译进度栏，翻译继续运行';
   }
   function stop() {
     aborted = true; session++;
@@ -237,12 +239,11 @@
       if (!toolbar) {
         toolbar = document.createElement('div'); toolbar.id = 'ds-translate-toolbar';
         LingoTheme.attach(toolbar);
-        toolbar.innerHTML = '<div id="ds-tb-panel"><span class="lc-brand-icon" aria-hidden="true"></span><span class="ds-tb-status">翻译中…</span><span class="ds-tb-progress" id="ds-tb-progress">0 / 0</span><button type="button" class="ds-tb-btn" id="ds-tb-show-original">显示原文</button><button type="button" class="ds-tb-btn ds-tb-danger" id="ds-tb-cancel">取消翻译</button><button type="button" class="ds-tb-btn" id="ds-tb-hide" title="隐藏进度栏，翻译继续运行">隐藏</button></div><button type="button" class="ds-tb-btn" id="ds-tb-reopen" aria-controls="ds-tb-panel" aria-expanded="true" hidden>显示翻译进度</button>';
+        toolbar.innerHTML = '<div id="ds-tb-panel"><div class="ds-tb-panel-clip"><div class="ds-tb-panel-content"><span class="lc-brand-icon" aria-hidden="true"></span><span class="ds-tb-status">翻译中…</span><span class="ds-tb-progress" id="ds-tb-progress">0 / 0</span><button type="button" class="ds-tb-btn" id="ds-tb-show-original">显示原文</button><button type="button" class="ds-tb-btn ds-tb-danger" id="ds-tb-cancel">取消翻译</button></div></div></div><button type="button" class="ds-tb-btn" id="ds-tb-toggle" aria-controls="ds-tb-panel" aria-expanded="true" aria-label="收起翻译进度栏"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="m6 14 6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
         document.body.prepend(toolbar);
         toolbar.querySelector('#ds-tb-show-original').addEventListener('click', toggleOriginal);
         toolbar.querySelector('#ds-tb-cancel').addEventListener('click', cancel);
-        toolbar.querySelector('#ds-tb-hide').addEventListener('click', () => setToolbarCollapsed(true, true));
-        toolbar.querySelector('#ds-tb-reopen').addEventListener('click', () => setToolbarCollapsed(false, true));
+        toolbar.querySelector('#ds-tb-toggle').addEventListener('click', () => setToolbarCollapsed(!toolbar.classList.contains('ds-tb-collapsed')));
       }
       setToolbarCollapsed(false);
       toolbar.querySelector('#ds-tb-show-original').textContent = '显示原文';
