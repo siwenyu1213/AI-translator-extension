@@ -202,3 +202,11 @@ popup.js仅将共用trigger-mode控件移动到当前用途的语言行，保留
 北京时间2026-10-16，隔离Edge155.0.4283.45、Node24.18.1、Playwright1.62.1完成19项主题/布局、9项设置与DeepSeek模拟端口、7组菜单/字体、54项静态检查及git diff --check。自适应专项在390px宽度下测得合成配置收起高512.70px、展开思考强度与Key编辑高646.48px，收起恢复原高；420px受限视口验证滚轮、聚焦保存与逐个访问底部操作，260/320/390px及150/200%标签页缩放通过。窄屏断言允许不足1px的滚动坐标舍入差；未改动按钮布局。verify-settings-controls新增--output并使用实际运行时间记录证据。
 
 报告为artifacts/qa/popup-auto-height/themes/report.json、settings/report.json、menus/report.json；截图themes/expanded.png、themes/translate.png和settings/deepseek-off.png，公开设置截图与本地预览已更新。全部使用合成配置/凭据与本机SSE；原生工具栏弹出层的最终尺寸、真实供应商及其他浏览器未验收。原生窗口的可用尺寸由浏览器决定。重新加载扩展后重开设置生效；本轮仅本地保存，已有流式改动不纳入提交，Description继续本地忽略。
+
+## 2026-10-16 放大输出浮层的原文与回答字号
+
+基线aad92fc，复用codex/ui-reading-redesign。用户以词典原型为参考，指出浮层原文字号过小。本轮仅在theme.css调整排版层级：原文由13px次要提示改为32px主题墨色词条标题，正文14→18px，h2为23px、h3为20px、其余小标题18px、代码12→15px；中文继续文楷屏幕版、英文继续本地Space/Syne。原文高度上限扩至min(124px,22vh)，长句换行并可独立滚动。保持原有定位、拖动、复制/下载与请求协议，版本4.6.0。
+
+北京时间2026-10-16，以隔离Edge155.0.4283.45、Node24.18.1、Playwright1.62.1完成18项浮层检查及54项静态检查，git diff --check通过。原有选区避让、流式拖动、滚动/缩窗位置、关闭等17项继续通过；新增专项检查三配色×260/375/1000px，覆盖长中文原文、英文词条、正文/小标题/代码实际字号、内容无横向溢出、底部按钮在窗口内、宿主网页字体保持Arial。全部使用合成网页/Key和本机SSE，未验证真实供应商、其他浏览器与特殊网站样式。
+
+证据artifacts/qa/result-type-scale/report.json、result.png及各配色/宽度截图；公开result截图和本地预览同步更新。verify-tooltip-position新增--output以独立保存证据。重新加载扩展并刷新网页后使用；仅本地保存，本轮不纳入原有流式源码与文档改动，Description同步且继续忽略。

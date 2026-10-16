@@ -31,13 +31,16 @@
 #deepseek-explain-tooltip.lc-theme .ds-close { color: var(--lc-muted); border-radius: 6px; }
 #deepseek-explain-tooltip.lc-theme .ds-quote {
   margin: 14px 16px 0; padding: 0 0 12px; border: 0; border-bottom: 1px solid var(--lc-rule);
-  border-radius: 0; background: transparent; line-height: 1.65;
+  border-radius: 0; background: transparent; color: var(--lc-ink);
+  font: 400 32px/1.3 var(--lc-title-font); letter-spacing: -.4px;
+  max-height: min(124px, 22vh); overflow-wrap: anywhere;
 }
-#deepseek-explain-tooltip.lc-theme .ds-body { padding: 14px 18px 12px; line-height: 1.85; }
+#deepseek-explain-tooltip.lc-theme .ds-body { padding: 14px 18px 12px; font-size: 18px; line-height: 1.85; }
 #deepseek-explain-tooltip.lc-theme .ds-markdown { line-height: 1.85; }
 #deepseek-explain-tooltip.lc-theme .ds-markdown h1 { font-size: 29px; font-weight: 500; }
-#deepseek-explain-tooltip.lc-theme .ds-markdown h2 { font-size: 18px; }
-#deepseek-explain-tooltip.lc-theme .ds-markdown h3 { font-size: 16px; }
+#deepseek-explain-tooltip.lc-theme .ds-markdown h2 { font-size: 23px; }
+#deepseek-explain-tooltip.lc-theme .ds-markdown h3 { font-size: 20px; }
+#deepseek-explain-tooltip.lc-theme .ds-markdown :is(h4,h5,h6) { font-size: 18px; }
 #deepseek-explain-tooltip.lc-theme .ds-markdown :is(code,pre,th,blockquote) { background: var(--lc-bg); }
 #deepseek-explain-tooltip.lc-theme .ds-markdown pre code { background: transparent; }
 #deepseek-explain-tooltip.lc-theme .ds-actions { padding: 4px 16px 12px; gap: 8px; }
@@ -46,7 +49,7 @@
 #deepseek-explain-tooltip.lc-theme .ds-reasoning { border: 1px solid var(--lc-rule); border-radius: 6px; background: var(--lc-bg); }
 #deepseek-explain-tooltip.lc-theme[data-lc-theme='playful'] { border-radius: 4px; }
 #deepseek-explain-tooltip.lc-theme[data-lc-theme='playful'] .ds-header { border-bottom: 2px solid var(--lc-ink); }
-#deepseek-explain-tooltip.lc-theme .ds-markdown code { font-family: 'LC Space', 'LC WenKai', monospace; }
+#deepseek-explain-tooltip.lc-theme .ds-markdown code { font-family: 'LC Space', 'LC WenKai', monospace; font-size: 15px; }
 #deepseek-explain-tooltip.lc-theme[data-lc-theme='vellum'] { border-radius: 6px; }
 #deepseek-explain-tooltip.lc-theme[data-lc-theme='vellum'] .ds-body { padding: 10px 16px; line-height: 1.75; }
 #deepseek-explain-tooltip.lc-theme[data-lc-theme='vellum'] .ds-markdown { line-height: 1.75; }
