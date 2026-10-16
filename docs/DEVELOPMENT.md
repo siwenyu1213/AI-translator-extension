@@ -137,6 +137,12 @@ git diff --cached
 
 GitHub同步必须核对远程提交和默认分支内容，不能把本地commit或模拟通过当作上传成功。
 
+## 2026-10-16 GitHub首页README更新
+
+用户明确选择更新main仓库首页。fetch确认PR #13已合入main，基线55f781d，运行文件与090150f一致；共享开发分支同时新增独立打包记录，因此使用专用工作树处理本次README，不上传对方提交。README按功能/预览/安装配置/使用/接口/隐私/常见问题/开发组织，加入1.0.0版本和纸本文笺图标、main源码ZIP入口，压缩模块说明；同步公开材料来源，两张截图从实际1.0.0扩展重新生成。扩展运行源码与版本未改。
+
+Node24.18.1、Edge155.0.4283.45和已有Playwright1.62.1，在独立profile中打开实际设置页与合成网页，确认v1.0.0、合成Key编辑区收起、无错误提示、固定字标及Markdown操作按钮后截图，截图已视觉复核；供应商请求只转本机SSE，无真实账号验收。55项静态与git diff --check通过，README及材料说明的相对文件/图片和目录锚点全部核对，GitHub Markdown渲染预览见本轮证据。报告与预览位于本工作树 `artifacts/qa/readme-1.0.0/`，最终main SHA及远程文件核验见 `remote-verification.json`。未重跑无关API/完整交互或原生工具栏弹窗验收。Description只在原工作目录更新，不进入提交。
+
 ## 2026-10-16 版本号统一为1.0.0
 
 用户要求将目前版本改为1.0.0。基线 `codex/ui-reading-redesign@c01877f`，工作区干净，fetch后与上游0/0；同步manifest.json、popup.html及README/本手册当前版本说明。仅调整版本标识，既有功能与配置格式沿用，历史验收记录中的旧版本保留为当时事实。Description当前版本及维护记录同步，但继续忽略、不提交。
