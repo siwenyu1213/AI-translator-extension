@@ -158,3 +158,11 @@ GitHub同步必须核对远程提交和默认分支内容，不能把本地commi
 北京时间2026-10-16，以Edge155.0.4283.45、Node24.18.1、Playwright1.62.1完成19项主题检查、17项定位拖动检查、11项全文工具栏检查及50项静态检查；git diff --check通过。主题检查涵盖即时同步、保存重开、草稿隔离、文字对比度、本地字体、键盘、实际标签页150/200%缩放、三方向260/320/390px及自定义地址弹窗，确认高度上限与所有关键控件可滚动访问。全部使用隔离profile、合成Key及本机SSE，不代表真实模型效果。报告分别为artifacts/qa/ui-reading-redesign/report.json、artifacts/qa/tooltip-header-2026-10-13/report.json（按报告内本轮时间）、artifacts/qa/ui-reading-redesign/toolbar/report.json、artifacts/qa/static-check.json；对比截图为ui-reading-redesign/compare-settings.png及compare-results.png。
 
 原生Edge中chrome.action.openPopup调用成功，但Computer Use无法可靠识别当前浏览器URL，按策略停止窗口截图检查；因此原生弹出层视觉尺寸、真实供应商、原生右键鼠标操作和其他浏览器仍未验证。验收浏览器与本机服务已关闭，profile保留。工作区中原有及并行产生的流式播放修改继续保留，不纳入本次UI提交；Description.md已同步、继续本地忽略。
+
+## 2026-10-16 第二轮结构排版原型
+
+用户反馈第一轮布局区别不足，因此在codex/ui-reading-redesign的a2e788f上新增可复用的scripts/build-ui-layout-preview.mjs，以原生HTML/CSS/JS生成三种独立结构：侧栏工作台（侧向用途导航与连接主区）、双页词典（题签、词条、边注）、阅读控制台（语言舞台与上下衔接操作区）。这些是使用示例配置的交互原型，尚未替换根目录扩展UI；不读写chrome.storage、不请求模型、不保存Key，不改变扩展版本或运行依赖。
+
+执行 `node scripts/build-ui-layout-preview.mjs`，默认输出到`.local/materials/ui-layout-round2/`，并更新第一轮预览入口`.local/materials/ui-reading-redesign/index.html`。首次更新前将原入口保存为同目录round1.html。可用`--output <目录>`指定单独原型输出目录；固定对比入口仍会更新。独立HTML与内嵌srcdoc对比页不依赖服务器、字体下载或外部库。按钮演示用途切换、键盘左右/Home/End、思考开关、连接dialog、取消/完成与保存提示；复制/下载仅展示反馈，没有实际剪贴板或下载行为。
+
+北京时间2026-10-16，以Node24.18.1、Edge155.0.4283.45将新生成的自包含源字符串渲染到独立空白测试页面，完成对比页切换、三套用途/键盘/开关/弹窗/保存及260/320/390px边界检查；无脚本错误或外部请求。51项静态与git diff --check通过。证据为`artifacts/qa/ui-layout-round2/report.json`、`compare-settings.png`与`compare-results.png`；本轮不是扩展集成或真实API验收，不复用上轮19/17/11项结果作为新原型证据。浏览器工具因file协议限制拒绝读取用户现有标签页，因此没有操作该标签页；用户刷新原入口即可查看新原型。详细设计说明仅本地保存，根目录运行源码、并行流式修改和上轮公开截图保持原样，Description.md同步但不提交。
