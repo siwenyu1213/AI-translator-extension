@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const arg = name => process.argv[process.argv.indexOf(name) + 1];
 const { chromium } = createRequire(import.meta.url)(arg('--playwright'));
-const output = resolve(root, 'artifacts/qa/fullpage-toolbar-compact');
+const output = resolve(root, 'artifacts/qa/fullpage-toolbar-buttons');
 const profile = resolve(root, '.local/browser-profile/fullpage-toolbar', `run-${Date.now()}`);
 mkdirSync(output, {recursive: true});
 const checks = [], errors = [], pending = [];
@@ -19,7 +19,7 @@ let context, worker, page, tabId, browserVersion, requestCount = 0, hold = true;
 const server = createServer(async (req, res) => {
   if (req.url === '/sample') {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.end('<!doctype html><html><head><title>Toolbar synthetic sample</title><style>body{margin:100px 24px;font:18px Arial}p{line-height:1.8}</style></head><body><p id="first">First synthetic paragraph.</p><p id="second">Second synthetic paragraph with a <a href="#sample">preserved link</a>.</p></body></html>');
+    res.end('<!doctype html><html><head><title>Toolbar synthetic sample</title><style>body{margin:100px 24px;font:18px Arial}p{line-height:1.8}button{width:190px;min-width:190px;flex:1;text-align:left;line-height:30px}</style></head><body><p id="first">First synthetic paragraph.</p><p id="second">Second synthetic paragraph with a <a href="#sample">preserved link</a>.</p></body></html>');
     return;
   }
   if (req.url.endsWith('/models')) {
@@ -49,6 +49,17 @@ async function check(name, fn) {
 const trigger = () => worker.evaluate(id => chrome.tabs.sendMessage(id, {type: 'TRIGGER_FULLPAGE_TRANSLATE'}), tabId);
 const progress = () => worker.evaluate(async id => (await chrome.scripting.executeScript({target: {tabId: id}, func: () => window.__dsFullPageTranslator.progress}))[0].result, tabId);
 const waitPanel = expanded => page.waitForFunction(expanded => { const panel = document.querySelector('#ds-tb-panel'); return getComputedStyle(panel).opacity === (expanded ? '1' : '0') && (expanded ? panel.getBoundingClientRect().height > 0 : panel.getBoundingClientRect().height < 1); }, expanded);
+async function checkButtonLayout() {
+  const buttons = await page.locator('#ds-tb-panel button').evaluateAll(elements => elements.map(el => {
+    const range = document.createRange(); range.selectNodeContents(el);
+    const box = el.getBoundingClientRect(), text = range.getBoundingClientRect();
+    return {width: box.width, height: box.height, dx: Math.abs(text.x + text.width / 2 - box.x - box.width / 2), dy: Math.abs(text.y + text.height / 2 - box.y - box.height / 2)};
+  }));
+  for (const button of buttons) {
+    assert.ok(button.width < 90 && button.height === 26);
+    assert.ok(button.dx < 1 && button.dy < 2);
+  }
+}
 const waitDone = () => page.waitForFunction(() => {
   const [done, total] = document.querySelector('#ds-tb-progress').textContent.split('/').map(Number);
   return total > 0 && done === total;
@@ -93,6 +104,7 @@ try {
     const toggle = await page.locator('#ds-tb-toggle').boundingBox();
     assert.ok(toggle.y >= panel.y + panel.height);
     assert.ok(Math.abs(toggle.x + toggle.width / 2 - 500) < 1);
+    await checkButtonLayout();
   });
   await check('方框箭头位于进度栏下方，收起后仅留居中箭头且焦点保留', async () => {
     await page.locator('#ds-tb-toggle').click();
@@ -170,6 +182,7 @@ try {
         const bounds = await page.locator('#ds-tb-toggle').boundingBox(); assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width);
       }
       await page.screenshot({path: resolve(output, `${theme}-expanded-narrow.png`), animations: 'disabled'});
+      await checkButtonLayout();
     }
   });
   await check('取消移除整个进度入口、恢复原文；重新启动默认展开', async () => {

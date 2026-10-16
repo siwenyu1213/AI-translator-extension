@@ -407,7 +407,30 @@
 #ds-translate-toolbar { flex-direction: column; gap: 4px; padding: 0; background: transparent; color: var(--lc-ink); font-family: var(--lc-body-font); box-shadow: none; pointer-events: none; }
 #ds-translate-toolbar .lc-brand-icon { width: 24px; height: 24px; }
 #ds-translate-toolbar .ds-tb-progress { color: var(--lc-muted); font-size: 12px; }
-#ds-translate-toolbar .ds-tb-btn { display: inline-flex; align-items: center; min-height: 32px; border-color: var(--lc-border); color: var(--lc-ink); background: var(--lc-surface); font-family: inherit; }
+#ds-translate-toolbar .ds-tb-btn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  height: 26px;
+  min-height: 26px;
+  margin: 0;
+  padding: 3px 8px;
+  box-sizing: border-box;
+  border-color: var(--lc-border);
+  color: var(--lc-ink);
+  background: var(--lc-surface);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+  text-indent: 0;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
 #ds-translate-toolbar .ds-tb-btn:hover { background: var(--lc-soft); }
 #ds-translate-toolbar .ds-tb-danger { border-color: var(--lc-error); color: var(--lc-error); }
 #ds-translate-toolbar .ds-tb-danger:hover { background: var(--lc-error-bg); }
