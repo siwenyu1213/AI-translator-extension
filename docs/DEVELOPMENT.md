@@ -137,6 +137,12 @@ git diff --cached
 
 GitHub同步必须核对远程提交和默认分支内容，不能把本地commit或模拟通过当作上传成功。
 
+## 2026-10-16 图标同步纸本文笺配色
+
+基线 `codex/ui-reading-redesign@919419f`，工作区干净且fetch后与上游0/0。按用户要求将 `icons/brand.svg` 的底色改为纸本文笺 `--lc-bg` 的 `#f3f0e5`、引号改为 `--lc-ink` 的 `#263d36`；保留原有路径、圆角和尺寸，用已有隔离Edge导出16/32/48/128px PNG。Manifest与工具栏、扩展管理入口继续共用这些PNG，界面品牌资源仍使用同一SVG。版本保持4.6.0。
+
+Node24.18.1、Edge155.0.4283.45及已有Playwright1.62.1验证：SVG除两处颜色外与基线完全一致；实际解压扩展中四张PNG尺寸、Manifest两处映射、米白/墨绿像素、旧色零命中及SVG解码均通过，页面无脚本错误；实际默认主题变量与图标色值一致。55项静态检查与git diff --check通过，已目视复核128px和16/32/48px对比图。证据 `artifacts/qa/paper-icons-2026-10-16/report.json`、`comparison.png`、`static-check.json`，最终推送SHA见同目录 `remote-verification.json`。原生工具栏图标鼠标操作/系统缩放外观未验收，未重复执行无关API或流式功能回归；重新加载扩展即可更新图标。Description同步且继续仅本地，不提交。
+
 ## 2026-10-16 当前界面与帧播放更新上传验收
 
 用户授权上传当前项目更新。基线为 `codex/ui-reading-redesign@3646c52`，开始时有9个未暂存文件；fetch后确认当前历史包含origin/main，没有远程同名分支。复用当前分支，将既有界面、字体、全文工具栏历史与工作区中的帧播放更新一起保存和推送，不改main或发布版本，版本仍为4.6.0。已核对仓库push权限、目标分支不存在及规则列表为空；Description、私有材料、生成报告不进入提交。
