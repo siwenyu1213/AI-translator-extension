@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const arg = name => process.argv[process.argv.indexOf(name) + 1];
 const { chromium } = createRequire(import.meta.url)(arg('--playwright'));
-const output = resolve(root, 'artifacts/qa/fullpage-toolbar-arrow');
+const output = resolve(root, 'artifacts/qa/fullpage-toolbar-compact');
 const profile = resolve(root, '.local/browser-profile/fullpage-toolbar', `run-${Date.now()}`);
 mkdirSync(output, {recursive: true});
 const checks = [], errors = [], pending = [];
@@ -100,7 +100,7 @@ try {
     assert.equal(await page.locator('#ds-tb-toggle').isVisible(), true);
     assert.equal(await page.evaluate(() => document.activeElement.id), 'ds-tb-toggle');
     const bounds = await page.locator('#ds-translate-toolbar').boundingBox();
-    assert.ok(bounds.height <= 37 && Math.abs(bounds.x + bounds.width / 2 - 500) < 1);
+    assert.ok(bounds.height <= 25 && Math.abs(bounds.x + bounds.width / 2 - 500) < 1);
     await page.screenshot({path: resolve(output, 'hidden-running.png')});
   });
   await check('隐藏时继续写入译文及完成计数，工具栏文字不参与翻译', async () => {
@@ -154,7 +154,7 @@ try {
       for (const width of [260, 390]) {
         await page.setViewportSize({width, height: 800});
         const bounds = await page.locator('#ds-tb-toggle').boundingBox();
-        assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width && bounds.height === 32);
+        assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width && bounds.height === 20);
       }
       await page.mouse.move(10, 700);
       await page.screenshot({path: resolve(output, `${theme}-hidden-narrow.png`), animations: 'disabled'});
@@ -188,7 +188,10 @@ try {
       const bounds = await page.locator('#ds-tb-panel').boundingBox();
       assert.ok(Math.abs(bounds.width - width / 3) < 1);
       assert.ok(Math.abs(bounds.x + bounds.width / 2 - width / 2) < 1);
-      if (width === 1440) await page.screenshot({path: resolve(output, 'desktop-centered.png'), animations: 'disabled'});
+      if (width === 1440) {
+        await page.screenshot({path: resolve(output, 'desktop-centered.png'), animations: 'disabled'});
+        await page.locator('#ds-translate-toolbar').screenshot({path: resolve(output, 'toolbar-detail.png'), animations: 'disabled'});
+      }
     }
     await page.emulateMedia({reducedMotion: 'reduce'});
     await page.locator('#ds-tb-toggle').click(); await waitPanel(false);

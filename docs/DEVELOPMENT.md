@@ -139,6 +139,8 @@ GitHub同步必须核对远程提交和默认分支内容，不能把本地commi
 
 本版定向报告与截图为 `artifacts/qa/fullpage-toolbar-arrow/report.json` 及同目录PNG，首版历史证据保留在 `artifacts/qa/fullpage-toolbar/`。既有回归为 `artifacts/qa/adversarial-fix-2026-10-11/browser/results.json`（以报告内2026-10-16时间为准），静态报告为 `artifacts/qa/static-check.json`；详细记录在 `.local/materials/fullpage-toolbar-2026-10-16.md`。已查看展开、隐藏及窄屏截图，测试浏览器和本机服务已关闭，隔离profile保留。未验证真实供应商生成与原生右键菜单的鼠标点击；合成响应不证明模型质量或速度。
 
+2026-10-16 箭头外观微调：基线 `21bdcf9`，用户要求缩小边框；仅将按钮32×32px改为24×20px、SVG18px改为14px，圆角4px，边框按主题减淡，阴影缩为1px/3px。同步既有验证脚本的尺寸与证据目录，真实Edge155.0.4283.45/Node24.18.1/Playwright1.62.1的11项定向检查及50项静态、diff检查通过；已查看局部、窄屏及收起截图。新证据 `artifacts/qa/fullpage-toolbar-compact/report.json`、`toolbar-detail.png`，此前证据保留。本轮仅样式微调，未重复执行上一段的18项广泛回归或真实供应商/原生右键鼠标验收；测试浏览器与服务已关闭。Description同步但不提交，版本保持4.6.0，仅本地保存。
+
 ## 2026-10-13 最小上传整理验收
 
 基线 `16a4992`，当前任务分支与 `origin/main` 一致且工作区干净。停止跟踪27个文件：交接1份、历史任务记录24份、第三方调试source map 2份；原文件仍完整保留在本机。上传清单83→56个文件，运行源码、清单、图标、字体、第三方脚本与许可证、可复用验证工具均未修改，扩展版本保持4.6.0。
