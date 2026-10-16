@@ -172,8 +172,8 @@ try {
       await page.screenshot({path: resolve(output, `${theme}-hidden-narrow.png`), animations: 'disabled'});
       const colors = await page.locator('#ds-tb-toggle').evaluate(el => ({ink: getComputedStyle(el).color, surface: getComputedStyle(el).backgroundColor}));
       assert.deepEqual(colors, {
-        cobalt: {ink: 'rgb(32, 55, 68)', surface: 'rgb(255, 255, 255)'},
-        playful: {ink: 'rgb(54, 59, 48)', surface: 'rgb(255, 252, 245)'},
+        cobalt: {ink: 'rgb(38, 61, 54)', surface: 'rgb(250, 248, 240)'},
+        playful: {ink: 'rgb(32, 55, 68)', surface: 'rgb(255, 255, 255)'},
         vellum: {ink: 'rgb(33, 48, 71)', surface: 'rgb(255, 255, 255)'}
       }[theme]);
       await page.locator('#ds-tb-toggle').click();

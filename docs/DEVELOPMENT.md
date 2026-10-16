@@ -41,7 +41,7 @@ GitHub入口为 `https://github.com/siwenyu1213/LingoClarify`。本地目录与�
 
 - 后台加载 `model-catalog.js`、`config.js`、`selection.js`、`selection-prompts.js`；只使用选区模块的无DOM分析。
 - 自动内容注入：`theme.js` → `selection.js` → Marked → DOMPurify → `markdown.js` → `content.js`，样式为 `theme.css`、`content.css`。
-- 设置页加载 `model-catalog.js`、`config.js`、`theme.js`、`popup.js`，共用配置与查询逻辑。外观模块独立保存 `uiTheme`，只更新扩展根元素，默认澄净阅读；cobalt/playful/vellum分别对应澄净阅读、纸本文笺、精密工具，字体和引号图标本地打包。
+- 设置页加载 `model-catalog.js`、`config.js`、`theme.js`、`popup.js`，共用配置与查询逻辑。外观模块独立保存 `uiTheme`，只更新扩展根元素，默认纸本文笺；cobalt/playful/vellum分别对应纸本文笺、清浅青、冷灰蓝，三配色共用词典布局，字体本地打包。
 - 全文由后台按需注入 `content-fullpage.js`，通过端口取得单条或批量结果。
 - 全文工具栏桌面宽度为视口的约三分之一、水平居中，窄屏最小宽度受视口限制。下方单个 `ds-tb-toggle` 方框箭头控制 `ds-tb-panel` 整体收起/展开，按钮持续保留且焦点不变；收起内容设为inert并从辅助技术隐藏。180ms收起/浮现动画遵从减少动画偏好，任务、进度与主题继续运行。隐藏状态再次注入时只打开当前工具栏；取消移除整个入口，新启动默认展开，不保存全局偏好。
 
@@ -166,3 +166,13 @@ GitHub同步必须核对远程提交和默认分支内容，不能把本地commi
 执行 `node scripts/build-ui-layout-preview.mjs`，默认输出到`.local/materials/ui-layout-round2/`，并更新第一轮预览入口`.local/materials/ui-reading-redesign/index.html`。首次更新前将原入口保存为同目录round1.html。可用`--output <目录>`指定单独原型输出目录；固定对比入口仍会更新。独立HTML与内嵌srcdoc对比页不依赖服务器、字体下载或外部库。按钮演示用途切换、键盘左右/Home/End、思考开关、连接dialog、取消/完成与保存提示；复制/下载仅展示反馈，没有实际剪贴板或下载行为。
 
 北京时间2026-10-16，以Node24.18.1、Edge155.0.4283.45将新生成的自包含源字符串渲染到独立空白测试页面，完成对比页切换、三套用途/键盘/开关/弹窗/保存及260/320/390px边界检查；无脚本错误或外部请求。51项静态与git diff --check通过。证据为`artifacts/qa/ui-layout-round2/report.json`、`compare-settings.png`与`compare-results.png`；本轮不是扩展集成或真实API验收，不复用上轮19/17/11项结果作为新原型证据。浏览器工具因file协议限制拒绝读取用户现有标签页，因此没有操作该标签页；用户刷新原入口即可查看新原型。详细设计说明仅本地保存，根目录运行源码、并行流式修改和上轮公开截图保持原样，Description.md同步但不提交。
+
+## 2026-10-16 选用词典式UI并精简说明
+
+基线9b0c32f，复用codex/ui-reading-redesign。用户选定第二轮词典布局，并要求删除“当前用途·解释”“阅读设置”、将“模型连接”改为“当前模型”。本轮将所选布局接入根目录popup.html/popup.css及共享theme.css：大字题签、页签、厂家印记、当前模型、语言/触发行、底部保存；删去宣传语、重复型号/服务说明、Key编辑提示和主题保存成功小字，保留字段可访问标签、失败反馈、DeepSeek必要提示。结果浮层沿用纸页侧边与词条标题，移除底部重复模型/品牌署名。三配色共用词典布局，cobalt默认纸本文笺、playful清浅青、vellum冷灰蓝，存储标识不迁移。
+
+popup.js仅将共用trigger-mode控件移动到当前用途的语言行，保留同一DOM控件和值，切换标签不会重置触发方式；主题保存成功静默，失败继续提示。DeepSeek层级、Key保存、供应商/模型查询与生成协议不变。更新原型生成器中的相关文字，当前本地入口改为所选界面的实际截图，旧三方案原型保留在.local/materials/ui-layout-round2/。扩展版本保持4.6.0。
+
+北京时间2026-10-16，在隔离Edge155.0.4283.45、Node24.18.1、Playwright1.62.1中完成19项主题/布局、9项设置与DeepSeek端口、17项定位拖动、11项全文工具栏及51项静态检查，git diff --check通过。新增断言验证指定文案精简、共用触发控件随Tab移动且保留值；覆盖无Key初始态、两用途保存重开、开关联动、主题草稿隔离、错误、自定义接口dialog、260/320/390px、150/200%实际标签页缩放。200%时长型号曾差0.6px被裁切，已在260px以下调小字号并改为底部单列；复验通过。截图已目视复核，默认已配置状态的保存按钮完整位于510px窗口内；首次配置/展开更多字段仍可内部滚动。
+
+证据为artifacts/qa/lexicon-ui/report.json、cobalt-settings.png、cobalt-result.png、同目录toolbar/report.json，以及artifacts/qa/settings-controls-2026-10-13/report.json和artifacts/qa/tooltip-header-2026-10-13/report.json（按报告内本轮HEAD/运行信息识别）。设置工具的date字符串为旧固定日期，以本段当轮记录为准。静态报告artifacts/qa/static-check.json。全部使用合成Key、本机接口与SSE，不证明真实供应商或模型效果。未操作用户现有file标签页；原生Edge工具栏弹出层视觉与原生右键鼠标仍未验收。测试浏览器和本机服务均已关闭；并行流式修改继续保留、不纳入本次提交，Description同步且本地忽略。

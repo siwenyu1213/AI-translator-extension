@@ -11,10 +11,8 @@
 <body class="lc-theme" data-lc-theme="cobalt">
 <div class="container">
   <header class="brand-header">
-    <span class="lc-brand-icon" aria-hidden="true"></span>
     <div><h1 class="title">说文</h1><p class="brand-subtitle">LingoClarify <span class="version">v4.6.0</span></p></div>
   </header>
-  <p class="brand-caption">读懂一个词，也读懂它所在的世界。</p>
   <p id="catalog-status" class="catalog-error" role="alert" hidden></p>
   <div id="disabled-extension" class="section" hidden>
     <p class="hint">扩展当前已停用。</p>
@@ -27,107 +25,92 @@
     <button type="button" class="tab-btn" id="tab-translate" role="tab" aria-selected="false" aria-controls="panel-translate" data-tab="translate"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 5h12M9 2v3M5 5c1 5 4 8 8 10M13 5c-1 5-4 8-8 10M14 21l4-10 4 10M15.5 18h5"/></svg>全文翻译</button>
   </div>
 
-  <!-- ═══ 解释标签设置 ═══ -->
   <div class="tab-panel active" id="panel-explain" role="tabpanel" aria-labelledby="tab-explain">
-    <div class="section field-pair">
-      <div><label class="label" for="explain-manufacturer">模型厂家</label>
-      <select id="explain-manufacturer" class="select" aria-controls="explain-model"></select></div>
-      <div><label class="label" for="explain-language">解释语言</label>
-      <select id="explain-language" class="select">
-        <option value="auto">自动（推荐）</option><option value="zh">中文</option><option value="en">English</option>
-      </select></div>
+    <h2 class="model-heading">当前模型</h2>
+    <div class="section field-pair model-pair">
+      <div class="manufacturer-field">
+        <label class="label visually-hidden" for="explain-manufacturer">模型厂家</label>
+        <select id="explain-manufacturer" class="select" aria-controls="explain-model"></select>
+      </div>
+      <div class="model-field">
+        <label class="label visually-hidden" for="explain-model">模型</label>
+        <select id="explain-model" class="select" aria-describedby="explain-model-detail"></select>
+      </div>
     </div>
-    <div class="section">
-      <label class="label" for="explain-model">模型</label>
-      <select id="explain-model" class="select" aria-describedby="explain-model-detail"></select>
-      <p id="explain-model-detail" class="hint"></p>
-
-    </div>
-
-    <div class="section" id="explain-deepseek-thinking-section" hidden>
+    <p id="explain-model-detail" class="hint model-detail"></p>
+    <div class="section thinking-section" id="explain-deepseek-thinking-section" hidden>
       <label class="toggle-label">
-        <input type="checkbox" id="explain-deepseek-thinking" aria-describedby="explain-deepseek-thinking-hint" aria-controls="explain-thinking">
         <span class="toggle-text">DeepSeek 思考模式</span>
+        <input type="checkbox" id="explain-deepseek-thinking" aria-describedby="explain-deepseek-thinking-hint" aria-controls="explain-thinking">
       </label>
-      <p class="hint" id="explain-deepseek-thinking-hint">开启后允许模型思考；关闭后禁止思考，深度思考也不可开启。</p>
+      <p class="hint" id="explain-deepseek-thinking-hint">关闭时同时停用深度思考。</p>
     </div>
-
-    <div class="section">
+    <div class="section thinking-section">
       <label class="toggle-label">
+        <span class="toggle-text">深度思考</span>
         <input type="checkbox" id="explain-thinking">
-        <span class="toggle-text">深度思考模式</span>
       </label>
     </div>
-
     <div class="section" id="explain-effort-section" style="display:none">
       <label class="label" for="explain-effort">思考强度</label>
       <select id="explain-effort" class="select">
-        <option value="high">高（推荐）</option>
-        <option value="medium">中</option>
-        <option value="low">低</option>
+        <option value="high">高</option><option value="medium">中</option><option value="low">低</option>
       </select>
     </div>
-
+    <div class="reading-preferences">
+      <div class="language-field">
+        <label class="label" for="explain-language">解释语言</label>
+        <select id="explain-language" class="select"><option value="auto">自动</option><option value="zh">中文</option><option value="en">English</option></select>
+      </div>
+      <div class="section" id="trigger-mode-section"><label class="label" for="trigger-mode">划词触发</label><select id="trigger-mode" class="select"><option value="auto">选中即解释</option><option value="contextMenu">仅右键菜单</option></select></div>
+    </div>
   </div>
 
-  <!-- ═══ 翻译标签设置 ═══ -->
   <div class="tab-panel" id="panel-translate" role="tabpanel" aria-labelledby="tab-translate" hidden>
-    <div class="section field-pair">
-      <div><label class="label" for="translate-manufacturer">模型厂家</label>
-      <select id="translate-manufacturer" class="select" aria-controls="translate-model"></select></div>
-      <div><label class="label" for="target-language">翻译目标语言</label>
-      <select id="target-language" class="select">
-        <option value="zh">中文</option><option value="en">English</option><option value="ja">日本語</option><option value="ko">한국어</option>
-        <option value="fr">Français</option><option value="de">Deutsch</option><option value="es">Español</option><option value="pt">Português</option><option value="ru">Русский</option><option value="ar">العربية</option>
-      </select></div>
+    <h2 class="model-heading">当前模型</h2>
+    <div class="section field-pair model-pair">
+      <div class="manufacturer-field">
+        <label class="label visually-hidden" for="translate-manufacturer">模型厂家</label>
+        <select id="translate-manufacturer" class="select" aria-controls="translate-model"></select>
+      </div>
+      <div class="model-field">
+        <label class="label visually-hidden" for="translate-model">模型</label>
+        <select id="translate-model" class="select" aria-describedby="translate-model-detail"></select>
+      </div>
     </div>
-    <div class="section">
-      <label class="label" for="translate-model">模型</label>
-      <select id="translate-model" class="select" aria-describedby="translate-model-detail"></select>
-      <p id="translate-model-detail" class="hint"></p>
-
-    </div>
-
-    <div class="section" id="translate-deepseek-thinking-section" hidden>
+    <p id="translate-model-detail" class="hint model-detail"></p>
+    <div class="section thinking-section" id="translate-deepseek-thinking-section" hidden>
       <label class="toggle-label">
-        <input type="checkbox" id="translate-deepseek-thinking" aria-describedby="translate-deepseek-thinking-hint" aria-controls="translate-thinking">
         <span class="toggle-text">DeepSeek 思考模式</span>
+        <input type="checkbox" id="translate-deepseek-thinking" aria-describedby="translate-deepseek-thinking-hint" aria-controls="translate-thinking">
       </label>
-      <p class="hint" id="translate-deepseek-thinking-hint">开启后允许模型思考；关闭后禁止思考，深度思考也不可开启。</p>
+      <p class="hint" id="translate-deepseek-thinking-hint">关闭时同时停用深度思考。</p>
     </div>
-
-    <div class="section">
+    <div class="section thinking-section">
       <label class="toggle-label">
+        <span class="toggle-text">深度思考</span>
         <input type="checkbox" id="translate-thinking">
-        <span class="toggle-text">深度思考模式</span>
       </label>
     </div>
-
     <div class="section" id="translate-effort-section" style="display:none">
       <label class="label" for="translate-effort">思考强度</label>
       <select id="translate-effort" class="select">
-        <option value="high">高（推荐）</option>
-        <option value="medium">中</option>
-        <option value="low">低</option>
+        <option value="high">高</option><option value="medium">中</option><option value="low">低</option>
       </select>
     </div>
+    <div class="reading-preferences">
+      <div class="language-field">
+        <label class="label" for="target-language">目标语言</label>
+        <select id="target-language" class="select"><option value="zh">中文</option><option value="en">English</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="es">Español</option><option value="pt">Português</option><option value="ru">Русский</option><option value="ar">العربية</option></select>
+      </div>
 
-  </div>
-
-  <div class="section" id="trigger-mode-section">
-    <label class="label" for="trigger-mode">划词触发方式</label>
-    <select id="trigger-mode" class="select" aria-describedby="trigger-mode-hint">
-      <option value="auto">选中文字后自动弹出（默认）</option>
-      <option value="contextMenu">仅右键菜单触发</option>
-    </select>
-    <p class="hint" id="trigger-mode-hint">选中文字后，右键选择“📖 说文：解释选中文字”。此设置同时适用于两个标签的划词回答。</p>
+    </div>
   </div>
 
   <div class="section key-section">
     <div id="key-editor">
       <label class="label" for="api-key">API Key</label>
       <input type="password" id="api-key" class="input" autocomplete="off" spellcheck="false">
-      <p class="hint">填写所选厂家的 Key，保存后自动收起。</p>
       <div class="key-actions">
         <button type="button" id="save-key" class="mini-btn">保存 API Key</button>
         <button type="button" id="cancel-key" class="mini-btn" hidden>取消</button>
@@ -149,13 +132,15 @@
     </div>
   </dialog>
 
-  <button type="button" id="save-btn" class="save-btn">保存设置</button>
-  <div id="status" class="status" role="status" aria-live="polite"></div>
-  <div class="theme-section">
-    <label class="label" for="ui-theme">主题风格</label>
-    <select id="ui-theme" class="select" aria-describedby="theme-status"><option value="cobalt">澄净阅读（默认）</option><option value="playful">纸本文笺</option><option value="vellum">精密工具</option></select>
-    <p id="theme-status" class="hint" role="status" aria-live="polite">切换后自动保存</p>
-  </div>
+  <footer class="settings-footer">
+    <div class="theme-section">
+      <label class="label visually-hidden" for="ui-theme">主题配色</label>
+      <select id="ui-theme" class="select" aria-describedby="theme-status"><option value="cobalt">纸本文笺</option><option value="playful">清浅青</option><option value="vellum">冷灰蓝</option></select>
+      <p id="theme-status" class="hint" role="status" aria-live="polite"></p>
+    </div>
+    <button type="button" id="save-btn" class="save-btn">保存设置<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></button>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+  </footer>
 </div>
 
 <script src="model-catalog.js"></script>

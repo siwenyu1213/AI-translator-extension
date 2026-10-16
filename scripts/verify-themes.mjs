@@ -52,11 +52,13 @@ try{
   const url=`chrome-extension://${new URL(worker.url()).host}/popup.html`;
   popup=await context.newPage();popup.on('pageerror',e=>errors.push(e.message));await popup.setViewportSize({width:390,height:600});await popup.goto(url);
   await popup.waitForFunction(()=>document.querySelector('#explain-manufacturer').options.length===11);
-  await check('旧配置和首次使用默认澄净阅读，三方向可选，无失效思考提示',async()=>{
+  await check('首次使用词典纸页，三配色可选，无重复小字',async()=>{
     await popup.evaluate(()=>LingoTheme.ready);
     assert.equal(await popup.locator('body').getAttribute('data-lc-theme'),'cobalt');
     assert.deepEqual(await popup.locator('#ui-theme option').evaluateAll(options=>options.map(o=>o.value)),['cobalt','playful','vellum']);
     assert.equal((await popup.locator('body').textContent()).includes('固定关闭思考'),false);
+    for(const text of ['当前用途','阅读设置','所用型号','模型服务','读懂一个词']) assert.equal((await popup.locator('body').innerText()).includes(text),false,text);
+    assert.equal(await popup.locator('#panel-explain .model-heading').textContent(),'当前模型');
     assert.equal(await popup.locator('#api-key').isVisible(),true);
     await settingsShot('first-run.png');
   });
@@ -75,13 +77,13 @@ try{
   await page.locator('#ds-tb-show-original').click();
   await selectWord();
   const before=await snapshot();
-  for(const [theme,color,surface]of[['cobalt','rgb(245, 248, 248)','rgb(255, 255, 255)'],['playful','rgb(247, 242, 232)','rgb(255, 252, 245)'],['vellum','rgb(240, 243, 248)','rgb(255, 255, 255)']]){
+  for(const [theme,color,surface]of[['cobalt','rgb(243, 240, 229)','rgb(250, 248, 240)'],['playful','rgb(245, 248, 248)','rgb(255, 255, 255)'],['vellum','rgb(240, 243, 248)','rgb(255, 255, 255)']]){
     await check(`${theme} 即时同步设置/已打开结果/全文工具栏，连接和模型保持`,async()=>{
       await setTheme(theme);
       await page.waitForFunction(theme=>['deepseek-explain-tooltip','ds-translate-toolbar'].every(id=>document.getElementById(id)?.dataset.lcTheme===theme),theme);
       assert.deepEqual(await snapshot(),before);
       assert.equal(await popup.evaluate(()=>getComputedStyle(document.body).backgroundColor),color);
-      assert.equal(await page.locator('#deepseek-explain-tooltip').evaluate(el=>getComputedStyle(el).backgroundColor),surface);
+      assert.equal(await page.locator('#deepseek-explain-tooltip').evaluate(el=>getComputedStyle(el).backgroundColor),color);
       assert.equal(await page.locator('.ds-tb-panel-content').evaluate(el=>getComputedStyle(el).backgroundColor),surface);
       await popup.evaluate(()=>document.fonts.ready);await page.evaluate(()=>document.fonts.ready);
       await settingsShot(`${theme}-settings.png`);
@@ -181,14 +183,20 @@ try{
     assert.equal(await popup.locator('#ui-theme').inputValue(),'playful');assert.equal(await popup.locator('body').getAttribute('data-lc-theme'),'playful');
     await popup.evaluate(()=>{chrome.storage.local.set=qaThemeStorageSet;delete globalThis.qaThemeStorageSet;});
   });
-  await check('损坏或已删除的主题值回退澄净阅读，现有网页同步',async()=>{
+  await check('损坏或已删除的主题值回退词典纸页，现有网页同步',async()=>{
     await worker.evaluate(()=>chrome.storage.local.set({uiTheme:'unknown-theme'}));await popup.waitForFunction(()=>document.body.dataset.lcTheme==='cobalt');
     await page.waitForFunction(()=>document.querySelector('#deepseek-explain-tooltip').dataset.lcTheme==='cobalt');
     await worker.evaluate(()=>chrome.storage.local.remove('uiTheme'));await popup.reload();await popup.waitForFunction(()=>document.querySelector('#ui-theme').value==='cobalt');
   });
   await check('键盘切换两用途、隐藏面板不可聚焦，主题控件键盘可用',async()=>{
     await popup.locator('#tab-explain').focus();await popup.keyboard.press('ArrowRight');assert.equal(await popup.locator('#tab-translate').getAttribute('aria-selected'),'true');assert.equal(await popup.locator('#panel-explain').isVisible(),false);
+    assert.equal(await popup.locator('#trigger-mode').isVisible(),true);
+    assert.equal(await popup.locator('#trigger-mode').evaluate(el=>el.closest('.tab-panel').id),'panel-translate');
+    await popup.locator('#trigger-mode').selectOption('contextMenu');
+    await popup.locator('#tab-translate').focus();
     await popup.keyboard.press('Home');assert.equal(await popup.locator('#tab-explain').getAttribute('aria-selected'),'true');await popup.locator('#ui-theme').focus();
+    assert.equal(await popup.locator('#trigger-mode').inputValue(),'contextMenu');
+    assert.equal(await popup.locator('#trigger-mode').evaluate(el=>el.closest('.tab-panel').id),'panel-explain');
     assert.equal(await popup.evaluate(()=>document.activeElement.id),'ui-theme');
   });
   await check('320px 设置页与375px结果/工具栏无横向溢出，网页本身样式不变',async()=>{
@@ -198,9 +206,9 @@ try{
     const pageColors=await page.evaluate(()=>({bg:getComputedStyle(document.body).backgroundColor,font:getComputedStyle(document.body).fontFamily}));assert.equal(pageColors.bg,'rgb(255, 255, 255)');assert.equal(pageColors.font,'Arial');
     await popup.setViewportSize({width:390,height:600});
   });
-  await check('本地品牌PNG尺寸与清单一致、界面/工具栏使用同一引号图标',async()=>{
+  await check('设置题签与本地品牌资源有效，PNG尺寸和清单一致',async()=>{
     for(const size of[16,32,48,128]){const data=readFileSync(resolve(root,`icons/icon${size}.png`));assert.equal(data.readUInt32BE(16),size);assert.equal(data.readUInt32BE(20),size);}
-    const brand=await popup.locator('.lc-brand-icon').evaluate(el=>getComputedStyle(el).backgroundImage);assert.ok(brand.includes('/icons/brand.svg'));
+    assert.equal(await popup.locator('.title').textContent(),'说文');
     const contentBrand=await page.locator('#deepseek-explain-tooltip .lc-brand-icon').evaluate(el=>getComputedStyle(el).backgroundImage);assert.ok(contentBrand.startsWith('url("chrome-extension://'));
     assert.equal(await page.evaluate(url=>new Promise(resolve=>{const image=new Image();image.onload=()=>resolve(image.naturalWidth===128);image.onerror=()=>resolve(false);image.src=url;}),contentBrand.slice(5,-2)),true);
     assert.equal(await page.locator('.lc-brand-icon').count(),2);return{sizes:[16,32,48,128]};

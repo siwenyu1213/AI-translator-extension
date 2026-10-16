@@ -1,18 +1,18 @@
-/* 三个可切换设计方向；保留旧uiTheme标识，现有配置无需迁移。 */
+/* 词典式界面共用三套配色；保留uiTheme标识，现有配置无需迁移。 */
 /* 变量和组件均限定在扩展根元素；字体由theme.js从本地加载。 */
 .lc-theme {
-  --lc-bg: #f5f8f8; --lc-surface: #ffffff; --lc-soft: #e8f0f0;
-  --lc-ink: #203744; --lc-muted: #526973; --lc-accent: #126b63; --lc-on: #ffffff;
-  --lc-border: #93a9ad; --lc-rule: #d8e3e5; --lc-error: #b42318; --lc-error-bg: #fff0ed;
+  --lc-bg: #f3f0e5; --lc-surface: #faf8f0; --lc-soft: #e7e5d6;
+  --lc-ink: #263d36; --lc-muted: #5d695f; --lc-accent: #36594b; --lc-on: #ffffff;
+  --lc-border: #8b9685; --lc-rule: #c8cbbb; --lc-error: #b42318; --lc-error-bg: #fff0ed;
   --lc-success: #246a48; --lc-shadow: #20374414;
   --lc-body-font: 'LC Inter', 'Segoe UI', 'Microsoft YaHei', sans-serif;
-  --lc-title-font: 'LC Space', 'Microsoft YaHei', sans-serif;
+  --lc-title-font: 'LC Cormorant', 'SimSun', 'Songti SC', Georgia, serif;
   color-scheme: light;
 }
 .lc-theme[data-lc-theme='playful'] {
-  --lc-bg: #f7f2e8; --lc-surface: #fffcf5; --lc-soft: #eee7d8;
-  --lc-ink: #363b30; --lc-muted: #666651; --lc-accent: #536442; --lc-on: #ffffff;
-  --lc-border: #a39e88; --lc-rule: #dcd4c2; --lc-shadow: #48452b14;
+  --lc-bg: #f5f8f8; --lc-surface: #ffffff; --lc-soft: #e8f0f0;
+  --lc-ink: #203744; --lc-muted: #526973; --lc-accent: #126b63; --lc-on: #ffffff;
+  --lc-border: #93a9ad; --lc-rule: #d8e3e5; --lc-shadow: #20374414;
   --lc-body-font: 'LC Space', 'Segoe UI', 'Microsoft YaHei', sans-serif;
   --lc-title-font: 'LC Cormorant', 'SimSun', 'Songti SC', Georgia, serif;
 }
@@ -24,29 +24,30 @@
 .lc-brand-icon { display: inline-block; flex: none; width: 40px; height: 40px; background: var(--lc-brand-image) center / contain no-repeat; }
 /* 主题层统一阅读组件外观；content.css负责定位、滚动约束和操作尺寸。 */
 #deepseek-explain-tooltip.lc-theme {
-  background: var(--lc-surface); border: 1px solid var(--lc-border);
-  border-radius: 12px; box-shadow: 0 8px 32px var(--lc-shadow);
+  background: var(--lc-bg); border: 1px solid var(--lc-border); border-left: 6px solid var(--lc-accent);
+  border-radius: 4px; box-shadow: 0 8px 32px var(--lc-shadow);
 }
-#deepseek-explain-tooltip.lc-theme .ds-header { padding: 9px 16px; background: var(--lc-bg); }
+#deepseek-explain-tooltip.lc-theme .ds-header { padding: 10px 16px; background: var(--lc-bg); border-bottom: 2px solid var(--lc-ink); }
+#deepseek-explain-tooltip.lc-theme .ds-header .lc-brand-icon { display: none; }
 #deepseek-explain-tooltip.lc-theme .ds-brand { color: var(--lc-ink); font-weight: 600; }
 #deepseek-explain-tooltip.lc-theme .ds-close { color: var(--lc-muted); border-radius: 6px; }
 #deepseek-explain-tooltip.lc-theme .ds-quote {
-  margin: 14px 16px 0; padding: 8px 11px; border: 0; border-left: 2px solid var(--lc-accent);
-  border-radius: 0 5px 5px 0; background: var(--lc-bg); line-height: 1.65;
+  margin: 14px 16px 0; padding: 0 0 12px; border: 0; border-bottom: 1px solid var(--lc-rule);
+  border-radius: 0; background: transparent; line-height: 1.65;
 }
 #deepseek-explain-tooltip.lc-theme .ds-body { padding: 14px 18px 12px; line-height: 1.85; }
 #deepseek-explain-tooltip.lc-theme .ds-markdown { line-height: 1.85; }
-#deepseek-explain-tooltip.lc-theme .ds-markdown h1 { font-size: 22px; }
+#deepseek-explain-tooltip.lc-theme .ds-markdown h1 { font-size: 29px; font-weight: 500; }
 #deepseek-explain-tooltip.lc-theme .ds-markdown h2 { font-size: 18px; }
 #deepseek-explain-tooltip.lc-theme .ds-markdown h3 { font-size: 16px; }
 #deepseek-explain-tooltip.lc-theme .ds-markdown :is(code,pre,th,blockquote) { background: var(--lc-bg); }
 #deepseek-explain-tooltip.lc-theme .ds-markdown pre code { background: transparent; }
 #deepseek-explain-tooltip.lc-theme .ds-actions { padding: 4px 16px 12px; gap: 8px; }
 #deepseek-explain-tooltip.lc-theme .ds-btn { border-radius: 6px; background: var(--lc-surface); }
-#deepseek-explain-tooltip.lc-theme .ds-footer { background: var(--lc-bg); }
+#deepseek-explain-tooltip.lc-theme .ds-footer { display: none; }
 #deepseek-explain-tooltip.lc-theme .ds-reasoning { border: 1px solid var(--lc-rule); border-radius: 6px; background: var(--lc-bg); }
 #deepseek-explain-tooltip.lc-theme[data-lc-theme='playful'] { border-radius: 4px; }
-#deepseek-explain-tooltip.lc-theme[data-lc-theme='playful'] .ds-header { border-bottom: 2px solid var(--lc-accent); }
+#deepseek-explain-tooltip.lc-theme[data-lc-theme='playful'] .ds-header { border-bottom: 2px solid var(--lc-ink); }
 #deepseek-explain-tooltip.lc-theme[data-lc-theme='playful'] .ds-markdown :is(h1,h2,h3) { font-family: 'SimSun', 'Songti SC', serif; }
 #deepseek-explain-tooltip.lc-theme[data-lc-theme='vellum'] { border-radius: 6px; }
 #deepseek-explain-tooltip.lc-theme[data-lc-theme='vellum'] .ds-body { padding: 10px 16px; line-height: 1.75; }
