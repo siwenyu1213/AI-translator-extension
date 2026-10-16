@@ -61,13 +61,16 @@ function renderCatalogStatus() {
   $catalogStatus.hidden = !message;
 }
 function catalogState(message = '') { catalogError = message; renderCatalogStatus(); }
+// 设置页显示模型品牌简称；连接仍使用原厂家 ID。
+const manufacturerLabels = {openai:'GPT',anthropic:'Claude',google:'Gemini',qwen:'Qwen',
+  moonshot:'Kimi',zai:'GLM',xai:'Grok',mistral:'Mistral'};
 function renderManufacturers() {
   tabs.forEach(tab => {
     const selected = tab.manufacturer.value || 'openai';
     tab.manufacturer.replaceChildren();
     for (const maker of [...catalogSnapshot.providers, {id:'custom',name:'自定义接口'}]) {
       const option = document.createElement('option');
-      option.value = maker.id; option.textContent = maker.name;
+      option.value = maker.id; option.textContent = manufacturerLabels[maker.id] || maker.name;
       tab.manufacturer.append(option);
     }
     tab.manufacturer.value = selected;

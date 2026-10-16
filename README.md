@@ -91,6 +91,8 @@ git clone https://github.com/siwenyu1213/LingoClarify.git
 
 设置页内置 **OpenAI、DeepSeek、Anthropic、Google、阿里千问、月之暗面、智谱、MiniMax、xAI、Mistral AI** 的地址预设，另有“自定义接口”。
 
+选择列表以模型品牌简称显示：GPT、DeepSeek、Claude、Gemini、Qwen、Kimi、GLM、MiniMax、Grok、Mistral；连接与模型 ID 沿用原值。
+
 预设用于地址选择，**不等于每家原生协议或每款模型都已验证兼容**。所选服务必须支持下列请求；只提供其他原生协议的服务需要兼容网关。
 
 | 用途 | 当前协议要求 |

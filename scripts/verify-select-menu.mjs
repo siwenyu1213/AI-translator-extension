@@ -43,6 +43,10 @@ try{
     return{title,latin};
   });
   await check('厂家菜单自绘、勾选与边界，点击外部关闭',async()=>{
+    const expected={openai:'GPT',deepseek:'DeepSeek',anthropic:'Claude',google:'Gemini',qwen:'Qwen',moonshot:'Kimi',zai:'GLM',minimax:'MiniMax',xai:'Grok',mistral:'Mistral',custom:'自定义接口'};
+    for(const kind of ['explain','translate']) {
+      assert.deepEqual(await popup.locator('#'+kind+'-manufacturer option').evaluateAll(options=>Object.fromEntries(options.map(option=>[option.value,option.textContent]))),expected);
+    }
     await popup.evaluate(()=>{const nativeFetch=fetch;globalThis.fetch=(url,init)=>String(url).includes('api.deepseek.com')?Promise.resolve(Response.json({data:[{id:'deepseek-flash'}]})):nativeFetch(url,init);});
     await popup.locator('#explain-manufacturer-trigger').click();
     await popup.getByRole('option',{name:'DeepSeek',exact:true}).click();
@@ -76,7 +80,7 @@ try{
     await popup.keyboard.press('Space');await popup.keyboard.press('Tab');assert.equal(await popup.locator('.lc-select-menu:popover-open').count(),0);
   });
   await check('用途切换和异步厂家列表同步，停用模型不打开菜单',async()=>{
-    await popup.locator('#explain-manufacturer-trigger').click();await popup.getByRole('option',{name:'OpenAI',exact:true}).click();
+    await popup.locator('#explain-manufacturer-trigger').click();await popup.getByRole('option',{name:'GPT',exact:true}).click();
     await popup.waitForFunction(()=>document.querySelector('#explain-model-trigger').disabled);
     assert.equal(await popup.locator('#explain-model-trigger').isDisabled(),true);
     await popup.locator('#tab-translate').click();assert.equal(await popup.locator('#translate-model-trigger').isEnabled(),true);

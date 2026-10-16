@@ -138,6 +138,12 @@ git diff --cached
 
 GitHub同步必须核对远程提交和默认分支内容，不能把本地commit或模拟通过当作上传成功。
 
+## 2026-10-16 选择列表品牌简称
+
+基线 `codex/ui-reading-redesign@375010b`，工作区干净，fetch后领先上游6个提交、无落后。popup.js仅在厂家选项渲染时应用品牌简称：GPT、Claude、Gemini、Qwen、Kimi、GLM、Grok、Mistral；DeepSeek、MiniMax和自定义接口沿用。两个标签的选择框及展开列表同步，目录原始厂家名称、厂家ID、连接地址、Key和模型ID不变，版本1.0.0。README、既有菜单回归和本地Description同步。
+
+北京时间2026-10-16，Node24.18.1、隔离Edge155.0.4283.45：56项静态、7项菜单/字体回归及git diff --check通过。两标签全部11个选项的简称与原ID已核对；另以合成Anthropic配置验证三主题/两标签/三宽度18组布局、长名称省略及菜单开关，保存重开显示Claude、存储厂家仍anthropic、模型仍claude-sonnet-4-6。证据 `artifacts/qa/model-brand-labels/report.json`、`claude/report.json`、`claude/settings-390.png` 和 `artifacts/qa/static-check.json`，截图已目视复核。未调用真实供应商API或验证原生工具栏弹出层；仅本地提交，重新加载扩展并打开设置页查看。
+
 ## 2026-10-16 厂家选择框外观
 
 再向右微调（基线 `1530051`，工作区干净）：名称由translateX(-2ch)改为-1ch，即相对上一版右移一个字符；14px/700字重沿用。Node24.18.1、隔离Edge155.0.4283.45下18组布局、两组合成长名称省略及菜单开关验证通过，56静态和git diff --check通过，390px截图已复核。证据 `artifacts/qa/manufacturer-label-right/report.json` 与同目录截图；未验证原生工具栏弹出层或真实API，版本1.0.0，仅本地提交。
