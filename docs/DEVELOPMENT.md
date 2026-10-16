@@ -137,6 +137,14 @@ git diff --cached
 
 GitHub同步必须核对远程提交和默认分支内容，不能把本地commit或模拟通过当作上传成功。
 
+## 2026-10-16 Edge商店提交包
+
+从干净的 `codex/ui-reading-redesign@090150f` 打包当前1.0.0运行文件，未修改运行源码或版本。产物为 `artifacts/releases/LingoClarify-Edge-v1.0.0-20261016-212308.zip`，39个文件、13,947,400字节；manifest.json直接位于ZIP根目录，保留根目录JS/HTML/CSS、图标、第三方脚本、本地字体、许可证与第三方来源说明。开发文档、验证工具、Git历史、Description.md、私有材料、浏览器配置、日志和source map不进入提交包。
+
+Node24.18.1下项目55项静态检查、解压成品39项静态检查及git diff --check通过；逐文件SHA-256确认解压内容与打包快照、当前运行文件一致。成品SHA-256为 `48afd28141b0f03d55d65331fcb4bc075bff1b47e5bbf0a5e7f367a0f7b11ff7`。清单及逐项哈希见 `artifacts/qa/LingoClarify-Edge-v1.0.0-20261016-212308/package-report.json`，解压检查见同目录 `extracted-static-check.json`。验证脚本仅在解压后加入临时验证目录，ZIP内不含该脚本。
+
+本轮仅完成本地打包与静态完整性检查，没有重复Edge交互、真实供应商API验收，也没有上传Partner Center或确认商店审核通过。提交时直接选择此ZIP；本地预检可将其解压，在edge://extensions加载包含manifest.json的目录，再按README配置厂家、Key和模型。
+
 ## 2026-10-16 版本号统一为1.0.0
 
 用户要求将目前版本改为1.0.0。基线 `codex/ui-reading-redesign@c01877f`，工作区干净，fetch后与上游0/0；同步manifest.json、popup.html及README/本手册当前版本说明。仅调整版本标识，既有功能与配置格式沿用，历史验收记录中的旧版本保留为当时事实。Description当前版本及维护记录同步，但继续忽略、不提交。
