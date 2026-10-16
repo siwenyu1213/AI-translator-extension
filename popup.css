@@ -115,10 +115,10 @@ dialog h2 { font: 400 23px/1.4 var(--lc-title-font); margin-bottom: 15px; }
 .lc-select-caret svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .lc-select-trigger[aria-expanded='true'] .lc-select-caret { transform: rotate(180deg); }
 .lc-select-trigger:disabled { cursor: default; opacity: .65; }
-/* 厂家文字从居中位置左移约两个字符，箭头独占右侧。 */
+/* 厂家文字从居中位置左移约一个字符，箭头独占右侧。 */
 .manufacturer-field .lc-select { display: flex; align-items: stretch; }
 .manufacturer-field .lc-select-trigger { display: grid; grid-template-columns: 14px minmax(0,1fr) 14px; gap: 0; border-radius: 8px; }
-.manufacturer-field .lc-select-value { grid-column: 2; max-width: 100%; text-align: center; transform: translateX(-2ch); }
+.manufacturer-field .lc-select-value { grid-column: 2; max-width: 100%; text-align: center; transform: translateX(-1ch); }
 .manufacturer-field .lc-select-caret { grid-column: 3; }
 .lc-select-menu {
   position: fixed; inset: auto; margin: 0; padding: 6px; border: 1px solid var(--lc-rule);

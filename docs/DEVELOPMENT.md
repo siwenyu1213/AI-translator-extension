@@ -140,6 +140,8 @@ GitHub同步必须核对远程提交和默认分支内容，不能把本地commi
 
 ## 2026-10-16 厂家选择框外观
 
+再向右微调（基线 `1530051`，工作区干净）：名称由translateX(-2ch)改为-1ch，即相对上一版右移一个字符；14px/700字重沿用。Node24.18.1、隔离Edge155.0.4283.45下18组布局、两组合成长名称省略及菜单开关验证通过，56静态和git diff --check通过，390px截图已复核。证据 `artifacts/qa/manufacturer-label-right/report.json` 与同目录截图；未验证原生工具栏弹出层或真实API，版本1.0.0，仅本地提交。
+
 后续文字微调（基线 `81ead46`，工作区干净）：厂家名称12→14px、字重700，从原居中位置左移2ch（DeepSeek实测约18px），垂直位置保留。Node24.18.1、隔离Edge155.0.4283.45下，三主题/两标签/390、320、260px共18组布局及390/260px合成长名称省略检查通过，菜单点击/Escape正常；56项静态与git diff --check通过。截图已复核，证据 `artifacts/qa/manufacturer-label/report.json` 及同目录 `settings-390.png`、`settings-320.png`、`settings-260.png`。未验证原生工具栏弹出层与真实API；仅本地提交，版本1.0.0。
 
 基线 `codex/ui-reading-redesign@0afcd26`，起始工作区干净。仅调整popup.css：厂家框边框由1px加粗至2px、圆角10px，内部按钮圆角8px；厂家文字相对整个框水平/垂直居中，两侧等宽预留空间，右侧保留箭头，按钮覆盖框内高度。解释与全文翻译共用样式，版本仍1.0.0。
