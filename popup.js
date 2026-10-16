@@ -61,13 +61,16 @@ function renderCatalogStatus() {
   $catalogStatus.hidden = !message;
 }
 function catalogState(message = '') { catalogError = message; renderCatalogStatus(); }
+// 设置页显示模型品牌简称；连接仍使用原厂家 ID。
+const manufacturerLabels = {openai:'GPT',anthropic:'Claude',google:'Gemini',qwen:'Qwen',
+  moonshot:'Kimi',zai:'GLM',xai:'Grok',mistral:'Mistral'};
 function renderManufacturers() {
   tabs.forEach(tab => {
     const selected = tab.manufacturer.value || 'openai';
     tab.manufacturer.replaceChildren();
     for (const maker of [...catalogSnapshot.providers, {id:'custom',name:'自定义接口'}]) {
       const option = document.createElement('option');
-      option.value = maker.id; option.textContent = maker.name;
+      option.value = maker.id; option.textContent = manufacturerLabels[maker.id] || maker.name;
       tab.manufacturer.append(option);
     }
     tab.manufacturer.value = selected;
@@ -269,8 +272,6 @@ document.querySelectorAll('.tab-btn').forEach(button => button.addEventListener(
   activeTabIndex = button.dataset.tab === 'translate' ? 1 : 0;
   document.querySelectorAll('.tab-btn').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-selected',String(b===button));});
   document.querySelectorAll('.tab-panel').forEach(p=>{const active=p.id==='panel-'+button.dataset.tab;p.classList.toggle('active',active);p.hidden=!active;});
-  // 两用途共用一个触发配置，将现有控件移入当前面板的语言行，不复制状态。
-  $('panel-'+button.dataset.tab).querySelector('.reading-preferences').append($('trigger-mode-section'));
   showConnection(); renderAllModelOptions();
 }));
 document.querySelector('.tab-bar').addEventListener('keydown', event => {

@@ -11,6 +11,7 @@
 | 路径 | 用途 |
 | --- | --- |
 | 根目录、`vendor/` | 运行源码、本地依赖与许可证 |
+| `_locales/zh_CN/`、`_locales/en/` | 商店名称/简介的语言资源，默认简体中文；不代表设置界面已英文翻译 |
 | `scripts/` | 可复用验证工具 |
 | `PRIVACY.md` | 公开隐私政策，说明实际数据流、第三方接收方、存储、权限及用户控制 |
 | `docs/DEVELOPMENT.md` | 公开开发说明与必要验收摘要 |
@@ -58,7 +59,7 @@ GitHub入口为 `https://github.com/siwenyu1213/LingoClarify`。本地目录与�
 
 DeepSeek官方hostname精确匹配后，分别读取 `explainDeepSeekThinkingEnabled` / `translateDeepSeekThinkingEnabled`，显式发送 `thinking.enabled/disabled`。默认关闭；关闭时归一化该用途的深度思考为false、不发送 `reasoning_effort`。打开总开关后，原 `*ThinkingEnabled` 控制是否发送强度。两层开关均纳入请求缓存与配置失效判断；第三方网关不凭模型名套用。
 
-设置页共用“划词触发方式”位于两面板的思考强度区域下方，保存 `triggerMode: auto/contextMenu`；已有网页通过storage变化即时更新。原生选区菜单始终注册，两种模式均可点击。
+“划词触发”仅在“解释”页的语言行显示，保存 `triggerMode: auto/contextMenu`；已有网页通过storage变化即时更新。原生选区菜单始终注册，两种模式均可点击。“全文翻译”页在目标语言下方提示：在页面空白处右键，选择「全文翻译」。
 
 ## 最低检查
 
@@ -137,6 +138,50 @@ git diff --cached
 ```
 
 GitHub同步必须核对远程提交和默认分支内容，不能把本地commit或模拟通过当作上传成功。
+
+## 2026-10-16 PR #15与主分支文档冲突修复
+
+从干净的codex/ui-reading-redesign@915fde6合入origin/main@fe48131，解决README三个冲突区块和本手册一个记录区块。README保留main新版首页、截图、隐私摘要和政策入口，补回当前分支的商店语言说明、模型品牌简称及解释页划词触发位置；开发记录保留两边内容。当前分支的界面、触发提示、语言资源及验证工具保持原样，PRIVACY正文与main一致，版本仍1.0.0。
+
+Node24.18.1下56项静态检查、文档链接/图片引用检查、冲突标记扫描及git diff --check通过；对照915fde6核验运行源码、manifest和语言包无新差异，对照main核验公开截图/来源及政策正文一致。证据位于artifacts/qa/pr15-conflict-2026-10-16/。本轮只解决文档整合，未重复Edge交互或真实供应商验收；普通推送后核验GitHub PR状态。扩展代码未因本轮冲突修复改变，无需额外重新加载；此前界面更新的使用方式见对应记录。
+
+## 2026-10-16 选择列表品牌简称
+
+基线 `codex/ui-reading-redesign@375010b`，工作区干净，fetch后领先上游6个提交、无落后。popup.js仅在厂家选项渲染时应用品牌简称：GPT、Claude、Gemini、Qwen、Kimi、GLM、Grok、Mistral；DeepSeek、MiniMax和自定义接口沿用。两个标签的选择框及展开列表同步，目录原始厂家名称、厂家ID、连接地址、Key和模型ID不变，版本1.0.0。README、既有菜单回归和本地Description同步。
+
+北京时间2026-10-16，Node24.18.1、隔离Edge155.0.4283.45：56项静态、7项菜单/字体回归及git diff --check通过。两标签全部11个选项的简称与原ID已核对；另以合成Anthropic配置验证三主题/两标签/三宽度18组布局、长名称省略及菜单开关，保存重开显示Claude、存储厂家仍anthropic、模型仍claude-sonnet-4-6。证据 `artifacts/qa/model-brand-labels/report.json`、`claude/report.json`、`claude/settings-390.png` 和 `artifacts/qa/static-check.json`，截图已目视复核。未调用真实供应商API或验证原生工具栏弹出层；仅本地提交，重新加载扩展并打开设置页查看。
+
+## 2026-10-16 厂家选择框外观
+
+再向右微调（基线 `1530051`，工作区干净）：名称由translateX(-2ch)改为-1ch，即相对上一版右移一个字符；14px/700字重沿用。Node24.18.1、隔离Edge155.0.4283.45下18组布局、两组合成长名称省略及菜单开关验证通过，56静态和git diff --check通过，390px截图已复核。证据 `artifacts/qa/manufacturer-label-right/report.json` 与同目录截图；未验证原生工具栏弹出层或真实API，版本1.0.0，仅本地提交。
+
+后续文字微调（基线 `81ead46`，工作区干净）：厂家名称12→14px、字重700，从原居中位置左移2ch（DeepSeek实测约18px），垂直位置保留。Node24.18.1、隔离Edge155.0.4283.45下，三主题/两标签/390、320、260px共18组布局及390/260px合成长名称省略检查通过，菜单点击/Escape正常；56项静态与git diff --check通过。截图已复核，证据 `artifacts/qa/manufacturer-label/report.json` 及同目录 `settings-390.png`、`settings-320.png`、`settings-260.png`。未验证原生工具栏弹出层与真实API；仅本地提交，版本1.0.0。
+
+基线 `codex/ui-reading-redesign@0afcd26`，起始工作区干净。仅调整popup.css：厂家框边框由1px加粗至2px、圆角10px，内部按钮圆角8px；厂家文字相对整个框水平/垂直居中，两侧等宽预留空间，右侧保留箭头，按钮覆盖框内高度。解释与全文翻译共用样式，版本仍1.0.0。
+
+北京时间2026-10-16，Node24.18.1、隔离Edge155.0.4283.45：56项静态检查、git diff --check、7项既有下拉菜单/字体交互回归通过。以合成配置验证三主题×两个标签×390/320/260px共18组布局，2px边框和10px圆角正常，文字中心与框中心横向误差小于1px、纵向误差小于2px，箭头不遮文字且页面无横向溢出；点击打开/Escape关闭正常，无页面脚本错误。证据 `artifacts/qa/manufacturer-box/report.json`、`settings-390.png`、`settings-320.png`、`settings-260.png`、`menu/report.json` 及 `artifacts/qa/static-check.json`，390px截图已目视复核。未验证原生工具栏弹出层或真实供应商API；仅本地提交，重新加载扩展并打开设置页查看。
+
+## 2026-10-16 全文翻译触发提示
+
+基线 `codex/ui-reading-redesign@ab914e8`，起始工作区干净，fetch后领先上游2个提交、无落后。划词触发控件固定留在“解释”页；“全文翻译”页的目标语言下方显示“在页面空白处右键，选择「全文翻译」。”，语言区域改为单列。同步README、既有主题回归与本地Description，版本保持1.0.0。
+
+北京时间2026-10-16，Node24.18.1、Edge155.0.4283.45：56项静态、19项主题/设置回归及git diff --check通过。隔离Edge实际加载根目录扩展，验证标签切换、划词触发草稿保留及保存/重开；390/320/260px下提示均位于目标语言下方且无横向溢出，截图已复核。证据 `artifacts/qa/fullpage-trigger-hint/report.json`、`hint.json`、`translate-390.png`、`translate-320.png`、`translate-260.png` 和 `artifacts/qa/static-check.json`。采用合成配置及本机接口，未验证真实供应商、原生工具栏弹出窗口与系统右键鼠标操作。本轮仅本地提交；重新加载扩展后重新打开设置页即可查看。
+
+## 2026-10-16 商店中文语言资源补齐
+
+基线 `codex/ui-reading-redesign@b8182ec`，起始工作区干净，fetch后领先上游1个提交且无落后。manifest的name、description和action.default_title改用消息引用，default_locale为zh_CN；新增 `_locales/zh_CN/messages.json` 与 `_locales/en/messages.json`，保留中英文商店元数据，界面文案沿用中文。verify.mjs增加语言目录、默认语言、消息引用与名称/简介长度检查。README与本手册同步目录说明，Description仅本地维护。
+
+沿用草稿版本1.0.0和原包文件名 `LingoClarify-Edge-v1.0.0-20261016-212308.zip`。新ZIP为41个文件（原39个运行/第三方文件加两份messages.json），manifest位于根目录；除manifest外的原运行资源逐一与旧包清单SHA-256核对一致。新包SHA-256为 `b9a9a26e60170da6d19469bac14a5d265aa6647a2ffb63cbc9ebf5ae74fd4bbb`，验证完成后复制至桌面并更新artifacts/releases同名包。旧包备份在 `artifacts/releases/backups/store-locales-20261016/`，SHA-256仍为 `48afd28141b0f03d55d65331fcb4bc075bff1b47e5bbf0a5e7f367a0f7b11ff7`。ZIP不含开发文档、验证工具、私有文件或浏览器配置。
+
+Node24.18.1、Edge155.0.4283.45：根目录56项静态、成品解压40项静态和git diff --check通过；隔离Edge分别以zh-CN/en-US实际加载成品，i18n与getManifest解析出对应简介，默认语言zh_CN、action标题正常，设置页v1.0.0且无pageerror。证据：`artifacts/qa/store-locales-20261016/package.json`、`browser.json`、`extracted-static.json`、中英文设置截图及桌面复制哈希记录。本轮未请求真实模型API、未上传Partner Center，也未验证后台语言识别结果；上传后应在Store listings复核简体中文条目。仅本地提交，不推送GitHub。
+
+## 2026-10-16 Edge商店提交包（首次打包，语言资源由上节补齐）
+
+从干净的 `codex/ui-reading-redesign@090150f` 打包当前1.0.0运行文件，未修改运行源码或版本。产物为 `artifacts/releases/LingoClarify-Edge-v1.0.0-20261016-212308.zip`，39个文件、13,947,400字节；manifest.json直接位于ZIP根目录，保留根目录JS/HTML/CSS、图标、第三方脚本、本地字体、许可证与第三方来源说明。开发文档、验证工具、Git历史、Description.md、私有材料、浏览器配置、日志和source map不进入提交包。
+
+Node24.18.1下项目55项静态检查、解压成品39项静态检查及git diff --check通过；逐文件SHA-256确认解压内容与打包快照、当前运行文件一致。成品SHA-256为 `48afd28141b0f03d55d65331fcb4bc075bff1b47e5bbf0a5e7f367a0f7b11ff7`。清单及逐项哈希见 `artifacts/qa/LingoClarify-Edge-v1.0.0-20261016-212308/package-report.json`，解压检查见同目录 `extracted-static-check.json`。验证脚本仅在解压后加入临时验证目录，ZIP内不含该脚本。
+
+本轮仅完成本地打包与静态完整性检查，没有重复Edge交互、真实供应商API验收，也没有上传Partner Center或确认商店审核通过。提交时直接选择此ZIP；本地预检可将其解压，在edge://extensions加载包含manifest.json的目录，再按README配置厂家、Key和模型。
 
 ## 2026-10-16 隐私政策PR冲突修复
 

@@ -24,8 +24,8 @@ button { cursor: pointer; }
 .field-pair { display: grid; grid-template-columns: minmax(112px,.9fr) minmax(0,1.7fr); gap: 12px; }
 .field-pair > div { min-width: 0; }
 .model-pair { padding-bottom: 12px; margin-bottom: 7px; border-bottom: 1px solid var(--lc-rule); }
-.manufacturer-field { display: flex; align-items: center; border: 1px solid var(--lc-border); min-height: 56px; }
-.manufacturer-field .select { font-size: 12px; padding-inline: 5px; }
+.manufacturer-field { display: flex; align-items: stretch; border: 2px solid var(--lc-border); border-radius: 10px; min-height: 56px; }
+.manufacturer-field .select { font-size: 14px; font-weight: 700; padding-inline: 5px; text-align: center; }
 .model-field { display: flex; align-items: center; }
 .model-field .select { font: 500 15px/1.4 var(--lc-body-font); padding-inline: 0; }
 .model-field .select:has(option[value='']:only-child) { font: 12px/1.5 var(--lc-body-font); }
@@ -55,6 +55,7 @@ button { cursor: pointer; }
 .reading-preferences > div + div { border-left: 1px solid var(--lc-rule); padding-left: 16px; }
 .reading-preferences .section { margin: 0; }
 .reading-preferences .select { padding-left: 0; min-height: 30px; font-size: 12px; }
+.fullpage-preferences { grid-template-columns: minmax(0,1fr); }
 .key-section { margin-top: 8px; margin-bottom: 4px; }
 .key-saved { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; min-height: 30px; font-size: 12px; }
 .key-saved > span, .key-saved .mini-btn { flex-shrink: 0; white-space: nowrap; }
@@ -114,6 +115,11 @@ dialog h2 { font: 400 23px/1.4 var(--lc-title-font); margin-bottom: 15px; }
 .lc-select-caret svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .lc-select-trigger[aria-expanded='true'] .lc-select-caret { transform: rotate(180deg); }
 .lc-select-trigger:disabled { cursor: default; opacity: .65; }
+/* 厂家文字从居中位置左移约一个字符，箭头独占右侧。 */
+.manufacturer-field .lc-select { display: flex; align-items: stretch; }
+.manufacturer-field .lc-select-trigger { display: grid; grid-template-columns: 14px minmax(0,1fr) 14px; gap: 0; border-radius: 8px; }
+.manufacturer-field .lc-select-value { grid-column: 2; max-width: 100%; text-align: center; transform: translateX(-1ch); }
+.manufacturer-field .lc-select-caret { grid-column: 3; }
 .lc-select-menu {
   position: fixed; inset: auto; margin: 0; padding: 6px; border: 1px solid var(--lc-rule);
   border-radius: 10px; background: var(--lc-surface); color: var(--lc-ink);
